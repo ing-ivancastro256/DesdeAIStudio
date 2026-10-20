@@ -3380,7 +3380,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Library / Properties Panel */}
         {!isPreviewMode && (
-          <aside className="w-80 bg-white border-r border-zinc-200 flex flex-col h-full shrink-0 overflow-hidden shadow-xs z-20">
+          <aside id="inspector-panel-sidebar" className="w-80 bg-white border-r border-zinc-200 flex flex-col h-full shrink-0 overflow-hidden shadow-xs z-20">
             {selectedElement ? (
               /* PROPERTY INSPECTOR FOR SELECTED ELEMENT */
               <div className="flex-1 flex flex-col h-full">
@@ -4675,7 +4675,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       >
                         <span className="flex items-center gap-1.5">
                           <Palette className="w-3.5 h-3.5 text-zinc-500" />
-                          Color y Fondo
+                          {selectedElement.type === 'button' ? 'Color y Fondo' : 'Color del texto'}
                         </span>
                         {openSections.colors ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                       </button>
@@ -4705,16 +4705,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 onChange={(val) => updateSelectedElement({ borderRadius: val })}
                               />
                             </>
-                          )}
-
-                          {selectedElement.type === 'bullet_list' && (
-                            <HexColorPicker
-                              label="Color del icono / viñeta:"
-                              value={selectedElement.styles.bulletColor || selectedElement.styles.textColor || '#2848F0'}
-                              onOpen={handleColorPickerOpen}
-                              onClose={handleColorPickerClose}
-                              onChange={(val) => updateSelectedElement({ bulletColor: val })}
-                            />
                           )}
                         </div>
                       )}
@@ -6097,6 +6087,27 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
                       <div className="w-[1px] h-3.5 bg-amber-400 mx-0.5" />
 
+                      {/* Section Settings (Tuerca de Configuración) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSectionId(section.id);
+                          setSelectedElementId(null);
+                          setSelectedRowId(null);
+                          const inspectorEl = document.getElementById('inspector-panel-sidebar');
+                          if (inspectorEl) {
+                            inspectorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }}
+                        className="p-1 rounded hover:bg-amber-700 transition-colors cursor-pointer flex items-center justify-center"
+                        title="Configuración de la sección"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-white" />
+                      </button>
+
+                      <div className="w-[1px] h-3.5 bg-amber-400 mx-0.5" />
+
                       {/* Duplicate Section */}
                       <button
                         type="button"
@@ -6224,6 +6235,25 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             <Box className="w-3.5 h-3.5 text-white" />
                             <span>{row.name || `Sección Interna (${row.columns.length} Col)`}</span>
                           </div>
+                          <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
+                          {/* Row Settings (Tuerca de Configuración) */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRowId(row.id);
+                              setSelectedSectionId(section.id);
+                              setSelectedElementId(null);
+                              const inspectorEl = document.getElementById('inspector-panel-sidebar');
+                              if (inspectorEl) {
+                                inspectorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }
+                            }}
+                            className="p-1 hover:bg-indigo-700 rounded transition-colors cursor-pointer flex items-center"
+                            title="Configuración de la sección interna"
+                          >
+                            <Settings className="w-3 h-3 text-white" />
+                          </button>
                           <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
                           <button
                             type="button"
@@ -6430,6 +6460,28 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                           <Move className="w-3.5 h-3.5 text-white" />
                                           <span className="font-['Poppins'] font-bold">{element.type}</span>
                                         </div>
+
+                                        {/* Divider */}
+                                        <div className="w-[1px] h-3.5 bg-blue-400" />
+
+                                        {/* Element Settings (Tuerca de Configuración) */}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedElementId(element.id);
+                                            setSelectedSectionId(section.id);
+                                            setSelectedRowId(null);
+                                            const inspectorEl = document.getElementById('inspector-panel-sidebar');
+                                            if (inspectorEl) {
+                                              inspectorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }
+                                          }}
+                                          className="p-1 rounded hover:bg-blue-600 transition-colors cursor-pointer flex items-center justify-center"
+                                          title="Configuración del elemento"
+                                        >
+                                          <Settings className="w-3.5 h-3.5 text-white" />
+                                        </button>
 
                                         {/* Divider */}
                                         <div className="w-[1px] h-3.5 bg-blue-400" />
@@ -6737,9 +6789,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                               <span
                                                 className="shrink-0 flex items-center justify-center select-none"
                                                 style={{
-                                                  marginRight: element.styles.textAlign === 'right' ? undefined : `${element.styles.bulletSpacing ?? 10}px`,
-                                                  marginLeft: element.styles.textAlign === 'right' ? `${element.styles.bulletSpacing ?? 10}px` : undefined,
-                                                  order: element.styles.textAlign === 'right' ? 2 : 1,
+                                                  marginRight: `${element.styles.bulletSpacing ?? 10}px`,
                                                   marginTop: `${Math.max(2, Math.round((element.styles.fontSize || 15) * 0.18))}px`,
                                                 }}
                                               >
@@ -6751,9 +6801,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                               </span>
                                               <div
                                                 style={{
-                                                  order: element.styles.textAlign === 'right' ? 1 : 2,
-                                                  flex: element.styles.textAlign === 'center' ? '0 1 auto' : '1 1 auto',
+                                                  flex: element.styles.textAlign === 'center' || element.styles.textAlign === 'right' ? '0 1 auto' : '1 1 auto',
                                                   minWidth: 0,
+                                                  textAlign: element.styles.textAlign || 'left',
                                                 }}
                                               >
                                                 <InlineEditableText

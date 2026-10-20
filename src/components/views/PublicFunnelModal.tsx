@@ -601,9 +601,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                 <span
                   className="shrink-0 flex items-center justify-center select-none"
                   style={{
-                    marginRight: element.styles?.textAlign === 'right' ? undefined : `${element.styles?.bulletSpacing ?? 10}px`,
-                    marginLeft: element.styles?.textAlign === 'right' ? `${element.styles?.bulletSpacing ?? 10}px` : undefined,
-                    order: element.styles?.textAlign === 'right' ? 2 : 1,
+                    marginRight: `${element.styles?.bulletSpacing ?? 10}px`,
                     marginTop: `${Math.max(2, Math.round((element.styles?.fontSize || 15) * 0.18))}px`,
                   }}
                 >
@@ -615,7 +613,9 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                 </span>
                 <div
                   style={{
-                    order: element.styles?.textAlign === 'right' ? 1 : 2,
+                    flex: element.styles?.textAlign === 'center' || element.styles?.textAlign === 'right' ? '0 1 auto' : '1 1 auto',
+                    minWidth: 0,
+                    textAlign: element.styles?.textAlign || 'left',
                     fontSize: `${element.styles?.fontSize || 15}px`,
                     fontFamily: element.styles?.fontFamily || activePage?.settings?.bodyFontFamily || 'Inter',
                     color: element.styles?.textColor || activePage?.settings?.textColor || '#121111',
