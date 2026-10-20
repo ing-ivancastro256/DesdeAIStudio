@@ -1,0 +1,6 @@
+{
+  "name": "Scale Sales Pro (SSP)",
+  "description": "SaaS B2B para profesionales y negocios de servicios que convierte tráfico de redes sociales en citas agendadas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
