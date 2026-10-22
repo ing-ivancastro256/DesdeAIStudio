@@ -237,6 +237,11 @@ export const INITIAL_FUNNEL: Funnel = {
       title: 'Página de Captura / Landing',
       position: 1,
       settings: {
+        pageWidthType: 'boxed',
+        pageContentMaxWidth: 1200,
+        pageBorderRadius: 0,
+        pagePaddingTop: 0,
+        pagePaddingBottom: 0,
         seo_title: 'Cómo Escalar tu Negocio de Servicios B2B | Valenzuela Consulting',
         seo_description: 'Descubre el sistema paso a paso para agendar llamadas con tomadores de decisiones.',
       },
@@ -336,7 +341,13 @@ export const INITIAL_FUNNEL: Funnel = {
       page_type: 'vsl',
       title: 'VSL / Carta de Ventas',
       position: 2,
-      settings: {},
+      settings: {
+        pageWidthType: 'boxed',
+        pageContentMaxWidth: 1200,
+        pageBorderRadius: 0,
+        pagePaddingTop: 0,
+        pagePaddingBottom: 0,
+      },
       sections: [
         {
           id: 'sec_vsl_hero',
@@ -412,7 +423,13 @@ export const INITIAL_FUNNEL: Funnel = {
       page_type: 'qualification',
       title: 'Filtro de Calificación',
       position: 3,
-      settings: {},
+      settings: {
+        pageWidthType: 'boxed',
+        pageContentMaxWidth: 1200,
+        pageBorderRadius: 0,
+        pagePaddingTop: 0,
+        pagePaddingBottom: 0,
+      },
       sections: [
         {
           id: 'sec_qual_1',
@@ -480,7 +497,13 @@ export const INITIAL_FUNNEL: Funnel = {
       page_type: 'calendar',
       title: 'Agendamiento de Cita',
       position: 4,
-      settings: {},
+      settings: {
+        pageWidthType: 'boxed',
+        pageContentMaxWidth: 1200,
+        pageBorderRadius: 0,
+        pagePaddingTop: 0,
+        pagePaddingBottom: 0,
+      },
       sections: [
         {
           id: 'sec_cal_1',
@@ -547,7 +570,13 @@ export const INITIAL_FUNNEL: Funnel = {
       page_type: 'thank_you',
       title: 'Página de Gracias y Confirmación',
       position: 5,
-      settings: {},
+      settings: {
+        pageWidthType: 'boxed',
+        pageContentMaxWidth: 1200,
+        pageBorderRadius: 0,
+        pagePaddingTop: 0,
+        pagePaddingBottom: 0,
+      },
       sections: [
         {
           id: 'sec_ty_1',

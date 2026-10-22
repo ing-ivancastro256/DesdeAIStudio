@@ -42,6 +42,11 @@ import {
   Eye,
   EyeOff,
   Radio,
+  Timer,
+  HelpCircle,
+  Share2,
+  CheckSquare,
+  TextCursorInput,
 } from 'lucide-react';
 
 interface StructureNavigatorProps {
@@ -101,6 +106,16 @@ const getElementIcon = (type: ElementType) => {
       return <FileText className="w-3.5 h-3.5 text-zinc-600 shrink-0" />;
     case 'popup_button':
       return <ExternalLink className="w-3.5 h-3.5 text-pink-600 shrink-0" />;
+    case 'countdown':
+      return <Timer className="w-3.5 h-3.5 text-orange-600 shrink-0" />;
+    case 'faq':
+      return <HelpCircle className="w-3.5 h-3.5 text-indigo-600 shrink-0" />;
+    case 'social_links':
+      return <Share2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />;
+    case 'checkbox':
+      return <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />;
+    case 'input_field':
+      return <TextCursorInput className="w-3.5 h-3.5 text-cyan-600 shrink-0" />;
     default:
       return <Box className="w-3.5 h-3.5 text-zinc-500 shrink-0" />;
   }
@@ -137,7 +152,7 @@ const getElementName = (el: PageBlockElement) => {
     case 'form':
       return 'Formulario';
     case 'simple_form':
-      return 'Formulario Simple';
+      return 'Formulario';
     case 'popup_button':
       return 'Botón Pop-up';
     case 'calendar':
@@ -146,10 +161,20 @@ const getElementName = (el: PageBlockElement) => {
       return 'Divisor';
     case 'spacer':
       return 'Espaciador';
+    case 'countdown':
+      return 'Cuenta Regresiva';
+    case 'faq':
+      return 'Preguntas Frecuentes';
+    case 'social_links':
+      return 'Redes Sociales';
+    case 'checkbox':
+      return 'Casilla de Verificación';
+    case 'input_field':
+      return 'Campo de Formulario';
     case 'icon':
-      return 'SVG / Icono';
+      return 'Icono';
     case 'audio':
-      return 'Audio / SoundCloud';
+      return 'Audio / Música';
     default:
       return 'Elemento';
   }

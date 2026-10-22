@@ -210,14 +210,14 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
                       type="button"
                       onClick={() => onUpdate({ pageBorderRadius: preset.val })}
                       className={`py-2 px-1 border rounded-lg text-center transition-all cursor-pointer ${
-                        (settings.pageBorderRadius ?? 16) === preset.val
+                        (settings.pageBorderRadius ?? 0) === preset.val
                           ? 'bg-[#2848F0] text-white border-[#2848F0] font-bold shadow-2xs'
                           : 'border-zinc-200 bg-white hover:border-[#2848F0] text-zinc-700'
                       }`}
                     >
                       <div className="font-mono text-xs font-bold">{preset.label}</div>
                       <div className={`text-[10px] ${
-                        (settings.pageBorderRadius ?? 16) === preset.val ? 'text-blue-100' : 'text-zinc-400'
+                        (settings.pageBorderRadius ?? 0) === preset.val ? 'text-blue-100' : 'text-zinc-400'
                       }`}>
                         {preset.desc}
                       </div>
@@ -227,7 +227,7 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
 
                 <NumberControl
                   label="Radio de Esquinas Personalizado"
-                  value={settings.pageBorderRadius ?? 16}
+                  value={settings.pageBorderRadius ?? 0}
                   min={0}
                   max={64}
                   step={1}
@@ -241,16 +241,16 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
                 <div className="space-y-0.5">
                   <div className="text-[11px] font-semibold text-zinc-700">Previsualización de Esquinas</div>
                   <div className="text-[10px] text-zinc-500 font-mono">
-                    border-radius: {settings.pageBorderRadius ?? 16}px
+                    border-radius: {settings.pageBorderRadius ?? 0}px
                   </div>
                 </div>
                 <div
                   className="w-12 h-10 border-2 border-[#2848F0] bg-blue-50/70 transition-all flex items-center justify-center text-[10px] font-mono font-bold text-[#2848F0]"
                   style={{
-                    borderRadius: `${settings.pageBorderRadius ?? 16}px`,
+                    borderRadius: `${settings.pageBorderRadius ?? 0}px`,
                   }}
                 >
-                  {settings.pageBorderRadius ?? 16}
+                  {settings.pageBorderRadius ?? 0}
                 </div>
               </div>
 
@@ -436,14 +436,14 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
             <div className="p-3.5 space-y-3 bg-white text-xs">
               <NumberControl
                 label="Padding Superior del Canvas"
-                value={settings.pagePaddingTop || 0}
+                value={settings.pagePaddingTop ?? 0}
                 min={0}
                 max={160}
                 onChange={(val) => onUpdate({ pagePaddingTop: val })}
               />
               <NumberControl
                 label="Padding Inferior del Canvas"
-                value={settings.pagePaddingBottom || 40}
+                value={settings.pagePaddingBottom ?? 0}
                 min={0}
                 max={160}
                 onChange={(val) => onUpdate({ pagePaddingBottom: val })}

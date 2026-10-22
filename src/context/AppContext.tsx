@@ -235,6 +235,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             pages: (f.pages || []).map((p) => ({
               ...p,
               funnel_id: f.id,
+              settings: {
+                ...p.settings,
+                pageWidthType: p.settings?.pageWidthType || 'boxed',
+                pageContentMaxWidth: p.settings?.pageContentMaxWidth || 1200,
+                pageBorderRadius:
+                  p.settings?.pageBorderRadius === undefined || p.settings?.pageBorderRadius === 16
+                    ? 0
+                    : p.settings.pageBorderRadius,
+                pagePaddingTop: p.settings?.pagePaddingTop ?? 0,
+                pagePaddingBottom:
+                  p.settings?.pagePaddingBottom === undefined || p.settings?.pagePaddingBottom === 40
+                    ? 0
+                    : p.settings.pagePaddingBottom,
+              },
             })),
           }));
         }

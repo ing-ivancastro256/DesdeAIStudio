@@ -18,6 +18,7 @@ import {
   Layout,
   Layers,
   Sparkles,
+  Clock,
 } from 'lucide-react';
 
 
@@ -82,6 +83,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
     margin: true,
     borders: false,
     layout: false,
+    delay: false,
   });
 
   const toggleAccordion = (key: string) => {
@@ -571,6 +573,152 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                 value={section.borderColor || '#E4E4E7'}
                 onChange={(val) => onUpdate({ borderColor: val })}
               />
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* ACCORDION 5: RETARDO DE APARICIÓN (DELAY)                      */}
+        {/* ============================================================== */}
+        <div className="border border-zinc-200 rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleAccordion('delay')}
+            className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5 text-xs">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              Retardo de Aparición (Delay)
+            </span>
+            <div className="flex items-center gap-1.5">
+              {((section.delayMinutes || 0) * 60 + (section.delaySeconds || 0)) > 0 && (
+                <span className="text-[10px] font-mono bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">
+                  {(section.delayMinutes || 0) > 0 ? `${section.delayMinutes}m ` : ''}
+                  {section.delaySeconds || 0}s
+                </span>
+              )}
+              {openSections.delay ? (
+                <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+              )}
+            </div>
+          </button>
+
+          {openSections.delay && (
+            <div className="p-3.5 space-y-3.5 bg-white text-xs font-['Inter']">
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                Configura un retardo en minutos y segundos para que esta sección externa aparezca de forma gradual una vez cargada la página.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="font-semibold text-zinc-700 block mb-1">
+                    Minutos:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={section.delayMinutes ?? 0}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(60, parseInt(e.target.value, 10) || 0));
+                        onUpdate({ delayMinutes: val });
+                      }}
+                      className="w-full p-2 pr-7 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
+                    />
+                    <span className="absolute right-2 top-2 text-[10px] font-bold text-zinc-400 select-none">
+                      min
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-zinc-700 block mb-1">
+                    Segundos:
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={section.delaySeconds ?? 0}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
+                        onUpdate({ delaySeconds: val });
+                      }}
+                      className="w-full p-2 pr-7 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
+                    />
+                    <span className="absolute right-2 top-2 text-[10px] font-bold text-zinc-400 select-none">
+                      seg
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Presets */}
+              <div>
+                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-1.5">
+                  Atajos rápidos:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: '0s (Inmediato)', m: 0, s: 0 },
+                    { label: '5 seg', m: 0, s: 5 },
+                    { label: '10 seg', m: 0, s: 10 },
+                    { label: '15 seg', m: 0, s: 15 },
+                    { label: '30 seg', m: 0, s: 30 },
+                    { label: '1 min', m: 1, s: 0 },
+                  ].map((preset) => {
+                    const isSelected =
+                      (section.delayMinutes || 0) === preset.m &&
+                      (section.delaySeconds || 0) === preset.s;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => onUpdate({ delayMinutes: preset.m, delaySeconds: preset.s })}
+                        className={`py-1.5 px-1 rounded-md text-[11px] font-semibold border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                            : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Status summary */}
+              <div
+                className={`p-2.5 rounded-lg border text-[11px] leading-relaxed flex items-start gap-2 ${
+                  ((section.delayMinutes || 0) * 60 + (section.delaySeconds || 0)) > 0
+                    ? 'bg-amber-50 border-amber-200 text-amber-900'
+                    : 'bg-zinc-50 border-zinc-200 text-zinc-600'
+                }`}
+              >
+                <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                <div>
+                  {((section.delayMinutes || 0) * 60 + (section.delaySeconds || 0)) > 0 ? (
+                    <>
+                      <p className="font-semibold">
+                        Aparecerá a los{' '}
+                        {(section.delayMinutes || 0) > 0 ? `${section.delayMinutes}m ` : ''}
+                        {section.delaySeconds || 0}s (
+                        {(section.delayMinutes || 0) * 60 + (section.delaySeconds || 0)} segundos)
+                      </p>
+                      <p className="text-[10px] text-amber-700 mt-0.5">
+                        En el editor permanece siempre visible para editar. Compruébalo en Vista Previa o en la página pública.
+                      </p>
+                    </>
+                  ) : (
+                    <p>Aparición inmediata al cargar la página (sin retardo).</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

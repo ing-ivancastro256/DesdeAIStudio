@@ -24,7 +24,15 @@ import { IconElement } from '../editor/elements/IconElement';
 import { SimpleFormElement } from '../editor/elements/SimpleFormElement';
 import { PopupButtonElement } from '../editor/elements/PopupButtonElement';
 import { EmbeddedVideoPlayer } from '../common/EmbeddedVideoPlayer';
+import { DelayedAppearance } from '../common/DelayedAppearance';
 import { renderBulletIcon } from '../../utils/bulletIcons';
+import {
+  CountdownTimerWidget,
+  FaqAccordionWidget,
+  SocialLinksWidget,
+  CheckboxWidget,
+  InputFieldWidget,
+} from '../editor/elements/ConversionWidgets';
 
 interface PublicFunnelModalProps {
   isOpen: boolean;
@@ -740,6 +748,110 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
       case 'calendar':
         return <React.Fragment key={element.id || eIdx}>{renderCalendarBooking()}</React.Fragment>;
 
+      case 'countdown':
+        return (
+          <div
+            key={element.id || eIdx}
+            style={{
+              textAlign: element.styles?.textAlign || 'center',
+              marginTop: `${element.styles?.marginTop || 0}px`,
+              marginBottom: `${element.styles?.marginBottom ?? 20}px`,
+            }}
+            className="w-full"
+          >
+            <CountdownTimerWidget
+              endDate={element.content.countdownEndDate}
+              daysLabel={element.content.countdownDaysLabel}
+              hoursLabel={element.content.countdownHoursLabel}
+              minutesLabel={element.content.countdownMinutesLabel}
+              secondsLabel={element.content.countdownSecondsLabel}
+              theme={element.content.countdownTheme || 'dark'}
+            />
+          </div>
+        );
+
+      case 'faq':
+        return (
+          <div
+            key={element.id || eIdx}
+            style={{
+              marginTop: `${element.styles?.marginTop || 0}px`,
+              marginBottom: `${element.styles?.marginBottom ?? 20}px`,
+            }}
+            className="w-full"
+          >
+            <FaqAccordionWidget items={element.content.faqItems} />
+          </div>
+        );
+
+      case 'social_links':
+        return (
+          <div
+            key={element.id || eIdx}
+            style={{
+              textAlign: element.styles?.textAlign || 'center',
+              marginTop: `${element.styles?.marginTop || 0}px`,
+              marginBottom: `${element.styles?.marginBottom ?? 20}px`,
+            }}
+            className="w-full"
+          >
+            <SocialLinksWidget
+              links={element.content.socialLinks}
+              size={element.content.socialSize || 'md'}
+              styleType={element.content.socialStyle || 'colored'}
+              colorMode={element.content.socialColorMode || 'default'}
+              iconColor={element.content.socialIconColor || '#FFFFFF'}
+              bgColor={element.content.socialBgColor || '#2848F0'}
+              shape={element.content.socialShape || 'circle'}
+            />
+          </div>
+        );
+
+      case 'checkbox':
+        return (
+          <div
+            key={element.id || eIdx}
+            style={{
+              textAlign: element.styles?.textAlign || 'left',
+              marginTop: `${element.styles?.marginTop || 0}px`,
+              marginBottom: `${element.styles?.marginBottom ?? 16}px`,
+            }}
+            className="w-full"
+          >
+            <CheckboxWidget
+              label={element.content.checkboxLabel}
+              checked={element.content.checkboxChecked}
+              required={element.content.checkboxRequired}
+            />
+          </div>
+        );
+
+      case 'input_field':
+        return (
+          <div
+            key={element.id || eIdx}
+            style={{
+              display: 'flex',
+              justifyContent:
+                element.styles?.textAlign === 'center'
+                  ? 'center'
+                  : element.styles?.textAlign === 'right'
+                  ? 'flex-end'
+                  : 'flex-start',
+              marginTop: `${element.styles?.marginTop || 0}px`,
+              marginBottom: `${element.styles?.marginBottom ?? 16}px`,
+            }}
+            className="w-full"
+          >
+            <InputFieldWidget
+              label={element.content.fieldLabel}
+              placeholder={element.content.fieldPlaceholder}
+              type={element.content.fieldType || 'email'}
+              required={element.content.fieldRequired}
+            />
+          </div>
+        );
+
       default:
         return (
           <div key={element.id || eIdx} className="my-2 p-2 text-xs text-zinc-500">
@@ -786,85 +898,98 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
     }
 
     return (
-      <div key={section.id || secIdx} style={sectionStyle} className="relative overflow-hidden w-full">
-        {/* Overlay for image background */}
-        {effectiveBgType === 'image' && (section.bgOverlayType || 'dark') !== 'none' && (
+      <DelayedAppearance
+        key={section.id || secIdx}
+        delayMinutes={section.delayMinutes}
+        delaySeconds={section.delaySeconds}
+        active={true}
+      >
+        <div style={sectionStyle} className="relative overflow-hidden w-full">
+          {/* Overlay for image background */}
+          {effectiveBgType === 'image' && (section.bgOverlayType || 'dark') !== 'none' && (
+            <div
+              className="absolute inset-0 pointer-events-none z-0"
+              style={{
+                backgroundColor:
+                  (section.bgOverlayType || 'dark') === 'dark' ? '#000000' : '#FFFFFF',
+                opacity: (section.bgOverlayOpacity ?? 60) / 100,
+              }}
+            />
+          )}
+
           <div
-            className="absolute inset-0 pointer-events-none z-0"
+            className="relative z-1 mx-auto"
             style={{
-              backgroundColor:
-                (section.bgOverlayType || 'dark') === 'dark' ? '#000000' : '#FFFFFF',
-              opacity: (section.bgOverlayOpacity ?? 60) / 100,
-            }}
-          />
-        )}
-
-        <div
-          className="relative z-1 mx-auto"
-          style={{
-            maxWidth:
-              activePage?.settings?.pageWidthType === 'full'
-                ? '100%'
-                : `${activePage?.settings?.pageContentMaxWidth || 1200}px`,
-            width: '100%',
-          }}
-        >
-          {section.rows.map((row, rIdx) => {
-            const rowShadowClass =
-              row.shadow === 'sm'
-                ? 'shadow-xs'
-                : row.shadow === 'md'
-                ? 'shadow-md'
-                : row.shadow === 'lg'
-                ? 'shadow-xl'
-                : row.shadow === 'xl'
-                ? 'shadow-2xl'
-                : '';
-
-            const rowStyle: React.CSSProperties = {
               maxWidth:
-                row.widthType === 'boxed' && row.maxWidth
-                  ? `${row.maxWidth}px`
-                  : row.widthType === 'full'
+                activePage?.settings?.pageWidthType === 'full'
                   ? '100%'
-                  : undefined,
-              marginLeft: 'auto',
-              marginRight: 'auto',
-              marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : undefined,
-              marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '24px',
-              paddingTop: row.paddingTop !== undefined ? `${row.paddingTop}px` : undefined,
-              paddingBottom: row.paddingBottom !== undefined ? `${row.paddingBottom}px` : undefined,
-              paddingLeft: row.paddingLeft !== undefined ? `${row.paddingLeft}px` : undefined,
-              paddingRight: row.paddingRight !== undefined ? `${row.paddingRight}px` : undefined,
-              backgroundColor: row.bgColor || undefined,
-              borderRadius: row.borderRadius !== undefined ? `${row.borderRadius}px` : undefined,
-              borderWidth: row.borderWidth !== undefined ? `${row.borderWidth}px` : undefined,
-              borderColor: row.borderColor || undefined,
-              borderStyle: row.borderStyle || (row.borderWidth ? 'solid' : undefined),
-            };
+                  : `${activePage?.settings?.pageContentMaxWidth || 1200}px`,
+              width: '100%',
+            }}
+          >
+            {section.rows.map((row, rIdx) => {
+              const rowShadowClass =
+                row.shadow === 'sm'
+                  ? 'shadow-xs'
+                  : row.shadow === 'md'
+                  ? 'shadow-md'
+                  : row.shadow === 'lg'
+                  ? 'shadow-xl'
+                  : row.shadow === 'xl'
+                  ? 'shadow-2xl'
+                  : '';
 
-            return (
-              <div
-                key={row.id || rIdx}
-                style={rowStyle}
-                className={`relative transition-all ${rowShadowClass}`}
-              >
-                <div className="flex flex-wrap -mx-3">
-                  {row.columns.map((column, cIdx) => (
-                    <div
-                      key={column.id || cIdx}
-                      style={{ width: `${column.widthPercentage}%` }}
-                      className="px-3"
-                    >
-                      {column.elements.map((element, eIdx) => renderElement(element, eIdx))}
+              const rowStyle: React.CSSProperties = {
+                maxWidth:
+                  row.widthType === 'boxed' && row.maxWidth
+                    ? `${row.maxWidth}px`
+                    : row.widthType === 'full'
+                    ? '100%'
+                    : undefined,
+                marginLeft: 'auto',
+                marginRight: 'auto',
+                marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : '0px',
+                marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '0px',
+                paddingTop: row.paddingTop !== undefined ? `${row.paddingTop}px` : undefined,
+                paddingBottom: row.paddingBottom !== undefined ? `${row.paddingBottom}px` : undefined,
+                paddingLeft: row.paddingLeft !== undefined ? `${row.paddingLeft}px` : undefined,
+                paddingRight: row.paddingRight !== undefined ? `${row.paddingRight}px` : undefined,
+                backgroundColor: row.bgColor || undefined,
+                borderRadius: row.borderRadius !== undefined ? `${row.borderRadius}px` : undefined,
+                borderWidth: row.borderWidth !== undefined ? `${row.borderWidth}px` : undefined,
+                borderColor: row.borderColor || undefined,
+                borderStyle: row.borderStyle || (row.borderWidth ? 'solid' : undefined),
+              };
+
+              return (
+                <DelayedAppearance
+                  key={row.id || rIdx}
+                  delayMinutes={row.delayMinutes}
+                  delaySeconds={row.delaySeconds}
+                  active={true}
+                >
+                  <div
+                    style={rowStyle}
+                    className={`relative transition-all ${rowShadowClass}`}
+                  >
+                    <div className="flex flex-wrap -mx-3">
+                      {row.columns.map((column, cIdx) => (
+                        <div
+                          key={column.id || cIdx}
+                          style={{ width: `${column.widthPercentage}%` }}
+                          className="px-3"
+                        >
+                          {column.elements.map((element, eIdx) => renderElement(element, eIdx))}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+                  </div>
+                </DelayedAppearance>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </DelayedAppearance>
     );
   };
 
@@ -913,6 +1038,8 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
             backgroundColor: activePage?.settings?.pageBgColor || '#FFFFFF',
             fontFamily: activePage?.settings?.bodyFontFamily || 'Inter',
             color: activePage?.settings?.textColor || '#121111',
+            paddingTop: `${activePage?.settings?.pagePaddingTop ?? 0}px`,
+            paddingBottom: `${activePage?.settings?.pagePaddingBottom ?? 0}px`,
           }}
         >
           {hasCustomSections ? (

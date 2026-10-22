@@ -13,7 +13,7 @@ export interface NumberControlProps {
 export const NumberControl: React.FC<NumberControlProps> = ({
   label,
   value,
-  min = 1,
+  min = 0,
   max = 120,
   step = 1,
   unit = 'px',
@@ -33,14 +33,11 @@ export const NumberControl: React.FC<NumberControlProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    // Allow user complete freedom to type any number (e.g. "1", "2", "14", "99") or empty
-    // without premature jumping or restrictive clamping on each keystroke!
     if (raw === '' || /^\d*$/.test(raw)) {
       setLocalText(raw);
       if (raw !== '') {
         const num = parseInt(raw, 10);
         if (!isNaN(num)) {
-          // Immediately apply if positive number without forcing min/max jumps
           onChange(num);
         }
       }
@@ -48,22 +45,25 @@ export const NumberControl: React.FC<NumberControlProps> = ({
   };
 
   const handleInputBlur = () => {
+    const minVal = min !== undefined ? min : 0;
+    const maxVal = max !== undefined ? max : 9999;
     if (localText === '' || isNaN(parseInt(localText, 10))) {
-      const fallback = Math.max(1, min);
-      setLocalText(String(fallback));
-      onChange(fallback);
+      setLocalText(String(minVal));
+      onChange(minVal);
     } else {
       const num = parseInt(localText, 10);
-      const effectiveMin = Math.min(min, 1);
-      const clamped = Math.max(effectiveMin, num);
+      const clamped = Math.min(Math.max(minVal, num), maxVal);
       setLocalText(String(clamped));
       onChange(clamped);
     }
   };
 
-  // Ensure slider min is never greater than the current value or 1
-  const safeSliderMin = Math.min(min, typeof value === 'number' && value >= 1 ? value : 1, 1);
-  const safeSliderMax = Math.max(max, typeof value === 'number' && value > max ? value : max, 100);
+  const safeSliderMin = typeof min === 'number' ? min : 0;
+  const safeSliderMax = typeof max === 'number' ? Math.max(max, safeSliderMin) : 120;
+  const currentSliderVal =
+    typeof value === 'number' && !isNaN(value)
+      ? Math.min(Math.max(safeSliderMin, value), safeSliderMax)
+      : safeSliderMin;
 
   return (
     <div className="space-y-1.5 font-['Inter']">
@@ -86,7 +86,7 @@ export const NumberControl: React.FC<NumberControlProps> = ({
         min={safeSliderMin}
         max={safeSliderMax}
         step={step}
-        value={typeof value === 'number' && value >= safeSliderMin ? value : safeSliderMin}
+        value={currentSliderVal}
         onChange={(e) => {
           const num = Number(e.target.value);
           setLocalText(String(num));

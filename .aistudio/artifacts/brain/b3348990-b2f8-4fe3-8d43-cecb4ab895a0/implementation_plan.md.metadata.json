@@ -1,6 +1,6 @@
 {
-  "summary": "Plan arquitectónico para la Configuración Global de Página (ancho completo/boxed, catálogo de 14 Google Fonts, colores y tipografía por defecto de encabezados) y Configuración de Sección Interna / Contenedor (padding, fondo, ancho y bordes independientes con selección directa).",
-  "updatedAt": "2026-10-14T16:55:52.211839369Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Plan completo para la reestructuración y enriquecimiento de la biblioteca de Elementos del constructor visual:\n1. Reorganización de grupos: Sección (sin icono de sección, 4 bloques limpios), Texto (Titular, Párrafo, Lista de viñetas, Editor de texto), Multimedia (Imagen, Video, Audio, Icono), CTA (Botón Acción, Botón Pop-up), Formularios (Formulario, reCAPTCHA, Casilla de verificación, Campo de formulario), Otros (Separador, Espaciador, Cuenta regresiva, Preguntas frecuentes), Redes Sociales (Widget configurable horizontal con Facebook, Instagram, TikTok, WhatsApp, YouTube) y Conversión SSP (Quiz/Preguntas SSP, Calendario).\n2. Nuevos componentes interactivos en canvas e inspector: Cuenta regresiva (días, horas, minutos, segundos), Preguntas frecuentes (acordeón desplegable), Widget de Redes Sociales, reCAPTCHA, Casilla de verificación y Campo de formulario.\n3. Soporte en vista previa pública y guardado de datos.",
+  "updatedAt":  "2026-10-21T19:50:38.084078808Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }

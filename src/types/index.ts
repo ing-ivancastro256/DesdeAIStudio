@@ -140,11 +140,29 @@ export type ElementType =
   | 'popup_button'
   | 'form'
   | 'calendar'
+  | 'countdown'
+  | 'faq'
+  | 'social_links'
+  | 'checkbox'
+  | 'input_field'
   | 'card_avatar'
   | 'card_name'
   | 'card_bio'
   | 'card_links'
   | 'card_funnel_button';
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface SocialLinkItem {
+  id: string;
+  platform: 'facebook' | 'instagram' | 'tiktok' | 'whatsapp' | 'youtube' | 'x' | 'linkedin';
+  url: string;
+  enabled: boolean;
+}
 
 export interface SimpleFormFieldConfig {
   id: string;
@@ -209,6 +227,32 @@ export interface PageBlockElement {
     // Popup Button
     popupButtonText?: string;
     popupId?: string;
+    // Countdown
+    countdownEndDate?: string;
+    countdownDaysLabel?: string;
+    countdownHoursLabel?: string;
+    countdownMinutesLabel?: string;
+    countdownSecondsLabel?: string;
+    countdownTheme?: 'dark' | 'light' | 'primary';
+    // FAQ
+    faqItems?: FaqItem[];
+    // Social Links
+    socialLinks?: SocialLinkItem[];
+    socialSize?: 'sm' | 'md' | 'lg';
+    socialStyle?: 'default' | 'custom' | 'colored' | 'black' | 'outline' | 'rounded';
+    socialColorMode?: 'default' | 'custom';
+    socialIconColor?: string;
+    socialBgColor?: string;
+    socialShape?: 'circle' | 'square' | 'rounded' | 'none';
+    // Checkbox
+    checkboxLabel?: string;
+    checkboxRequired?: boolean;
+    checkboxChecked?: boolean;
+    // Input Field
+    fieldLabel?: string;
+    fieldPlaceholder?: string;
+    fieldType?: 'text' | 'email' | 'phone' | 'number' | 'textarea';
+    fieldRequired?: boolean;
   };
   styles: ElementStyles;
 }
@@ -236,6 +280,9 @@ export interface PageBlockRow {
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
   shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+  // Retardo de aparición (delay)
+  delayMinutes?: number;
+  delaySeconds?: number;
   columns: PageBlockColumn[];
 }
 
@@ -269,6 +316,9 @@ export interface PageBlockSection {
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '5xl' | '7xl' | 'full';
+  // Retardo de aparición (delay)
+  delayMinutes?: number;
+  delaySeconds?: number;
   // Content
   rows: PageBlockRow[];
 }

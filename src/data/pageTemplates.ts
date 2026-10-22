@@ -467,7 +467,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
       headingFontFamily: 'Poppins',
       bodyFontFamily: 'Inter',
       primaryColor: '#2848F0',
-      pageBorderRadius: 16,
+      pageBorderRadius: 0,
       textColor: '#121111',
     },
     sections: [
@@ -577,7 +577,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
       headingFontFamily: 'Poppins',
       bodyFontFamily: 'Inter',
       primaryColor: '#7C3AED',
-      pageBorderRadius: 16,
+      pageBorderRadius: 0,
       textColor: '#121111',
     },
     sections: [

@@ -11,6 +11,8 @@ import {
   SimpleFormFieldConfig,
   FunnelPageGlobalSettings,
   AVAILABLE_FONTS,
+  FaqItem,
+  SocialLinkItem,
 } from '../../types';
 import {
   Type,
@@ -73,6 +75,7 @@ import {
   Settings,
   LayoutTemplate,
   Check,
+  X,
   CheckCircle2,
   Square,
   ArrowRight,
@@ -80,7 +83,13 @@ import {
   Zap,
   Minus,
   RefreshCw,
+  Timer,
+  Share2,
+  CheckSquare,
+  TextCursorInput,
+  Clock,
 } from 'lucide-react';
+import { DelayedAppearance } from '../common/DelayedAppearance';
 import { SectionInspector } from './SectionInspector';
 import { PageSettingsInspector } from './PageSettingsInspector';
 import { RowInspector } from './RowInspector';
@@ -99,6 +108,13 @@ import { InlineEditableText } from './elements/InlineEditableText';
 import { NumberControl } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
 import { BoxModelSpacingControl } from '../common/BoxModelSpacingControl';
+import {
+  CountdownTimerWidget,
+  FaqAccordionWidget,
+  SocialLinksWidget,
+  CheckboxWidget,
+  InputFieldWidget,
+} from './elements/ConversionWidgets';
 
 interface VisualEditorProps {
   initialPage?: FunnelPage;
@@ -220,6 +236,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [activeTab, setActiveTab] = useState<'page' | 'elements' | 'blocks' | 'templates'>('page');
   const [viewportMode, setViewportMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
+  const [previewResetCount, setPreviewResetCount] = useState<number>(0);
   const [showStructurePanel, setShowStructurePanel] = useState<boolean>(true);
   const [fullscreenWysiwygElementId, setFullscreenWysiwygElementId] = useState<string | null>(null);
   const [hoveredSectionId, setHoveredSectionId] = useState<string | null>(null);
@@ -231,7 +248,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [pageSettings, setPageSettings] = useState<FunnelPageGlobalSettings>(() => ({
     pageWidthType: currentPage.settings?.pageWidthType || 'boxed',
     pageContentMaxWidth: currentPage.settings?.pageContentMaxWidth || 1200,
-    pageBorderRadius: currentPage.settings?.pageBorderRadius !== undefined ? currentPage.settings?.pageBorderRadius : 16,
+    pageBorderRadius:
+      (currentPage.settings?.pageBorderRadius !== undefined && currentPage.settings?.pageBorderRadius !== 16)
+        ? currentPage.settings.pageBorderRadius
+        : 0,
     pageBgColor: currentPage.settings?.pageBgColor || '#FFFFFF',
     primaryColor: currentPage.settings?.primaryColor || '#2848F0',
     textColor: currentPage.settings?.textColor || '#121111',
@@ -241,8 +261,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     defaultH2Size: currentPage.settings?.defaultH2Size || 28,
     defaultH3Size: currentPage.settings?.defaultH3Size || 22,
     defaultH4Size: currentPage.settings?.defaultH4Size || 18,
-    pagePaddingTop: currentPage.settings?.pagePaddingTop || 0,
-    pagePaddingBottom: currentPage.settings?.pagePaddingBottom || 40,
+    pagePaddingTop: currentPage.settings?.pagePaddingTop ?? 0,
+    pagePaddingBottom:
+      currentPage.settings?.pagePaddingBottom !== undefined && currentPage.settings?.pagePaddingBottom !== 40
+        ? currentPage.settings.pagePaddingBottom
+        : 0,
     seo_title: currentPage.settings?.seo_title || '',
     seo_description: currentPage.settings?.seo_description || '',
   }));
@@ -314,9 +337,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
   const [draggingBlockType, setDraggingBlockType] = useState<string | null>(null);
   const [draggingSectionLayout, setDraggingSectionLayout] = useState<'1col' | '2col' | '3col' | '4col' | null>(null);
+  const [draggingInnerCols, setDraggingInnerCols] = useState<number | null>(null);
   const [sectionDropIndicator, setSectionDropIndicator] = useState<{
     sectionId: string;
     index: number;
+    position: 'before' | 'after';
+  } | null>(null);
+  const [rowDropIndicator, setRowDropIndicator] = useState<{
+    sectionId: string;
+    rowIndex: number;
     position: 'before' | 'after';
   } | null>(null);
 
@@ -1259,6 +1288,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       newRows = [
         {
           id: `row_${Date.now()}`,
+          marginTop: 0,
+          marginBottom: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
           columns: [
             {
               id: `col_${Date.now()}`,
@@ -1300,6 +1335,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       newRows = [
         {
           id: `row_${Date.now()}`,
+          marginTop: 0,
+          marginBottom: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
           columns: [
             {
               id: `col_${Date.now()}_1`,
@@ -1344,6 +1385,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       newRows = [
         {
           id: `row_${Date.now()}`,
+          marginTop: 0,
+          marginBottom: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
           columns: [1, 2, 3].map((num) => ({
             id: `col_${Date.now()}_${num}`,
             widthPercentage: 33.33,
@@ -1368,6 +1415,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       newRows = [
         {
           id: `row_${Date.now()}`,
+          marginTop: 0,
+          marginBottom: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
           columns: [1, 2, 3, 4].map((num) => ({
             id: `col_${Date.now()}_${num}`,
             widthPercentage: 25,
@@ -1716,6 +1769,107 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           marginRight: 0,
         };
         break;
+      case 'countdown':
+        newElement.content = {
+          countdownEndDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+          countdownDaysLabel: 'Días',
+          countdownHoursLabel: 'Horas',
+          countdownMinutesLabel: 'Minutos',
+          countdownSecondsLabel: 'Segundos',
+          countdownTheme: 'dark',
+        };
+        newElement.styles = {
+          textAlign: 'center',
+          marginTop: 0,
+          marginBottom: 24,
+          marginLeft: 0,
+          marginRight: 0,
+        };
+        break;
+      case 'faq':
+        newElement.content = {
+          faqItems: [
+            {
+              id: `faq_1_${Date.now()}`,
+              question: '¿Cómo funciona el proceso una vez que me registro?',
+              answer: 'Inmediatamente recibirás un correo con tus credenciales de acceso y uno de nuestros asesores se pondrá en contacto contigo para coordinar los primeros pasos.',
+            },
+            {
+              id: `faq_2_${Date.now()}`,
+              question: '¿Qué garantía tengo con Scale Sales Pro?',
+              answer: 'Cuentas con una garantía incondicional de satisfacción. Si durante los primeros 14 días no estás satisfecho, te reembolsamos el 100% de tu inversión sin preguntas.',
+            },
+            {
+              id: `faq_3_${Date.now()}`,
+              question: '¿Necesito experiencia técnica o herramientas adicionales?',
+              answer: 'No, todo está integrado y listo para usar con plantillas prediseñadas de alta conversión que puedes personalizar en minutos.',
+            },
+          ],
+        };
+        newElement.styles = {
+          marginTop: 0,
+          marginBottom: 24,
+          marginLeft: 0,
+          marginRight: 0,
+        };
+        break;
+      case 'social_links':
+        newElement.content = {
+          socialLinks: [
+            { id: 'fb', platform: 'facebook', url: 'https://facebook.com', enabled: true },
+            { id: 'ig', platform: 'instagram', url: 'https://instagram.com', enabled: true },
+            { id: 'tt', platform: 'tiktok', url: 'https://tiktok.com', enabled: true },
+            { id: 'wa', platform: 'whatsapp', url: 'https://wa.me/', enabled: true },
+            { id: 'yt', platform: 'youtube', url: 'https://youtube.com', enabled: true },
+          ],
+          socialSize: 'md',
+          socialStyle: 'colored',
+          socialColorMode: 'default',
+          socialIconColor: '#FFFFFF',
+          socialBgColor: '#2848F0',
+          socialShape: 'circle',
+        };
+        newElement.styles = {
+          textAlign: 'center',
+          marginTop: 0,
+          marginBottom: 20,
+          marginLeft: 0,
+          marginRight: 0,
+        };
+        break;
+      case 'checkbox':
+        newElement.content = {
+          checkboxLabel: 'Acepto los términos y condiciones de la política de privacidad.',
+          checkboxChecked: false,
+          checkboxRequired: true,
+        };
+        newElement.styles = {
+          fontSize: 14,
+          fontFamily: 'Inter',
+          textColor: '#374151',
+          marginTop: 0,
+          marginBottom: 16,
+          marginLeft: 0,
+          marginRight: 0,
+        };
+        break;
+      case 'input_field':
+        newElement.content = {
+          fieldLabel: 'Tu Correo Electrónico Principal',
+          fieldPlaceholder: 'ejemplo@tudominio.com',
+          fieldType: 'email',
+          fieldRequired: true,
+        };
+        newElement.styles = {
+          fontSize: 14,
+          fontFamily: 'Inter',
+          textColor: '#121111',
+          marginTop: 0,
+          marginBottom: 16,
+          marginLeft: 0,
+          marginRight: 0,
+        };
+        break;
       default:
         break;
     }
@@ -1855,8 +2009,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     showToast('Orden del elemento actualizado');
   };
 
-  // Add layout row with 1, 2, 3 or 4 columns
-  const addColumnsLayout = (numCols: number) => {
+  // Add layout row (columnas internas) with 1, 2, 3 or 4 columns
+  const addColumnsLayout = (numCols: number, targetSectionId?: string, targetRowIndex?: number) => {
     const widthPercentage = 100 / numCols;
     const newColumns: PageBlockColumn[] = Array.from({ length: numCols }, (_, i) => ({
       id: `col_${Date.now()}_${i}`,
@@ -1884,7 +2038,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
     const newRow: PageBlockRow = {
       id: `row_${Date.now()}`,
-      name: `Fila de ${numCols} columna(s)`,
+      name: `Sección Interna (${numCols} Col)`,
+      marginTop: 0,
+      marginBottom: 0,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingLeft: 0,
+      paddingRight: 0,
       columns: newColumns,
     };
 
@@ -1898,20 +2058,62 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         paddingBottom: 48,
         paddingLeft: 24,
         paddingRight: 24,
+        marginTop: 0,
+        marginBottom: 0,
         rows: [newRow],
       };
       pushHistory([brandNewSection]);
-      showToast(`Fila de ${numCols} columna(s) insertada`);
+      setSelectedSectionId(brandNewSection.id);
+      setSelectedRowId(newRow.id);
+      setSelectedElementId(null);
+      showToast(`Columnas internas (${numCols} Col) agregadas`);
       return;
     }
 
-    const nextSections = sections.map((sec, idx) => {
-      if (idx !== 0) return sec;
-      return { ...sec, rows: [...sec.rows, newRow] };
+    const secIdToTarget =
+      targetSectionId ||
+      selectedSectionId ||
+      (selectedRowId ? sections.find((s) => s.rows.some((r) => r.id === selectedRowId))?.id : null) ||
+      (selectedElementId
+        ? sections.find((s) => s.rows.some((r) => r.columns.some((c) => c.elements.some((el) => el.id === selectedElementId))))
+            ?.id
+        : null) ||
+      sections[0].id;
+
+    let targetIdx = targetRowIndex;
+    const targetSec = sections.find((s) => s.id === secIdToTarget);
+    if (typeof targetIdx !== 'number' && targetSec) {
+      if (selectedRowId) {
+        const foundRowIdx = targetSec.rows.findIndex((r) => r.id === selectedRowId);
+        if (foundRowIdx !== -1) {
+          targetIdx = foundRowIdx + 1;
+        }
+      } else if (selectedElementId) {
+        const foundRowIdx = targetSec.rows.findIndex((r) =>
+          r.columns.some((c) => c.elements.some((el) => el.id === selectedElementId))
+        );
+        if (foundRowIdx !== -1) {
+          targetIdx = foundRowIdx + 1;
+        }
+      }
+    }
+
+    const nextSections = sections.map((sec) => {
+      if (sec.id !== secIdToTarget) return sec;
+      const newRows = [...sec.rows];
+      if (typeof targetIdx === 'number' && targetIdx >= 0 && targetIdx <= newRows.length) {
+        newRows.splice(targetIdx, 0, newRow);
+      } else {
+        newRows.push(newRow);
+      }
+      return { ...sec, rows: newRows };
     });
 
     pushHistory(nextSections);
-    showToast(`Fila de ${numCols} columna(s) insertada`);
+    setSelectedSectionId(secIdToTarget);
+    setSelectedRowId(newRow.id);
+    setSelectedElementId(null);
+    showToast(`Columnas internas (${numCols} Col) agregadas`);
   };
 
   // Insert Pre-built Blocks (supports specific target index or append)
@@ -3318,10 +3520,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             <button
               type="button"
               onClick={() => {
-                setActiveTab('templates');
-                setSelectedElementId(null);
-                setSelectedRowId(null);
-                setSelectedSectionId(null);
+                if (activeTab === 'templates' && !selectedElementId && !selectedRowId && !selectedSectionId) {
+                  setActiveTab('elements');
+                } else {
+                  setActiveTab('templates');
+                  setSelectedElementId(null);
+                  setSelectedRowId(null);
+                  setSelectedSectionId(null);
+                }
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                 activeTab === 'templates' && !selectedElement && !selectedRowId && !activeSectionForInspector
@@ -3332,9 +3538,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             >
               <LayoutTemplate className="w-3.5 h-3.5" />
               <span>Plantillas</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-200 text-purple-900 font-bold">
-                Nuevo
-              </span>
             </button>
           )}
 
@@ -3355,7 +3558,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           )}
 
           <button
-            onClick={() => setIsPreviewMode(!isPreviewMode)}
+            onClick={() => {
+              const nextMode = !isPreviewMode;
+              setIsPreviewMode(nextMode);
+              if (nextMode) {
+                setPreviewResetCount((c) => c + 1);
+              }
+            }}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
               isPreviewMode
                 ? 'bg-amber-100 text-amber-900 border-amber-300'
@@ -3365,6 +3574,21 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             <Eye className="w-3.5 h-3.5" />
             <span>{isPreviewMode ? 'Modo Edición' : 'Vista Previa'}</span>
           </button>
+
+          {isPreviewMode && (
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewResetCount((c) => c + 1);
+                showToast('Temporizadores de retardo reiniciados');
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-50 transition-colors cursor-pointer"
+              title="Reiniciar y volver a reproducir retardos de aparición"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+              <span>Reiniciar Retardos</span>
+            </button>
+          )}
 
           <button
             onClick={handleSavePage}
@@ -4510,6 +4734,414 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     </div>
                   )}
 
+                  {/* 15. COUNTDOWN TIMER INSPECTOR */}
+                  {selectedElement.type === 'countdown' && (
+                    <div className="space-y-3.5 border border-orange-200 rounded-xl p-3 bg-orange-50/20">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
+                          <Timer className="w-4 h-4 text-orange-600" />
+                          <span>Cuenta Regresiva</span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Fecha y hora límite:</label>
+                        <input
+                          type="datetime-local"
+                          value={selectedElement.content.countdownEndDate || ''}
+                          onChange={(e) => updateSelectedElement({}, { countdownEndDate: e.target.value })}
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Tema visual:</label>
+                        <select
+                          value={selectedElement.content.countdownTheme || 'dark'}
+                          onChange={(e) => updateSelectedElement({}, { countdownTheme: e.target.value as any })}
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
+                        >
+                          <option value="dark">Oscuro Elegante (Fondo negro)</option>
+                          <option value="light">Claro Moderno (Fondo blanco)</option>
+                          <option value="primary">Color Primario (Azul SSP)</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-200">
+                        <div>
+                          <label className="text-[10px] text-zinc-600 block mb-0.5">Etiqueta Días:</label>
+                          <input
+                            type="text"
+                            value={selectedElement.content.countdownDaysLabel || 'Días'}
+                            onChange={(e) => updateSelectedElement({}, { countdownDaysLabel: e.target.value })}
+                            className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-zinc-600 block mb-0.5">Etiqueta Horas:</label>
+                          <input
+                            type="text"
+                            value={selectedElement.content.countdownHoursLabel || 'Horas'}
+                            onChange={(e) => updateSelectedElement({}, { countdownHoursLabel: e.target.value })}
+                            className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-zinc-600 block mb-0.5">Etiqueta Minutos:</label>
+                          <input
+                            type="text"
+                            value={selectedElement.content.countdownMinutesLabel || 'Minutos'}
+                            onChange={(e) => updateSelectedElement({}, { countdownMinutesLabel: e.target.value })}
+                            className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-zinc-600 block mb-0.5">Etiqueta Segundos:</label>
+                          <input
+                            type="text"
+                            value={selectedElement.content.countdownSecondsLabel || 'Segundos'}
+                            onChange={(e) => updateSelectedElement({}, { countdownSecondsLabel: e.target.value })}
+                            className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 16. FAQ ACCORDION INSPECTOR */}
+                  {selectedElement.type === 'faq' && (
+                    <div className="space-y-3.5 border border-indigo-200 rounded-xl p-3 bg-indigo-50/20">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
+                          <HelpCircle className="w-4 h-4 text-indigo-600" />
+                          <span>Preguntas Frecuentes (FAQ)</span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                        {(selectedElement.content.faqItems || []).map((faq, fIdx) => (
+                          <div key={faq.id || fIdx} className="p-2.5 bg-white border border-zinc-200 rounded-lg space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-zinc-700">Pregunta #{fIdx + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextItems = (selectedElement?.content.faqItems || []).filter((_, i) => i !== fIdx);
+                                  updateSelectedElement({}, { faqItems: nextItems });
+                                }}
+                                className="text-red-500 hover:text-red-700 p-0.5"
+                                title="Eliminar pregunta"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={faq.question}
+                              placeholder="¿Cuál es tu pregunta?"
+                              onChange={(e) => {
+                                const nextItems = [...(selectedElement?.content.faqItems || [])];
+                                nextItems[fIdx] = { ...nextItems[fIdx], question: e.target.value };
+                                updateSelectedElement({}, { faqItems: nextItems });
+                              }}
+                              className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg font-medium"
+                            />
+                            <textarea
+                              value={faq.answer}
+                              rows={2}
+                              placeholder="Respuesta explicativa..."
+                              onChange={(e) => {
+                                const nextItems = [...(selectedElement?.content.faqItems || [])];
+                                nextItems[fIdx] = { ...nextItems[fIdx], answer: e.target.value };
+                                updateSelectedElement({}, { faqItems: nextItems });
+                              }}
+                              className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg resize-none"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextItems = [
+                            ...(selectedElement?.content.faqItems || []),
+                            {
+                              id: `faq_${Date.now()}`,
+                              question: 'Nueva Pregunta Frecuente',
+                              answer: 'Escribe aquí la respuesta para tus usuarios.',
+                            },
+                          ];
+                          updateSelectedElement({}, { faqItems: nextItems });
+                        }}
+                        className="w-full py-2 px-3 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar Pregunta Frecuente</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 17. SOCIAL LINKS INSPECTOR */}
+                  {selectedElement.type === 'social_links' && (
+                    <div className="space-y-3.5 border border-blue-200 rounded-xl p-3 bg-blue-50/20">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
+                          <Share2 className="w-4 h-4 text-[#2848F0]" />
+                          <span>Redes Sociales</span>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] font-semibold text-zinc-700 block mb-1">Tamaño:</label>
+                          <select
+                            value={selectedElement.content.socialSize || 'md'}
+                            onChange={(e) => updateSelectedElement({}, { socialSize: e.target.value as any })}
+                            className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                          >
+                            <option value="sm">Pequeño</option>
+                            <option value="md">Mediano</option>
+                            <option value="lg">Grande</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-semibold text-zinc-700 block mb-1">Forma del fondo:</label>
+                          <select
+                            value={selectedElement.content.socialShape || 'circle'}
+                            onChange={(e) => updateSelectedElement({}, { socialShape: e.target.value as any })}
+                            className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                          >
+                            <option value="circle">Círculo</option>
+                            <option value="rounded">Bordes Suaves</option>
+                            <option value="square">Cuadrado</option>
+                            <option value="none">Sin fondo (Solo icono)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-semibold text-zinc-700 block mb-1">Modo de color:</label>
+                        <select
+                          value={selectedElement.content.socialColorMode || 'default'}
+                          onChange={(e) => {
+                            const mode = e.target.value as 'default' | 'custom';
+                            updateSelectedElement(
+                              {},
+                              {
+                                socialColorMode: mode,
+                                socialStyle: mode === 'custom' ? 'custom' : 'colored',
+                              }
+                            );
+                          }}
+                          className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white font-medium"
+                        >
+                          <option value="default">Colores Oficiales (Por defecto)</option>
+                          <option value="custom">Color Personalizado</option>
+                        </select>
+                      </div>
+
+                      {/* If custom color mode: Pickers for background and icon color */}
+                      {(selectedElement.content.socialColorMode === 'custom' || selectedElement.content.socialStyle === 'custom') && (
+                        <div className="space-y-2.5 p-2.5 bg-white border border-blue-100 rounded-lg shadow-2xs">
+                          <HexColorPicker
+                            label="Color del fondo / forma:"
+                            value={selectedElement.content.socialBgColor || '#2848F0'}
+                            onOpen={handleColorPickerOpen}
+                            onClose={handleColorPickerClose}
+                            onChange={(val) => updateSelectedElement({}, { socialBgColor: val })}
+                          />
+                          <HexColorPicker
+                            label="Color del icono:"
+                            value={selectedElement.content.socialIconColor || '#FFFFFF'}
+                            onOpen={handleColorPickerOpen}
+                            onClose={handleColorPickerClose}
+                            onChange={(val) => updateSelectedElement({}, { socialIconColor: val })}
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-2 pt-1 border-t border-zinc-200">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-zinc-700 block">Redes y orden:</label>
+                          <span className="text-[10px] text-zinc-400">Usa las flechas para reordenar</span>
+                        </div>
+                        {(selectedElement.content.socialLinks || []).map((link, lIdx, arr) => (
+                          <div key={link.id || link.platform} className="p-2 bg-white border border-zinc-200 rounded-lg space-y-1.5 shadow-2xs">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    disabled={lIdx === 0}
+                                    onClick={() => {
+                                      if (lIdx === 0) return;
+                                      const next = [...arr];
+                                      const temp = next[lIdx];
+                                      next[lIdx] = next[lIdx - 1];
+                                      next[lIdx - 1] = temp;
+                                      updateSelectedElement({}, { socialLinks: next });
+                                    }}
+                                    className="p-1 rounded hover:bg-zinc-100 disabled:opacity-20 cursor-pointer text-zinc-600 disabled:cursor-not-allowed transition-colors"
+                                    title="Subir posición"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={lIdx === arr.length - 1}
+                                    onClick={() => {
+                                      if (lIdx === arr.length - 1) return;
+                                      const next = [...arr];
+                                      const temp = next[lIdx];
+                                      next[lIdx] = next[lIdx + 1];
+                                      next[lIdx + 1] = temp;
+                                      updateSelectedElement({}, { socialLinks: next });
+                                    }}
+                                    className="p-1 rounded hover:bg-zinc-100 disabled:opacity-20 cursor-pointer text-zinc-600 disabled:cursor-not-allowed transition-colors"
+                                    title="Bajar posición"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                <span className="text-xs font-semibold capitalize text-zinc-800">{link.platform}</span>
+                              </div>
+                              <label className="flex items-center gap-1 cursor-pointer text-[10px] text-zinc-600">
+                                <input
+                                  type="checkbox"
+                                  checked={link.enabled}
+                                  onChange={(e) => {
+                                    const next = [...arr];
+                                    next[lIdx] = { ...next[lIdx], enabled: e.target.checked };
+                                    updateSelectedElement({}, { socialLinks: next });
+                                  }}
+                                  className="rounded text-[#2848F0]"
+                                />
+                                <span>{link.enabled ? 'Visible' : 'Oculto'}</span>
+                              </label>
+                            </div>
+                            {link.enabled && (
+                              <input
+                                type="text"
+                                value={link.url}
+                                placeholder={`https://${link.platform}.com/...`}
+                                onChange={(e) => {
+                                  const next = [...arr];
+                                  next[lIdx] = { ...next[lIdx], url: e.target.value };
+                                  updateSelectedElement({}, { socialLinks: next });
+                                }}
+                                className="w-full p-1.5 text-xs border border-zinc-200 rounded-md bg-zinc-50 font-mono"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 18. CHECKBOX INSPECTOR */}
+                  {selectedElement.type === 'checkbox' && (
+                    <div className="space-y-3.5 border border-emerald-200 rounded-xl p-3 bg-emerald-50/20">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
+                          <CheckSquare className="w-4 h-4 text-emerald-600" />
+                          <span>Casilla de Verificación</span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Texto de la casilla:</label>
+                        <textarea
+                          rows={2}
+                          value={selectedElement.content.checkboxLabel || ''}
+                          onChange={(e) => updateSelectedElement({}, { checkboxLabel: e.target.value })}
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white resize-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-4 pt-1 border-t border-zinc-200">
+                        <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedElement.content.checkboxRequired)}
+                            onChange={(e) => updateSelectedElement({}, { checkboxRequired: e.target.checked })}
+                            className="rounded text-[#2848F0]"
+                          />
+                          <span>Campo Obligatorio</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(selectedElement.content.checkboxChecked)}
+                            onChange={(e) => updateSelectedElement({}, { checkboxChecked: e.target.checked })}
+                            className="rounded text-[#2848F0]"
+                          />
+                          <span>Marcado por defecto</span>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 19. INPUT FIELD INSPECTOR */}
+                  {selectedElement.type === 'input_field' && (
+                    <div className="space-y-3.5 border border-blue-200 rounded-xl p-3 bg-blue-50/20">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
+                          <TextCursorInput className="w-4 h-4 text-[#2848F0]" />
+                          <span>Campo de Formulario</span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Etiqueta del campo (Label):</label>
+                        <input
+                          type="text"
+                          value={selectedElement.content.fieldLabel || ''}
+                          onChange={(e) => updateSelectedElement({}, { fieldLabel: e.target.value })}
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Marcador de posición (Placeholder):</label>
+                        <input
+                          type="text"
+                          value={selectedElement.content.fieldPlaceholder || ''}
+                          onChange={(e) => updateSelectedElement({}, { fieldPlaceholder: e.target.value })}
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="font-semibold text-zinc-700 block mb-1">Tipo de entrada:</label>
+                          <select
+                            value={selectedElement.content.fieldType || 'email'}
+                            onChange={(e) => updateSelectedElement({}, { fieldType: e.target.value as any })}
+                            className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white"
+                          >
+                            <option value="text">Texto corto</option>
+                            <option value="email">Correo electrónico</option>
+                            <option value="phone">Teléfono / WhatsApp</option>
+                            <option value="number">Número</option>
+                            <option value="textarea">Área de texto (multilínea)</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center pt-5">
+                          <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(selectedElement.content.fieldRequired)}
+                              onChange={(e) => updateSelectedElement({}, { fieldRequired: e.target.checked })}
+                              className="rounded text-[#2848F0]"
+                            />
+                            <span>Campo Obligatorio</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* ============================================================== */}
                   {/* ACCORDION: TIPOGRAFÍA (SOLO PARA ELEMENTOS DE TEXTO Y BOTÓN) */}
                   {/* EXCLUIDO ESTRICTAMENTE DE IMÁGENES, VIDEOS, SEPARADORES, ETC.  */}
@@ -5155,7 +5787,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             ) : (
               /* TABBED LIBRARY: ELEMENTS, BLOCKS & PAGE SETTINGS */
               <div className="flex-1 flex flex-col h-full overflow-hidden">
-                {/* Tabs Header - Order: Página, Elementos, Bloques, Plantillas */}
+                {/* Tabs Header - Order: Página, Elementos, Bloques */}
                 <div className="flex border-b border-zinc-200 bg-zinc-50 shrink-0">
                   <button
                     type="button"
@@ -5205,23 +5837,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   >
                     Bloques
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab('templates');
-                      setSelectedElementId(null);
-                      setSelectedRowId(null);
-                      setSelectedSectionId(null);
-                    }}
-                    className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-colors cursor-pointer relative ${
-                      activeTab === 'templates'
-                        ? 'border-purple-600 text-purple-700 bg-white'
-                        : 'border-transparent text-zinc-500 hover:text-zinc-800'
-                    }`}
-                  >
-                    <span>Plantillas</span>
-                    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-600 inline-block align-middle" />
-                  </button>
                 </div>
 
                 {activeTab === 'page' ? (
@@ -5242,9 +5857,19 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           <LayoutTemplate className="w-3.5 h-3.5 text-purple-600" />
                           Plantillas de Embudo
                         </span>
-                        <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-full">
-                          100% Editables
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-full">
+                            100% Editables
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('elements')}
+                            className="p-0.5 text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 rounded transition-colors cursor-pointer"
+                            title="Cerrar panel de plantillas"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-[11px] text-zinc-500 font-['Inter'] leading-relaxed">
                         Carga una estructura completa y persuasiva. Todo el contenido queda en el lienzo listo para que puedas editar textos, videos, colores y botones.
@@ -5371,11 +5996,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {activeTab === 'elements' ? (
                     <>
-                      {/* 1. SECCIÓN (PRIORIDAD #1 - DRAGGABLE & CLICKABLE) */}
+                      {/* 1. SECCIÓN */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-['Inter'] flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5 text-[#2848F0]" />
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 font-['Inter']">
                             Sección
                           </span>
                           <span className="text-[10px] text-[#2848F0] font-semibold bg-blue-100/70 px-1.5 py-0.5 rounded">
@@ -5484,7 +6108,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         </div>
                       </div>
 
-                      {/* 2. TEXTO (H1, H2, H3, H4, PÁRRAFO, LISTA, WYSIWYG) */}
+                      {/* 2. TEXTO */}
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
                           Texto
@@ -5516,7 +6140,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
                           >
                             <AlignLeft className="w-5 h-5 text-zinc-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium">Párrafo (Multilínea)</span>
+                            <span className="text-[11px] font-medium">Párrafo</span>
                           </button>
 
                           <button
@@ -5547,7 +6171,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         </div>
                       </div>
 
-                      {/* 3. MULTIMEDIA (BOTÓN, VIDEO, IMAGEN, SEPARADOR, ESPACIADOR, AUDIO/MÚSICA, ICONO) */}
+                      {/* 3. MULTIMEDIA */}
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
                           Multimedia
@@ -5556,14 +6180,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           <button
                             draggable
                             onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'button');
+                              e.dataTransfer.setData('application/ssp-element-type', 'image');
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            onClick={() => addElement('button')}
+                            onClick={() => addElement('image')}
                             className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
                           >
-                            <CreditCard className="w-5 h-5 text-[#2848F0] group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium">Botón Acción</span>
+                            <ImageIcon className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium">Imagen</span>
                           </button>
 
                           <button
@@ -5582,16 +6206,118 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           <button
                             draggable
                             onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'image');
+                              e.dataTransfer.setData('application/ssp-element-type', 'audio');
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            onClick={() => addElement('image')}
+                            onClick={() => addElement('audio')}
                             className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
                           >
-                            <ImageIcon className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium">Imagen</span>
+                            <Music className="w-5 h-5 text-amber-500 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium">Audio</span>
                           </button>
 
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'icon');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('icon')}
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
+                          >
+                            <Smile className="w-5 h-5 text-indigo-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium">Icono</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 4. CTA */}
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
+                          CTA
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'button');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('button')}
+                            className="p-2.5 border border-blue-200 bg-blue-50/30 hover:border-[#2848F0] hover:bg-blue-50 rounded-xl flex flex-col items-center justify-center gap-1 transition-all text-blue-950 cursor-grab active:cursor-grabbing group shadow-2xs"
+                          >
+                            <CreditCard className="w-5 h-5 text-[#2848F0] group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-semibold">Botón</span>
+                          </button>
+
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'popup_button');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('popup_button')}
+                            className="p-2.5 border border-purple-200 bg-purple-50/20 hover:border-purple-500 hover:bg-purple-50 rounded-xl flex flex-col items-center justify-center gap-1 transition-all text-purple-950 cursor-grab active:cursor-grabbing group shadow-2xs"
+                          >
+                            <Layers className="w-5 h-5 text-purple-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-semibold">Botón Pop-up</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 5. FORMULARIOS */}
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
+                          Formularios
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'simple_form');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('simple_form')}
+                            className="col-span-2 p-2.5 border border-emerald-200 bg-emerald-50/20 hover:border-emerald-500 hover:bg-emerald-50 rounded-xl flex items-center justify-center gap-2 transition-all text-emerald-950 cursor-grab active:cursor-grabbing group shadow-2xs"
+                          >
+                            <FileText className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-bold">Formulario</span>
+                          </button>
+
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'checkbox');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('checkbox')}
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
+                          >
+                            <CheckSquare className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium">Casilla de Verificación</span>
+                          </button>
+
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'input_field');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('input_field')}
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
+                          >
+                            <TextCursorInput className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium">Campo de Formulario</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 6. OTROS */}
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
+                          Otros
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
                           <button
                             draggable
                             onDragStart={(e) => {
@@ -5621,66 +6347,175 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           <button
                             draggable
                             onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'audio');
+                              e.dataTransfer.setData('application/ssp-element-type', 'countdown');
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            onClick={() => addElement('audio')}
+                            onClick={() => addElement('countdown')}
                             className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
                           >
-                            <Music className="w-5 h-5 text-amber-500 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium">Música / Audio</span>
+                            <Timer className="w-5 h-5 text-orange-500 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium">Cuenta Regresiva</span>
                           </button>
 
                           <button
                             draggable
                             onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'icon');
+                              e.dataTransfer.setData('application/ssp-element-type', 'faq');
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            onClick={() => addElement('icon')}
-                            className="col-span-2 p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex items-center justify-center gap-2 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
+                            onClick={() => addElement('faq')}
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
                           >
-                            <Smile className="w-5 h-5 text-indigo-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-semibold">Icono Vectorial</span>
+                            <HelpCircle className="w-5 h-5 text-indigo-500 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium">Preguntas Frecuentes</span>
                           </button>
                         </div>
                       </div>
 
-                      {/* 4. FORMULARIOS (FORMULARIO SIMPLE + BOTÓN POP-UP) */}
+                      {/* 7. REDES SOCIALES */}
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
-                          Formularios
+                          Redes Sociales
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'simple_form');
-                              e.dataTransfer.effectAllowed = 'copy';
-                            }}
-                            onClick={() => addElement('simple_form')}
-                            className="p-2.5 border border-emerald-200 bg-emerald-50/20 hover:border-emerald-500 hover:bg-emerald-50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-emerald-950 cursor-grab active:cursor-grabbing group shadow-2xs"
-                          >
-                            <FileText className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-bold">Formulario Simple</span>
-                          </button>
+                        <button
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('application/ssp-element-type', 'social_links');
+                            e.dataTransfer.effectAllowed = 'copy';
+                          }}
+                          onClick={() => addElement('social_links')}
+                          className="w-full p-2.5 border border-zinc-200 bg-white hover:border-[#2848F0] hover:bg-blue-50/50 rounded-xl flex items-center justify-center gap-2 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs"
+                        >
+                          <Share2 className="w-5 h-5 text-[#2848F0] group-hover:scale-110 transition-transform" />
+                          <span className="text-[11px] font-semibold text-zinc-800 group-hover:text-[#2848F0]">Redes Sociales</span>
+                        </button>
+                      </div>
 
-                          <button
+                      {/* 8. COLUMNAS INTERNAS */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 font-['Inter']">
+                            Columnas Internas
+                          </span>
+                          <span className="text-[10px] text-indigo-600 font-semibold bg-indigo-50 px-1.5 py-0.5 rounded">
+                            Arrastra a sección
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 mb-2.5 font-['Inter']">
+                          Columnas internas dentro de una sección existente (no crea nueva sección):
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div
                             draggable
                             onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'popup_button');
+                              setDraggingInnerCols(1);
+                              e.dataTransfer.setData('application/ssp-inner-columns', '1');
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            onClick={() => addElement('popup_button')}
-                            className="p-2.5 border border-blue-200 bg-blue-50/30 hover:border-blue-500 hover:bg-blue-50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-blue-950 cursor-grab active:cursor-grabbing group shadow-2xs"
+                            onDragEnd={() => {
+                              setDraggingInnerCols(null);
+                              setRowDropIndicator(null);
+                            }}
+                            onClick={() => addColumnsLayout(1)}
+                            className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
+                            title="Arrastra a una sección o haz clic para añadir 1 columna interna"
                           >
-                            <Layers className="w-5 h-5 text-[#2848F0] group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-bold">Botón Pop-up</span>
-                          </button>
+                            <div className="w-full h-5 rounded bg-indigo-100 border border-indigo-300 flex items-center justify-center">
+                              <span className="text-[9px] font-bold text-indigo-700">100%</span>
+                            </div>
+                            <span className="text-[11px] font-semibold group-hover:text-indigo-600">1 Col</span>
+                          </div>
+
+                          <div
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggingInnerCols(2);
+                              e.dataTransfer.setData('application/ssp-inner-columns', '2');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onDragEnd={() => {
+                              setDraggingInnerCols(null);
+                              setRowDropIndicator(null);
+                            }}
+                            onClick={() => addColumnsLayout(2)}
+                            className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
+                            title="Arrastra a una sección o haz clic para añadir 2 columnas internas"
+                          >
+                            <div className="w-full h-5 rounded flex gap-1">
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[9px] font-bold text-indigo-700">50%</span>
+                              </div>
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[9px] font-bold text-indigo-700">50%</span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-semibold group-hover:text-indigo-600">2 Col</span>
+                          </div>
+
+                          <div
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggingInnerCols(3);
+                              e.dataTransfer.setData('application/ssp-inner-columns', '3');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onDragEnd={() => {
+                              setDraggingInnerCols(null);
+                              setRowDropIndicator(null);
+                            }}
+                            onClick={() => addColumnsLayout(3)}
+                            className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
+                            title="Arrastra a una sección o haz clic para añadir 3 columnas internas"
+                          >
+                            <div className="w-full h-5 rounded flex gap-0.5">
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-indigo-700">33%</span>
+                              </div>
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-indigo-700">33%</span>
+                              </div>
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-indigo-700">33%</span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-semibold group-hover:text-indigo-600">3 Col</span>
+                          </div>
+
+                          <div
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggingInnerCols(4);
+                              e.dataTransfer.setData('application/ssp-inner-columns', '4');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onDragEnd={() => {
+                              setDraggingInnerCols(null);
+                              setRowDropIndicator(null);
+                            }}
+                            onClick={() => addColumnsLayout(4)}
+                            className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
+                            title="Arrastra a una sección o haz clic para añadir 4 columnas internas"
+                          >
+                            <div className="w-full h-5 rounded flex gap-0.5">
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[7px] font-bold text-indigo-700">25%</span>
+                              </div>
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[7px] font-bold text-indigo-700">25%</span>
+                              </div>
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[7px] font-bold text-indigo-700">25%</span>
+                              </div>
+                              <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
+                                <span className="text-[7px] font-bold text-indigo-700">25%</span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-semibold group-hover:text-indigo-600">4 Col</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* 5. CONVERSIÓN SSP */}
+                      {/* 8. CONVERSIÓN SSP */}
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
                           Conversión SSP
@@ -5709,39 +6544,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           >
                             <Calendar className="w-5 h-5 text-amber-600 group-hover:scale-110 transition-transform" />
                             <span className="text-[11px] font-medium">Calendario SSP</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* 6. DISEÑO DE COLUMNAS */}
-                      <div>
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
-                          Diseño de Columnas
-                        </div>
-                        <div className="grid grid-cols-4 gap-1.5">
-                          <button
-                            onClick={() => addColumnsLayout(1)}
-                            className="p-2 border border-zinc-200 rounded-lg hover:border-[#2848F0] hover:bg-blue-50 text-center text-xs font-semibold cursor-pointer"
-                          >
-                            1 Col
-                          </button>
-                          <button
-                            onClick={() => addColumnsLayout(2)}
-                            className="p-2 border border-zinc-200 rounded-lg hover:border-[#2848F0] hover:bg-blue-50 text-center text-xs font-semibold cursor-pointer"
-                          >
-                            2 Col
-                          </button>
-                          <button
-                            onClick={() => addColumnsLayout(3)}
-                            className="p-2 border border-zinc-200 rounded-lg hover:border-[#2848F0] hover:bg-blue-50 text-center text-xs font-semibold cursor-pointer"
-                          >
-                            3 Col
-                          </button>
-                          <button
-                            onClick={() => addColumnsLayout(4)}
-                            className="p-2 border border-zinc-200 rounded-lg hover:border-[#2848F0] hover:bg-blue-50 text-center text-xs font-semibold cursor-pointer"
-                          >
-                            4 Col
                           </button>
                         </div>
                       </div>
@@ -5810,10 +6612,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           }}
         >
           <div
-            className={`transition-all duration-300 shadow-xl border flex flex-col relative w-full ${
+            className={`transition-all duration-300 shadow-xl border flex flex-col relative w-full h-auto min-h-0 ${
               isPreviewMode
-                ? 'min-h-screen mb-16 shadow-2xl overflow-visible'
-                : 'min-h-[500px] mb-32 overflow-visible'
+                ? 'mb-16 shadow-2xl overflow-visible'
+                : 'mb-24 overflow-visible'
             } ${viewportMode === 'mobile' ? 'max-w-[390px] my-4' : ''}`}
             style={{
               maxWidth:
@@ -5822,11 +6624,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   : pageSettings.pageWidthType === 'full'
                   ? '100%'
                   : `${pageSettings.pageContentMaxWidth || 1200}px`,
-              borderRadius: `${pageSettings.pageBorderRadius ?? 16}px`,
+              borderRadius: `${pageSettings.pageBorderRadius ?? 0}px`,
               backgroundColor: pageSettings.pageBgColor || '#FFFFFF',
               fontFamily: pageSettings.bodyFontFamily || 'Inter',
               color: pageSettings.textColor || '#121111',
               borderColor: '#E4E4E7',
+              paddingTop: `${pageSettings.pagePaddingTop ?? 0}px`,
+              paddingBottom: `${pageSettings.pagePaddingBottom ?? 0}px`,
             }}
             onClick={(e) => {
               if (e.target === e.currentTarget && !isPreviewMode) {
@@ -5900,7 +6704,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               sections.map((section, secIdx) => {
               const isSectionSelected = !isPreviewMode && selectedSectionId === section.id && !selectedElementId;
               const effectiveBgType = section.bgType || (section.bgGradient ? 'gradient' : section.bgImageUrl ? 'image' : 'solid');
-              const canvasRadius = pageSettings.pageBorderRadius !== undefined ? pageSettings.pageBorderRadius : 16;
+              const canvasRadius = pageSettings.pageBorderRadius !== undefined ? pageSettings.pageBorderRadius : 0;
               const isFirstSection = secIdx === 0;
               const isLastSection = secIdx === sections.length - 1;
 
@@ -5947,6 +6751,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       </div>
                     )}
 
+                  <DelayedAppearance
+                    delayMinutes={section.delayMinutes}
+                    delaySeconds={section.delaySeconds}
+                    active={isPreviewMode}
+                    resetTrigger={previewResetCount}
+                  >
                   <div
                     id={section.id}
                     style={sectionStyle}
@@ -5957,9 +6767,35 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         draggingSectionId || e.dataTransfer.types.includes('application/ssp-section-id');
                       const isSectionLayout =
                         draggingSectionLayout || e.dataTransfer.types.includes('application/ssp-section-layout');
-                      if (!isPrebuilt && !isSectionDrag && !isSectionLayout) return;
+                      const isInnerCols =
+                        draggingInnerCols !== null || e.dataTransfer.types.includes('application/ssp-inner-columns');
+                      if (!isPrebuilt && !isSectionDrag && !isSectionLayout && !isInnerCols) return;
                       e.preventDefault();
                       e.stopPropagation();
+                      if (isInnerCols) {
+                        let closestRowIdx = 0;
+                        let closestDist = Infinity;
+                        let pos: 'before' | 'after' = 'after';
+                        section.rows.forEach((r, idx) => {
+                          const el = document.getElementById(r.id);
+                          if (el) {
+                            const rRect = el.getBoundingClientRect();
+                            const mid = rRect.top + rRect.height / 2;
+                            const dist = Math.abs(e.clientY - mid);
+                            if (dist < closestDist) {
+                              closestDist = dist;
+                              closestRowIdx = idx;
+                              pos = e.clientY < mid ? 'before' : 'after';
+                            }
+                          }
+                        });
+                        setRowDropIndicator({
+                          sectionId: section.id,
+                          rowIndex: closestRowIdx,
+                          position: pos,
+                        });
+                        return;
+                      }
                       const rect = e.currentTarget.getBoundingClientRect();
                       const relativeY = e.clientY - rect.top;
                       const position = relativeY < rect.height / 2 ? 'before' : 'after';
@@ -5970,6 +6806,45 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       });
                     }}
                     onDrop={(e) => {
+                      const innerColsData =
+                        e.dataTransfer.getData('application/ssp-inner-columns') ||
+                        (draggingInnerCols !== null ? String(draggingInnerCols) : null);
+                      if (innerColsData) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const cols = parseInt(innerColsData, 10) || 1;
+                        let targetRowIdx: number;
+                        if (rowDropIndicator && rowDropIndicator.sectionId === section.id) {
+                          targetRowIdx =
+                            rowDropIndicator.position === 'before'
+                              ? rowDropIndicator.rowIndex
+                              : rowDropIndicator.rowIndex + 1;
+                        } else {
+                          let closestRowIdx = Math.max(0, section.rows.length - 1);
+                          let closestDist = Infinity;
+                          let isBefore = false;
+                          section.rows.forEach((r, idx) => {
+                            const el = document.getElementById(r.id);
+                            if (el) {
+                              const rRect = el.getBoundingClientRect();
+                              const mid = rRect.top + rRect.height / 2;
+                              const dist = Math.abs(e.clientY - mid);
+                              if (dist < closestDist) {
+                                closestDist = dist;
+                                closestRowIdx = idx;
+                                isBefore = e.clientY < mid;
+                              }
+                            }
+                          });
+                          targetRowIdx = isBefore ? closestRowIdx : closestRowIdx + 1;
+                        }
+                        setDraggingInnerCols(null);
+                        setRowDropIndicator(null);
+                        setSectionDropIndicator(null);
+                        addColumnsLayout(cols, section.id, targetRowIdx);
+                        return;
+                      }
+
                       const layoutType =
                         (e.dataTransfer.getData('application/ssp-section-layout') || draggingSectionLayout) as
                           | '1col'
@@ -6085,6 +6960,19 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           <span className="font-['Poppins'] font-bold">{section.name || `Sección ${secIdx + 1}`}</span>
                         </div>
 
+                        {((section.delayMinutes || 0) * 60 + (section.delaySeconds || 0)) > 0 && (
+                          <div
+                            className="flex items-center gap-1 bg-amber-900/90 text-amber-200 px-1.5 py-0.5 rounded text-[10px] font-mono select-none"
+                            title={`Retardo de aparición programado: ${(section.delayMinutes || 0) > 0 ? `${section.delayMinutes}m ` : ''}${section.delaySeconds || 0}s`}
+                          >
+                            <Clock className="w-3 h-3 text-amber-300" />
+                            <span>
+                              {(section.delayMinutes || 0) > 0 ? `${section.delayMinutes}m ` : ''}
+                              {section.delaySeconds || 0}s
+                            </span>
+                          </div>
+                        )}
+
                       <div className="w-[1px] h-3.5 bg-amber-400 mx-0.5" />
 
                       {/* Section Settings (Tuerca de Configuración) */}
@@ -6192,8 +7080,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         : undefined,
                     marginLeft: 'auto',
                     marginRight: 'auto',
-                    marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : undefined,
-                    marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '24px',
+                    marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : '0px',
+                    marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '0px',
                     paddingTop: row.paddingTop !== undefined ? `${row.paddingTop}px` : undefined,
                     paddingBottom: row.paddingBottom !== undefined ? `${row.paddingBottom}px` : undefined,
                     paddingLeft: row.paddingLeft !== undefined ? `${row.paddingLeft}px` : undefined,
@@ -6206,25 +7094,87 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   };
 
                   return (
-                    <div
-                      id={row.id}
-                      key={row.id || rIdx}
-                      style={rowStyle}
-                      onClick={(e) => {
-                        if (isPreviewMode) return;
-                        e.stopPropagation();
-                        setSelectedRowId(row.id);
-                        setSelectedElementId(null);
-                        setSelectedSectionId(null);
-                      }}
-                      className={`relative transition-all group/row ${rowShadowClass} ${
-                        !isPreviewMode
-                          ? isRowSelected
-                            ? 'ring-2 ring-indigo-600 rounded-xl bg-indigo-50/10'
-                            : 'hover:ring-1 hover:ring-indigo-300 hover:ring-dashed rounded-xl'
-                          : ''
-                      }`}
-                    >
+                    <React.Fragment key={row.id || rIdx}>
+                      {/* Visual Drop Line Indicator Before Row */}
+                      {!isPreviewMode &&
+                        rowDropIndicator &&
+                        rowDropIndicator.sectionId === section.id &&
+                        rowDropIndicator.rowIndex === rIdx &&
+                        rowDropIndicator.position === 'before' && (
+                          <div className="w-full h-2 bg-indigo-600 rounded-full my-2.5 shadow-md relative flex items-center justify-center animate-pulse z-40">
+                            <div className="absolute -top-3 bg-indigo-600 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                              <span>Insertar columnas aquí</span>
+                            </div>
+                          </div>
+                        )}
+
+                      <DelayedAppearance
+                        delayMinutes={row.delayMinutes}
+                        delaySeconds={row.delaySeconds}
+                        active={isPreviewMode}
+                        resetTrigger={previewResetCount}
+                      >
+                      <div
+                        id={row.id}
+                        style={rowStyle}
+                        onDragOver={(e) => {
+                          const isInnerCols =
+                            draggingInnerCols !== null ||
+                            e.dataTransfer.types.includes('application/ssp-inner-columns');
+                          if (isInnerCols) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const relativeY = e.clientY - rect.top;
+                            const position = relativeY < rect.height / 2 ? 'before' : 'after';
+                            setRowDropIndicator({
+                              sectionId: section.id,
+                              rowIndex: rIdx,
+                              position,
+                            });
+                          }
+                        }}
+                        onDrop={(e) => {
+                          const innerColsData =
+                            e.dataTransfer.getData('application/ssp-inner-columns') ||
+                            (draggingInnerCols !== null ? String(draggingInnerCols) : null);
+                          if (innerColsData) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const cols = parseInt(innerColsData, 10) || 1;
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const relativeY = e.clientY - rect.top;
+                            const position =
+                              rowDropIndicator &&
+                              rowDropIndicator.sectionId === section.id &&
+                              rowDropIndicator.rowIndex === rIdx
+                                ? rowDropIndicator.position
+                                : relativeY < rect.height / 2
+                                ? 'before'
+                                : 'after';
+                            const targetRowIdx = position === 'before' ? rIdx : rIdx + 1;
+                            setDraggingInnerCols(null);
+                            setRowDropIndicator(null);
+                            setSectionDropIndicator(null);
+                            addColumnsLayout(cols, section.id, targetRowIdx);
+                            return;
+                          }
+                        }}
+                        onClick={(e) => {
+                          if (isPreviewMode) return;
+                          e.stopPropagation();
+                          setSelectedRowId(row.id);
+                          setSelectedElementId(null);
+                          setSelectedSectionId(null);
+                        }}
+                        className={`relative transition-all group/row ${rowShadowClass} ${
+                          !isPreviewMode
+                            ? isRowSelected
+                              ? 'ring-2 ring-indigo-600 rounded-xl bg-indigo-50/10'
+                              : 'hover:ring-1 hover:ring-indigo-300 hover:ring-dashed rounded-xl'
+                            : ''
+                        }`}
+                      >
                       {/* FLOATING ACTION TOOLBAR FOR SELECTED INTERNAL SECTION (ROW) */}
                       {!isPreviewMode && isRowSelected && (
                         <div
@@ -6235,6 +7185,18 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             <Box className="w-3.5 h-3.5 text-white" />
                             <span>{row.name || `Sección Interna (${row.columns.length} Col)`}</span>
                           </div>
+                          {((row.delayMinutes || 0) * 60 + (row.delaySeconds || 0)) > 0 && (
+                            <div
+                              className="flex items-center gap-1 bg-indigo-900/90 text-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-mono select-none"
+                              title={`Retardo de aparición programado: ${(row.delayMinutes || 0) > 0 ? `${row.delayMinutes}m ` : ''}${row.delaySeconds || 0}s`}
+                            >
+                              <Clock className="w-3 h-3 text-indigo-300" />
+                              <span>
+                                {(row.delayMinutes || 0) > 0 ? `${row.delayMinutes}m ` : ''}
+                                {row.delaySeconds || 0}s
+                              </span>
+                            </div>
+                          )}
                           <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
                           {/* Row Settings (Tuerca de Configuración) */}
                           <button
@@ -6296,6 +7258,25 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           }}
                           className="px-3"
                           onDragOver={(e) => {
+                            const isInnerCols =
+                              draggingInnerCols !== null ||
+                              e.dataTransfer.types.includes('application/ssp-inner-columns');
+                            if (isInnerCols) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const rowEl = document.getElementById(row.id);
+                              const rect = rowEl
+                                ? rowEl.getBoundingClientRect()
+                                : e.currentTarget.getBoundingClientRect();
+                              const relativeY = e.clientY - rect.top;
+                              const position = relativeY < rect.height / 2 ? 'before' : 'after';
+                              setRowDropIndicator({
+                                sectionId: section.id,
+                                rowIndex: rIdx,
+                                position,
+                              });
+                              return;
+                            }
                             const isBlockOrSectionDrag =
                               draggingBlockType ||
                               draggingSectionId ||
@@ -6310,6 +7291,25 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             e.stopPropagation();
                           }}
                           onDrop={(e) => {
+                            const innerColsData =
+                              e.dataTransfer.getData('application/ssp-inner-columns') ||
+                              (draggingInnerCols !== null ? String(draggingInnerCols) : null);
+                            if (innerColsData) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const cols = parseInt(innerColsData, 10) || 1;
+                              const targetRowIdx =
+                                rowDropIndicator &&
+                                rowDropIndicator.sectionId === section.id &&
+                                rowDropIndicator.rowIndex === rIdx
+                                  ? (rowDropIndicator.position === 'before' ? rIdx : rIdx + 1)
+                                  : rIdx + 1;
+                              setDraggingInnerCols(null);
+                              setRowDropIndicator(null);
+                              setSectionDropIndicator(null);
+                              addColumnsLayout(cols, section.id, targetRowIdx);
+                              return;
+                            }
                             const isBlockOrSectionDrag =
                               draggingBlockType ||
                               draggingSectionId ||
@@ -7065,6 +8065,86 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                         </p>
                                       </div>
                                     )}
+
+                                    {element.type === 'countdown' && (
+                                      <div
+                                        style={{
+                                          textAlign: element.styles.textAlign || 'center',
+                                        }}
+                                        className="w-full py-2"
+                                      >
+                                        <CountdownTimerWidget
+                                          endDate={element.content.countdownEndDate}
+                                          daysLabel={element.content.countdownDaysLabel}
+                                          hoursLabel={element.content.countdownHoursLabel}
+                                          minutesLabel={element.content.countdownMinutesLabel}
+                                          secondsLabel={element.content.countdownSecondsLabel}
+                                          theme={element.content.countdownTheme || 'dark'}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {element.type === 'faq' && (
+                                      <div className="w-full py-2">
+                                        <FaqAccordionWidget items={element.content.faqItems} />
+                                      </div>
+                                    )}
+
+                                    {element.type === 'social_links' && (
+                                      <div
+                                        style={{
+                                          textAlign: element.styles.textAlign || 'center',
+                                        }}
+                                        className="w-full py-2"
+                                      >
+                                        <SocialLinksWidget
+                                          links={element.content.socialLinks}
+                                          size={element.content.socialSize || 'md'}
+                                          styleType={element.content.socialStyle || 'colored'}
+                                          colorMode={element.content.socialColorMode || 'default'}
+                                          iconColor={element.content.socialIconColor || '#FFFFFF'}
+                                          bgColor={element.content.socialBgColor || '#2848F0'}
+                                          shape={element.content.socialShape || 'circle'}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {element.type === 'checkbox' && (
+                                      <div
+                                        style={{
+                                          textAlign: element.styles.textAlign || 'left',
+                                        }}
+                                        className="w-full py-1.5"
+                                      >
+                                        <CheckboxWidget
+                                          label={element.content.checkboxLabel}
+                                          checked={element.content.checkboxChecked}
+                                          required={element.content.checkboxRequired}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {element.type === 'input_field' && (
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          justifyContent:
+                                            element.styles.textAlign === 'center'
+                                              ? 'center'
+                                              : element.styles.textAlign === 'right'
+                                              ? 'flex-end'
+                                              : 'flex-start',
+                                        }}
+                                        className="w-full py-1.5"
+                                      >
+                                        <InputFieldWidget
+                                          label={element.content.fieldLabel}
+                                          placeholder={element.content.fieldPlaceholder}
+                                          type={element.content.fieldType || 'email'}
+                                          required={element.content.fieldRequired}
+                                        />
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* HORIZONTAL PLACEMENT DROP LINE INDICATOR (AFTER) - REQ 2 */}
@@ -7087,10 +8167,26 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     })}
                   </div>
                 </div>
-              );
-            })}
+                </DelayedAppearance>
+
+                {/* Visual Drop Line Indicator After Row */}
+                {!isPreviewMode &&
+                  rowDropIndicator &&
+                  rowDropIndicator.sectionId === section.id &&
+                  rowDropIndicator.rowIndex === rIdx &&
+                  rowDropIndicator.position === 'after' && (
+                    <div className="w-full h-2 bg-indigo-600 rounded-full my-2.5 shadow-md relative flex items-center justify-center animate-pulse z-40">
+                      <div className="absolute -top-3 bg-indigo-600 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                        <span>Insertar columnas aquí</span>
+                      </div>
+                    </div>
+                  )}
+              </React.Fragment>
+            );
+          })}
                 </div>
               </div>
+              </DelayedAppearance>
 
               {/* SECTION & PREBUILT BLOCK DROP INDICATOR (AFTER) */}
               {sectionDropIndicator &&
