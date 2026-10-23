@@ -64,10 +64,16 @@ export function extractYouTubeStartTime(url: string): number | null {
   return seconds > 0 ? seconds : null;
 }
 
+export interface VideoEmbedOptions {
+  autoplay?: boolean;
+  muted?: boolean;
+  loop?: boolean;
+}
+
 /**
- * Parses any video URL and generates an embeddable URL.
+ * Parses any video URL and generates an embeddable URL with optional autoplay/muted/loop parameters.
  */
-export function getEmbedVideoInfo(rawUrl: string | undefined): ParsedVideoInfo {
+export function getEmbedVideoInfo(rawUrl: string | undefined, options?: VideoEmbedOptions): ParsedVideoInfo {
   if (!rawUrl || typeof rawUrl !== 'string') {
     return {
       isValid: false,
@@ -87,6 +93,8 @@ export function getEmbedVideoInfo(rawUrl: string | undefined): ParsedVideoInfo {
     };
   }
 
+  const { autoplay = false, muted = false, loop = false } = options || {};
+
   // 1. YouTube
   const ytId = extractYouTubeId(trimmed);
   if (ytId) {
@@ -94,6 +102,15 @@ export function getEmbedVideoInfo(rawUrl: string | undefined): ParsedVideoInfo {
     let embed = `https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&enablejsapi=1`;
     if (startTime) {
       embed += `&start=${startTime}`;
+    }
+    if (autoplay) {
+      embed += `&autoplay=1`;
+    }
+    if (muted) {
+      embed += `&mute=1`;
+    }
+    if (loop) {
+      embed += `&loop=1&playlist=${ytId}`;
     }
     return {
       isValid: true,
@@ -109,24 +126,48 @@ export function getEmbedVideoInfo(rawUrl: string | undefined): ParsedVideoInfo {
     /(?:vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/[^\/]*\/videos\/|album\/\d+\/video\/|video\/|))(\d+)/i
   );
   if (vimeoMatch && vimeoMatch[1]) {
+    let embed = `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0&portrait=0`;
+    if (autoplay) embed += `&autoplay=1`;
+    if (muted) embed += `&muted=1`;
+    if (loop) embed += `&loop=1`;
     return {
       isValid: true,
       type: 'vimeo',
-      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}?title=0&byline=0&portrait=0`,
+      embedUrl: embed,
       originalUrl: trimmed,
       videoId: vimeoMatch[1],
     };
   }
   if (trimmed.includes('player.vimeo.com/video/')) {
+    let embed = trimmed;
+    if (autoplay && !embed.includes('autoplay=')) embed += `${embed.includes('?') ? '&' : '?'}autoplay=1`;
+    if (muted && !embed.includes('muted=')) embed += `&muted=1`;
+    if (loop && !embed.includes('loop=')) embed += `&loop=1`;
     return {
       isValid: true,
       type: 'vimeo',
-      embedUrl: trimmed,
+      embedUrl: embed,
       originalUrl: trimmed,
     };
   }
 
-  // 3. Loom
+  // 3. Wistia
+  const wistiaMatch = trimmed.match(/(?:wistia\.com\/(?:medias|embed)\/|fast\.wistia\.net\/embed\/iframe\/)([a-zA-Z0-9]+)/i);
+  if (wistiaMatch && wistiaMatch[1]) {
+    let embed = `https://fast.wistia.net/embed/iframe/${wistiaMatch[1]}?videoFoam=true`;
+    if (autoplay) embed += `&autoPlay=true`;
+    if (muted) embed += `&muted=true`;
+    if (loop) embed += `&endVideoBehavior=loop`;
+    return {
+      isValid: true,
+      type: 'wistia' as any,
+      embedUrl: embed,
+      originalUrl: trimmed,
+      videoId: wistiaMatch[1],
+    };
+  }
+
+  // 4. Loom
   const loomMatch = trimmed.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9_-]+)/i);
   if (loomMatch && loomMatch[1]) {
     return {
@@ -138,7 +179,7 @@ export function getEmbedVideoInfo(rawUrl: string | undefined): ParsedVideoInfo {
     };
   }
 
-  // 4. Direct video file (.mp4, .webm, .ogg)
+  // 5. Direct video file (.mp4, .webm, .ogg)
   if (/\.(mp4|webm|ogg)($|\?)/i.test(trimmed)) {
     return {
       isValid: true,
@@ -148,7 +189,7 @@ export function getEmbedVideoInfo(rawUrl: string | undefined): ParsedVideoInfo {
     };
   }
 
-  // 5. Generic iframe or HTTP url
+  // 6. Generic iframe or HTTP url
   if (/^https?:\/\//i.test(trimmed)) {
     return {
       isValid: true,

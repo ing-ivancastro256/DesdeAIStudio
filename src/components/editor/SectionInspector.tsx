@@ -293,7 +293,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                         >
                           <div
                             className="w-full h-7 rounded shadow-2xs"
-                            style={{ background: grad.value }}
+                            style={{ backgroundImage: grad.value }}
                           />
                           <span className="text-zinc-800 text-[10px] truncate">{grad.name}</span>
                         </button>

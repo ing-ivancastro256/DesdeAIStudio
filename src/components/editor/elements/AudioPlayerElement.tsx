@@ -118,6 +118,13 @@ export const AudioPlayerElement: React.FC<AudioPlayerElementProps> = ({
     maxWidth: element.styles?.maxWidth || '100%',
   };
 
+  const isPlaylist =
+    audioUrl.includes('playlist') ||
+    audioUrl.includes('album') ||
+    audioUrl.includes('sets');
+
+  const embedHeight = isPlaylist ? 380 : 152;
+
   return (
     <div style={containerStyle} className="w-full">
       {/* SPOTIFY EMBED MODE */}
@@ -126,7 +133,7 @@ export const AudioPlayerElement: React.FC<AudioPlayerElementProps> = ({
           <iframe
             src={getSpotifyEmbedUrl(audioUrl)}
             width="100%"
-            height="152"
+            height={embedHeight}
             frameBorder="0"
             allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
             loading="lazy"
@@ -141,7 +148,7 @@ export const AudioPlayerElement: React.FC<AudioPlayerElementProps> = ({
         <div className="rounded-2xl overflow-hidden shadow-sm border border-zinc-200">
           <iframe
             width="100%"
-            height="166"
+            height={isPlaylist ? 380 : 166}
             scrolling="no"
             frameBorder="no"
             allow="autoplay"

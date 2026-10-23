@@ -695,13 +695,74 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
             <EmbeddedVideoPlayer
               videoUrl={element.content.videoUrl}
               aspectRatio={element.styles?.aspectRatio || '16/9'}
-              borderRadius={element.styles?.borderRadius ?? 12}
+              borderRadius={element.styles?.borderRadius ?? 0}
               maxWidth={element.styles?.maxWidth || '780px'}
+              borderWidth={element.styles?.borderWidth}
+              borderColor={element.styles?.borderColor}
+              borderStyle={element.styles?.borderStyle}
+              isEditable={false}
+              videoSource={element.content.videoSource}
+              videoAutoplay={element.content.videoAutoplay}
+              videoMuted={element.content.videoMuted}
+              videoLoop={element.content.videoLoop}
+              videoCoverType={element.content.videoCoverType}
+              videoCoverImage={element.content.videoCoverImage}
+              videoCoverText={element.content.videoCoverText}
+              videoCoverTextFont={element.content.videoCoverTextFont}
+              videoCoverTextSize={element.content.videoCoverTextSize}
+              videoCoverTextColor={element.content.videoCoverTextColor}
+              videoCoverTextBg={element.content.videoCoverTextBg}
+              videoCoverTextBold={element.content.videoCoverTextBold}
+              videoCoverPlayIcon={element.content.videoCoverPlayIcon}
+              videoCoverButtonShape={element.content.videoCoverButtonShape}
+              videoCoverPlayColor={element.content.videoCoverPlayColor}
+              videoCoverPlayBg={element.content.videoCoverPlayBg}
+              videoCoverPlaySize={element.content.videoCoverPlaySize}
+              videoCoverArrowType={element.content.videoCoverArrowType}
+              videoCoverArrowColor={element.content.videoCoverArrowColor}
+              videoCoverArrowSize={element.content.videoCoverArrowSize}
+              videoCoverArrowRotation={element.content.videoCoverArrowRotation}
+              videoCoverBgType={element.content.videoCoverBgType}
+              videoCoverBgColor={element.content.videoCoverBgColor}
+              videoCoverBgOpacity={element.content.videoCoverBgOpacity}
             />
           </div>
         );
 
-      case 'image':
+      case 'image': {
+        const linkUrl = element.styles?.linkUrl || element.content?.linkUrl;
+        const linkOpenNewTab = element.styles?.linkOpenNewTab ?? element.content?.linkOpenNewTab ?? true;
+        const imgNode = (
+          <img
+            src={element.content.src || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80'}
+            alt={element.content.alt || 'Imagen'}
+            style={{
+              width: element.styles?.imageWidth ? `${element.styles.imageWidth}px` : (element.styles?.maxWidth || '100%'),
+              height: element.styles?.imageHeight ? `${element.styles.imageHeight}px` : 'auto',
+              maxWidth: '100%',
+              borderRadius: `${element.styles?.borderRadius ?? 0}px`,
+              opacity: element.styles?.opacity ?? 1,
+              objectFit: element.styles?.imageHeight ? 'cover' : undefined,
+              border: element.styles?.borderWidth
+                ? `${element.styles.borderWidth}px ${element.styles.borderStyle || 'solid'} ${
+                    element.styles.borderColor || '#E4E4E7'
+                  }`
+                : undefined,
+              boxShadow:
+                element.styles?.shadow === 'sm'
+                  ? '0 1px 2px 0 rgb(0 0 0 / 0.05)'
+                  : element.styles?.shadow === 'md'
+                  ? '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  : element.styles?.shadow === 'lg'
+                  ? '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                  : element.styles?.shadow === 'xl'
+                  ? '0 20px 25px -5px rgb(0 0 0 / 0.1)'
+                  : undefined,
+            }}
+            className="transition-all"
+          />
+        );
+
         return (
           <div
             key={element.id || eIdx}
@@ -717,18 +778,21 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
               marginBottom: `${element.styles?.marginBottom ?? 16}px`,
             }}
           >
-            <img
-              src={element.content.src || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80'}
-              alt={element.content.alt || 'Imagen'}
-              style={{
-                width: element.styles?.maxWidth || '100%',
-                borderRadius: `${element.styles?.borderRadius || 8}px`,
-                transform: element.styles?.rotation ? `rotate(${element.styles.rotation}deg)` : undefined,
-              }}
-              className="object-cover shadow-sm max-h-[500px]"
-            />
+            {linkUrl ? (
+              <a
+                href={linkUrl}
+                target={linkOpenNewTab ? '_blank' : '_self'}
+                rel="noreferrer noopener"
+                className="inline-block cursor-pointer hover:opacity-95 transition-opacity"
+              >
+                {imgNode}
+              </a>
+            ) : (
+              imgNode
+            )}
           </div>
         );
+      }
 
       case 'divider':
         return (
@@ -888,7 +952,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
     if (effectiveBgType === 'solid') {
       sectionStyle.backgroundColor = section.bgColor || '#FFFFFF';
     } else if (effectiveBgType === 'gradient') {
-      sectionStyle.background =
+      sectionStyle.backgroundImage =
         section.bgGradient || 'linear-gradient(135deg, #18181B 0%, #09090B 100%)';
     } else if (effectiveBgType === 'image' && section.bgImageUrl) {
       sectionStyle.backgroundImage = `url("${section.bgImageUrl}")`;

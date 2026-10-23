@@ -1,115 +1,153 @@
-# Plan de Reorganización y Nuevos Elementos en la Biblioteca del Editor
+# Plan de Modernización y Reestructuración Multimedia (Imagen, Video, Audio e Icono)
 
-Reestructuración integral del panel lateral de **Elementos** en el constructor visual de Scale Sales Pro, estandarizando nombres, depurando iconos innecesarios, creando nuevos elementos interactivos (Cuenta regresiva, Preguntas Frecuentes, Widget de Redes Sociales, reCAPTCHA, Casilla de verificación y Campo de formulario) y organizando los grupos según las especificaciones del usuario.
+Este plan detalla la reestructuración completa de los controles e inspectores de los elementos del grupo **MULTIMEDIA** (`image`, `video`, `audio`, `icon`) en el editor visual y en el visor del embudo, asegurando controles ergonómicos, diseño limpio sin elementos innecesarios y soporte completo para portadas interactivas de video y playlists de audio.
 
----
+## Decisiones Críticas y Preferencias Confirmadas
 
-## 1. Estructura de Grupos y Elementos
-
-### Grupo 1: Sección
-- **Encabezado**: Sin icono de sección, título limpio "Sección" con etiqueta informativa "Arrastra al lienzo".
-- **Elementos (Bloques de disposición en cuadrícula)**:
-  - `1 Columna` (100%)
-  - `2 Columnas` (50% / 50%)
-  - `3 Columnas` (33% / 33% / 33%)
-  - `4 Columnas` (25% / 25% / 25% / 25%)
-
-### Grupo 2: Texto
-- **Titular**: Encabezados H1 a H4 configurables.
-- **Párrafo**: Texto multilínea con saltos de línea automáticos.
-- **Lista de Viñetas**: Ítems ordenados o con iconos personalizables.
-- **Editor de Texto**: Editor enriquecido con formato WYSIWYG.
-
-### Grupo 3: Multimedia
-- **Imagen**: Selector y carga de imagen con opciones de tamaño y bordes.
-- **Video**: Reproductor responsive para YouTube, Vimeo y video directo.
-- **Audio**: Reproductor de pistas o música de fondo.
-- **Icono**: Icono personalizable (renombrado de "Icono Vectorial" a simplemente "Icono").
-
-### Grupo 4: CTA (Llamadas a la Acción)
-- **Botón**: Botón de acción con enlace a siguiente página, URL o calendario.
-- **Botón Pop-up**: Botón que dispara modales flotantes con ofertas o formularios.
-
-### Grupo 5: Formularios
-- **Formulario**: Formulario de captura de prospectos (renombrado de "Formulario Simple" a "Formulario").
-- **reCAPTCHA**: Caja de verificación de seguridad "No soy un robot".
-- **Casilla de verificación**: Checkbox para términos, condiciones o selección múltiple.
-- **Campo de formulario**: Input personalizable (texto, email, teléfono, número o textarea).
-
-### Grupo 6: Otros
-- **Separador**: Línea divisoria personalizable (sólida, discontinua o con espaciado).
-- **Espaciador**: Bloque de separación vertical ajustable en píxeles.
-- **Cuenta regresiva**: Contador regresivo con tarjetas para Días, Horas, Minutos y Segundos, estilo alta conversión con fecha límite configurable.
-- **Preguntas frecuentes**: Acordeón FAQ interactivo con preguntas y respuestas desplegables.
-
-### Grupo 7: Redes Sociales
-- **Widget de Redes Sociales**: Un único elemento configurable que inserta una barra horizontal con los iconos de Facebook, Instagram, TikTok, WhatsApp y YouTube. Permite activar/desactivar cada red, editar URLs y personalizar tamaño y colores.
-
-### Grupo 8: Conversión SSP
-- **Formulario SSP (Quiz)**: Formulario interactivo de preguntas y calificación de prospectos.
-- **Calendario SSP**: Selector interactivo de citas sincronizado con Google Calendar.
+> [!IMPORTANT]
+> Se han integrado las siguientes respuestas y elecciones directas del usuario:
+> - **Proporción de Imagen**: Conexión proporcional por defecto entre ancho y alto, con botón de candado interactivo para desbloquear dimensiones libres cuando sea necesario y botón "Restaurar tamaño original".
+> - **Acción de Portada de Video (Cover)**: Al hacer clic en la portada personalizada, la cubierta se oculta suavemente e inicia la reproducción del video de inmediato.
+> - **Playlists de Audio (Spotify / SoundCloud)**: Reproductor enriquecido con visualización interactiva y lista de hasta 20 pistas de la playlist.
 
 ---
 
-## 2. Cambios en Modelo de Datos y Tipos (`src/types/index.ts`)
+## 1. Alcance por Elemento
 
-1. Ampliar `ElementType`:
-   ```ts
-   export type ElementType =
-     | 'heading'
-     | 'subheading'
-     | 'paragraph'
-     | 'bullet_list'
-     | 'rich_text'
-     | 'button'
-     | 'image'
-     | 'video'
-     | 'divider'
-     | 'spacer'
-     | 'audio'
-     | 'icon'
-     | 'simple_form'
-     | 'popup_button'
-     | 'form'
-     | 'calendar'
-     | 'countdown'      // NUEVO
-     | 'faq'            // NUEVO
-     | 'social_links'   // NUEVO
-     | 'recaptcha'      // NUEVO
-     | 'checkbox'       // NUEVO
-     | 'input_field';   // NUEVO
-   ```
-
-2. Extender `content` de `PageBlockElement` para soportar:
-   - `countdown`: `targetDate`, `countdownDaysLabel`, `countdownHoursLabel`, `countdownMinutesLabel`, `countdownSecondsLabel`, `countdownTheme`.
-   - `faq`: `faqItems: { id: string; question: string; answer: string; open?: boolean }[]`.
-   - `social_links`: `socialPlatforms: { id: string; platform: 'facebook' | 'instagram' | 'tiktok' | 'whatsapp' | 'youtube'; url: string; enabled: boolean }[]`.
-   - `recaptcha`: `recaptchaTheme: 'light' | 'dark'`.
-   - `checkbox`: `checkboxLabel`, `checkboxChecked`, `checkboxRequired`.
-   - `input_field`: `inputPlaceholder`, `inputLabel`, `inputType`, `inputRequired`.
+### A. Elemento Imagen (`image`)
+1. **Bordes y Radio por Defecto**:
+   - Nuevas imágenes se inicializan con `borderRadius: 0` (0px) en lugar de esquinas redondeadas forzadas.
+2. **Ajustes y Forma de Imagen**:
+   - **Eliminar control de rotación** (grados).
+   - **Controles de Ancho y Alto sincronizados** (siguiendo *Imagen 1* del usuario):
+     - Fila para **Ancho (Size / Width)**: Deslizador (`range`) + Input numérico con unidad (`px` / `%`).
+     - Fila para **Alto (Height)**: Deslizador (`range`) + Input numérico con unidad (`px` / `%`).
+     - Botón de enlace / candado para alternar entre proporción fija y libre.
+     - Botón/enlace inferior: `↺ Restaurar tamaño original` que restablece las dimensiones naturales de la imagen.
+   - Conservar sombra, opacidad y alineación.
+3. **Nuevo Grupo "LINK DE IMAGEN"**:
+   - Input para URL de destino (`linkUrl`).
+   - Switch o checkbox para `Abrir en nueva pestaña (_blank)`.
+   - Si está vacío, la imagen no realiza ninguna acción al clic.
+   - En canvas (modo vista previa) y embudo público, la imagen se envuelve en enlace `<a>` funcional.
+4. **Orden Estricto de Acordeones**:
+   1. *Origen de la imagen*
+   2. *Ajustes y Forma de Imagen*
+   3. *Link de Imagen*
+   4. *Borde Exterior de Imagen*
+   5. *Disposición (Márgenes y Relleno)*
 
 ---
 
-## 3. Implementación en `VisualEditor.tsx` y `PublicFunnelModal.tsx`
-
-1. **`createNewElement`**:
-   - Crear los valores predeterminados de diseño y contenido para `countdown`, `faq`, `social_links`, `recaptcha`, `checkbox`, `input_field`.
-2. **`renderElementContent`**:
-   - Renderizado interactivo en el lienzo para cada nuevo elemento con Tailwind CSS de alta calidad visual.
-   - Cuenta regresiva con animación de segundero y cajas estilizadas.
-   - Acordeón FAQ con interacción de colapsar/desplegar en vivo.
-   - Fila de redes sociales con badges y enlaces reales.
-3. **Inspector de Propiedades (`ElementInspector.tsx` / panel lateral)**:
-   - Configuración de fechas y textos para el contador.
-   - Añadir/editar/eliminar preguntas en el FAQ.
-   - Activar/desactivar redes sociales y colocar enlaces URL correspondientes.
-4. **Replica en `PublicFunnelModal.tsx`**:
-   - Garantizar que la página publicada o en vista previa muestre todos los nuevos componentes con perfecta fidelidad visual y funcional.
+### B. Elemento Video (`video`)
+1. **Origen del Video**:
+   - Selector desplegable **"Fuente"**: `YouTube`, `Vimeo`, `Wistia`, `Subir Video`, `Video Externo`, `Alojado en Servidor`.
+   - Campo para introducir la URL del video.
+   - Eliminación de textos redundantes y del check verde de "listo para reproducir" para lograr una interfaz limpia.
+   - Conservación del botón de carga de video de prueba (`Cargar video de prueba`).
+2. **Ajustes del Reproductor**:
+   - Configuración de bordes:
+     - Grosor de borde (`borderWidth` en px).
+     - Estilo de borde (`borderStyle`: sólido, rayado, punteado).
+     - Color de borde (`borderColor` con selector Hex/paleta).
+   - Bordes redondeados (`borderRadius` en px).
+   - Ancho máximo del reproductor:
+     - Botones de presets rápidos (`480px`, `640px`, `750px`, `100%`).
+     - Input numérico libre en px/% para control milimétrico.
+   - Mantenimiento de alineación (`izquierda`, `centro`, `derecha`) y relación de aspecto (`16:9`, `4:3`, `9:16`, `1:1`).
+3. **Nuevo Grupo "OPCIONES DEL VIDEO"**:
+   - `Autoreproducir` (`autoplay`).
+   - `Silenciar` (`muted`).
+   - `Bucle / Repetir` (`loop`).
+4. **Nuevo Grupo "COVER PORTADA" (siguiendo *Imagen 2*)**:
+   - Selector de tipo de portada:
+     - **Opción 1: Imagen personalizada** (subida o URL de imagen de portada).
+     - **Opción 2: Portada diseñada con 4 elementos interactivos**:
+       1. **Icono de Play**: Centrado vertical y horizontalmente; selector de variantes de icono (Play clásico, Play con círculo, Play suave); control de tamaño y color del icono y de su botón circular.
+       2. **Texto Superior**: Píldora/banner superior (ej. "DALE CLICK AQUÍ" / "Haz clic para ver el video"); personalizable en tipografía, tamaño de fuente, color de texto, color de fondo de la cápsula y estilos (negrita, mayúsculas).
+       3. **Flecha Indicadora**: Flecha curvada orientada hacia el botón de play; personalizable en tipo de flecha, tamaño, color y ángulo de rotación sobre su eje (0° a 360°).
+       4. **Fondo de Portada**: Fondo personalizable (color sólido, gradiente suave o patrón oscuro) con control de opacidad y selector de color.
+   - **Comportamiento interactivo**: Al hacer clic sobre la portada (en vista previa o modo público), la cubierta se desvanece suavemente y el video se reproduce automáticamente.
+5. **Disposición**:
+   - Mantenimiento intacto del control de márgenes (Box Model).
 
 ---
 
-## 4. Verificación y Calidad
+### C. Elemento Audio (`audio`)
+1. **Origen de Audio**:
+   - Selector desplegable **"Fuente"**: `SoundCloud`, `Spotify`, `Audio Externo`, `Subir Audio`, `Alojado en Servidor`.
+   - Campo para URL de audio/canción/playlist.
+   - Eliminación de textos redundantes inferiores y del check verde.
+   - Mantenimiento de botón de carga de audio de prueba.
+2. **Soporte de Playlist**:
+   - Cuando se introduce un enlace de playlist (Spotify o SoundCloud), renderizar el reproductor embebido completo que expone la lista de pistas navegable (hasta 20+ temas).
+3. **Disposición**:
+   - Acordeón de espaciado y márgenes al final.
 
-- Ejecutar `lint_applet` y `compile_applet` para asegurar ausencia de errores de tipado o compilación.
-- Comprobar inserción tanto por clic como por arrastre (drag-and-drop).
-- Verificar que las secciones creadas mantengan espaciados en 0px por defecto tal como se solicitó previamente.
+---
+
+### D. Elemento Icono (`icon`)
+1. **Previsualización Visual de Icono**:
+   - En lugar de mostrar solo el nombre textual (ej. "Star"), renderizar la forma real del icono seleccionado en un recuadro gráfico destacado.
+2. **Organización de Controles**:
+   - **Tamaño y Color en una sola línea**: Slider de tamaño del icono colocado de forma compacta y selector de color en la misma fila para optimizar espacio vertical.
+   - Inmediatamente debajo: **"Forma del icono"** (desplegable: Ninguna / Círculo / Cuadrado / Esquinas redondeadas).
+   - Inmediatamente debajo: **"Color de Fondo del contenedor"** con su respectivo selector de color (Hex y presets).
+3. **Disposición**:
+   - Acordeón de márgenes y padding al final.
+
+---
+
+## 2. Arquitectura de Componentes y Datos
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ VisualEditor / Inspector Panel (Sidebar)                               │
+├────────────────────────────────────────────────────────────────────────┤
+│  Image Inspector:                                                      │
+│  [1. Origen] → [2. Ajustes/Forma (W/H Sliders)] → [3. Link] →         │
+│  [4. Bordes] → [5. Disposición]                                        │
+│                                                                        │
+│  Video Inspector:                                                      │
+│  [1. Origen (Fuente + URL)] → [2. Ajustes (Bordes + Ancho)] →          │
+│  [3. Opciones (Autoplay/Mute/Loop)] → [4. Cover Portada (4 Elementos)] │
+│  → [5. Disposición]                                                    │
+│                                                                        │
+│  Audio Inspector:                                                      │
+│  [1. Origen (Fuente + Playlist)] → [2. Disposición]                    │
+│                                                                        │
+│  Icon Inspector:                                                       │
+│  [Visual Preview] → [Tamaño + Color fila única] →                      │
+│  [Forma Contenedor] → [Color Fondo] → [Disposición]                    │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   │ Actualiza estado del elemento
+                                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ Canvas Renderer & PublicFunnelModal                                    │
+├────────────────────────────────────────────────────────────────────────┤
+│  - Renderizado de imagen con enlace <a> funcional si existe URL        │
+│  - Renderizado de Video con Cover interactivo y autoplay al clic       │
+│  - Embed de Audio con soporte para playlist de 20 temas                │
+│  - Renderizado de Icono con forma y fondo configurados                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Plan de Verificación
+
+1. **Pruebas de Imagen**:
+   - Agregar nueva imagen y verificar que nace con `borderRadius: 0px`.
+   - Modificar ancho y alto con los sliders y comprobar sincronización proporcional con candado activo y desbloqueo al abrir el candado.
+   - Pulsar "Restaurar tamaño original" y verificar restablecimiento.
+   - Probar configuración de enlace y apertura en nueva pestaña en modo vista previa.
+2. **Pruebas de Video**:
+   - Seleccionar fuente (YouTube, Vimeo, etc.), verificar remoción de textos y checks verdes.
+   - Probar bordes y ancho máximo numérico.
+   - Configurar portada personalizada compuesta con icono, texto superior, flecha girada y fondo; verificar que al hacer clic se oculta e inicia el video.
+3. **Pruebas de Audio**:
+   - Probar fuentes, ingresar enlace de playlist y verificar visualización de lista de pistas.
+4. **Pruebas de Icono**:
+   - Verificar preview gráfico de la forma del icono, alineación horizontal de tamaño y color, y selector de forma/fondo.
+5. **Validación de Compilación y Tipos**:
+   - Ejecutar `compile_applet` y `lint_applet` para confirmar cero errores.

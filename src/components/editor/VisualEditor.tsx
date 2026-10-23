@@ -88,7 +88,20 @@ import {
   CheckSquare,
   TextCursorInput,
   Clock,
+  Lock,
+  Unlock,
+  Play,
+  PlayCircle,
+  Film,
+  MousePointerClick,
+  ArrowDownRight,
+  CornerRightDown,
+  Tv,
+  Flame,
+  Heart,
+  Disc,
 } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { DelayedAppearance } from '../common/DelayedAppearance';
 import { SectionInspector } from './SectionInspector';
 import { PageSettingsInspector } from './PageSettingsInspector';
@@ -430,9 +443,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     action: true,
     imageSource: true,
     imageAdjustments: true,
+    imageLink: true,
     imageBorder: true,
     videoSource: true,
     videoSettings: true,
+    videoOptions: true,
+    videoCover: true,
     dividerSettings: true,
     formSettings: true,
     calendarSettings: true,
@@ -1621,7 +1637,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           alt: 'Reunión de estrategia comercial',
         };
         newElement.styles = {
-          borderRadius: 12,
+          borderRadius: 0,
+          imageWidth: 450,
+          aspectRatioLocked: true,
           marginTop: 0,
           marginBottom: 20,
           marginLeft: 0,
@@ -1631,9 +1649,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       case 'video':
         newElement.content = {
           videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          videoSource: 'youtube',
+          videoCoverType: 'none',
         };
         newElement.styles = {
           maxWidth: '750px',
+          borderRadius: 0,
           marginTop: 0,
           marginBottom: 24,
           marginLeft: 0,
@@ -1663,6 +1684,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       case 'audio':
         newElement.content = {
           audioType: 'direct',
+          audioSource: 'external',
           audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
           audioTitle: 'Audio Explicativo / Música',
           audioArtist: 'Scale Sales Pro',
@@ -3864,185 +3886,1144 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     </div>
                   )}
 
-                  {/* 4. CONTENT & SOURCE FOR IMAGE (NO TIPOGRAFÍA!) */}
+                  {/* 4. MULTIMEDIA - IMAGEN: EXACTAMENTE 5 GRUPOS ORDENADOS */}
+                  {/* 1 Origen de la imagen, 2 Ajustes y Forma de Imagen, 3 Link de Imagen, 4 Borde Exterior de Imagen, 5 Disposición */}
                   {selectedElement.type === 'image' && (
-                    <div className="space-y-3.5 border border-zinc-200 rounded-xl p-3 bg-zinc-50/50">
-                      <div className="flex items-center justify-between">
-                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
-                          <ImageIcon className="w-4 h-4 text-[#2848F0]" />
-                          <span>Origen de la Imagen</span>
-                        </label>
-                        <span className="text-[10px] text-zinc-400 font-mono">JPG / PNG / WebP</span>
-                      </div>
+                    <div className="space-y-3">
+                      {/* 1. ORIGEN DE LA IMAGEN */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('imageSource')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <ImageIcon className="w-3.5 h-3.5 text-[#2848F0]" />
+                            1. Origen de la imagen
+                          </span>
+                          {openSections.imageSource ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
 
-                      {/* File upload button triggering system file dialog */}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full py-2.5 px-3 bg-white border border-[#2848F0] text-[#2848F0] hover:bg-blue-50/70 font-semibold rounded-lg flex items-center justify-center gap-2 shadow-2xs transition-colors cursor-pointer"
-                      >
-                        <Upload className="w-4 h-4" />
-                        <span>Subir imagen desde explorador</span>
-                      </button>
+                        {openSections.imageSource && (
+                          <div className="p-3 space-y-3.5 bg-white">
+                            {/* File upload button triggering system file dialog */}
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-full py-2.5 px-3 bg-white border border-[#2848F0] text-[#2848F0] hover:bg-blue-50/70 font-semibold rounded-lg flex items-center justify-center gap-2 shadow-2xs transition-colors cursor-pointer"
+                            >
+                              <Upload className="w-4 h-4" />
+                              <span>Subir imagen desde explorador</span>
+                            </button>
 
-                      {/* Or direct URL input */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px] font-semibold text-zinc-600">O pegar URL de imagen:</span>
-                          <span className="text-[10px] text-zinc-400">Web / CDN</span>
-                        </div>
-                        <input
-                          type="text"
-                          value={selectedElement.content.src || ''}
-                          onChange={(e) => updateSelectedElement({}, { src: e.target.value })}
-                          placeholder="https://..."
-                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
-                        />
-                      </div>
+                            {/* Direct URL input */}
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[11px] font-semibold text-zinc-600">O pegar URL de imagen:</span>
+                                <span className="text-[10px] text-zinc-400">Web / CDN</span>
+                              </div>
+                              <input
+                                type="text"
+                                value={selectedElement.content.src || ''}
+                                onChange={(e) => updateSelectedElement({}, { src: e.target.value })}
+                                placeholder="https://..."
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
+                              />
+                            </div>
 
-                      {/* Image Preview thumbnail */}
-                      {selectedElement.content.src && (
-                        <div className="relative rounded-lg overflow-hidden border border-zinc-200 bg-white p-1">
-                          <img
-                            src={selectedElement.content.src}
-                            alt="Miniatura"
-                            className="w-full h-24 object-cover rounded"
-                          />
-                          <div className="text-[10px] text-zinc-400 text-center mt-1">
-                            Vista previa del recurso
+                            {/* Image Preview thumbnail */}
+                            {selectedElement.content.src && (
+                              <div className="relative rounded-lg overflow-hidden border border-zinc-200 bg-white p-1">
+                                <img
+                                  src={selectedElement.content.src}
+                                  alt="Miniatura"
+                                  className="w-full h-24 object-cover rounded"
+                                />
+                                <div className="text-[10px] text-zinc-400 text-center mt-1">
+                                  Vista previa del recurso
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Alt text for accessibility */}
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Texto alternativo (Alt / SEO):</label>
+                              <input
+                                type="text"
+                                value={selectedElement.content.alt || ''}
+                                onChange={(e) => updateSelectedElement({}, { alt: e.target.value })}
+                                placeholder="Descripción de la imagen"
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
+                              />
+                            </div>
+
+                            {/* Quick demo presets */}
+                            <div>
+                              <span className="text-[11px] text-zinc-500 font-medium block mb-1.5">Imágenes rápidas de muestra:</span>
+                              <div className="grid grid-cols-3 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateSelectedElement({}, {
+                                      src: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80',
+                                      alt: 'Reunión de estrategia comercial',
+                                    })
+                                  }
+                                  className="p-1 text-[10px] bg-white border border-zinc-200 rounded hover:border-[#2848F0] text-zinc-700 cursor-pointer text-center"
+                                >
+                                  Reunión
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateSelectedElement({}, {
+                                      src: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&auto=format&fit=crop&q=80',
+                                      alt: 'Consultora ejecutiva profesional',
+                                    })
+                                  }
+                                  className="p-1 text-[10px] bg-white border border-zinc-200 rounded hover:border-[#2848F0] text-zinc-700 cursor-pointer text-center"
+                                >
+                                  Consultora
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateSelectedElement({}, {
+                                      src: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=80',
+                                      alt: 'Gráfico de resultados y crecimiento',
+                                    })
+                                  }
+                                  className="p-1 text-[10px] bg-white border border-zinc-200 rounded hover:border-[#2848F0] text-zinc-700 cursor-pointer text-center"
+                                >
+                                  Resultados
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      )}
-
-                      {/* Alt text for accessibility */}
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1">Texto alternativo (Alt / SEO):</label>
-                        <input
-                          type="text"
-                          value={selectedElement.content.alt || ''}
-                          onChange={(e) => updateSelectedElement({}, { alt: e.target.value })}
-                          placeholder="Descripción de la imagen"
-                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
-                        />
+                        )}
                       </div>
 
-                      {/* Quick demo presets */}
-                      <div>
-                        <span className="text-[11px] text-zinc-500 font-medium block mb-1.5">Imágenes rápidas de muestra:</span>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateSelectedElement({}, {
-                                src: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80',
-                                alt: 'Reunión de estrategia comercial',
-                              })
+                      {/* 2. AJUSTES Y FORMA DE IMAGEN (SIN ROTACIÓN, ANCHO Y ALTO CONECTADOS - IMAGEN 1) */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('imageAdjustments')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Sliders className="w-3.5 h-3.5 text-[#2848F0]" />
+                            2. Ajustes y Forma de Imagen
+                          </span>
+                          {openSections.imageAdjustments ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openSections.imageAdjustments && (() => {
+                          const isLocked = selectedElement.styles.aspectRatioLocked ?? true;
+                          const curWidth = selectedElement.styles.imageWidth || 450;
+                          const curHeight = selectedElement.styles.imageHeight || Math.round(curWidth / 1.5);
+                          const ratio = (selectedElement.styles.imageWidth && selectedElement.styles.imageHeight)
+                            ? selectedElement.styles.imageWidth / selectedElement.styles.imageHeight
+                            : 1.5;
+
+                          const handleWidthChange = (val: number) => {
+                            const clampedWidth = Math.max(20, Math.min(1200, val));
+                            if (isLocked) {
+                              const calculatedHeight = Math.round(clampedWidth / ratio);
+                              updateSelectedElement({
+                                imageWidth: clampedWidth,
+                                imageHeight: calculatedHeight,
+                              });
+                            } else {
+                              updateSelectedElement({ imageWidth: clampedWidth });
                             }
-                            className="p-1 text-[10px] bg-white border border-zinc-200 rounded hover:border-[#2848F0] text-zinc-700 cursor-pointer text-center"
-                          >
-                            Reunión
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateSelectedElement({}, {
-                                src: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&auto=format&fit=crop&q=80',
-                                alt: 'Consultora ejecutiva profesional',
-                              })
+                          };
+
+                          const handleHeightChange = (val: number) => {
+                            const clampedHeight = Math.max(20, Math.min(1200, val));
+                            if (isLocked) {
+                              const calculatedWidth = Math.round(clampedHeight * ratio);
+                              updateSelectedElement({
+                                imageWidth: calculatedWidth,
+                                imageHeight: clampedHeight,
+                              });
+                            } else {
+                              updateSelectedElement({ imageHeight: clampedHeight });
                             }
-                            className="p-1 text-[10px] bg-white border border-zinc-200 rounded hover:border-[#2848F0] text-zinc-700 cursor-pointer text-center"
-                          >
-                            Consultora
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateSelectedElement({}, {
-                                src: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=80',
-                                alt: 'Gráfico de resultados y crecimiento',
-                              })
-                            }
-                            className="p-1 text-[10px] bg-white border border-zinc-200 rounded hover:border-[#2848F0] text-zinc-700 cursor-pointer text-center"
-                          >
-                            Resultados
-                          </button>
-                        </div>
+                          };
+
+                          const handleResetSize = () => {
+                            updateSelectedElement({
+                              imageWidth: 450,
+                              imageHeight: undefined,
+                              aspectRatioLocked: true,
+                            });
+                          };
+
+                          return (
+                            <div className="p-3 space-y-4 bg-white">
+                              {/* CONTROLES DE ANCHO Y ALTO CONECTADOS (IMAGEN 1) */}
+                              <div className="space-y-3 p-3 bg-zinc-50/70 border border-zinc-200 rounded-xl">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-zinc-800">Dimensiones de la imagen</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ aspectRatioLocked: !isLocked })}
+                                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border cursor-pointer transition-colors ${
+                                      isLocked
+                                        ? 'bg-blue-50 text-[#2848F0] border-blue-200'
+                                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                                    }`}
+                                    title={isLocked ? 'Proporción vinculada (clic para desbloquear dimensiones)' : 'Dimensiones libres (clic para bloquear proporción)'}
+                                  >
+                                    {isLocked ? <Lock className="w-3 h-3 text-[#2848F0]" /> : <Unlock className="w-3 h-3 text-zinc-400" />}
+                                    <span>{isLocked ? 'Proporción vinculada' : 'Libre'}</span>
+                                  </button>
+                                </div>
+
+                                {/* ANCHO */}
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-700">
+                                    <span>Ancho</span>
+                                    <span className="font-mono text-zinc-500 text-[10px]">{curWidth}px</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="range"
+                                      min={50}
+                                      max={1200}
+                                      step={5}
+                                      value={curWidth}
+                                      onChange={(e) => handleWidthChange(Number(e.target.value))}
+                                      className="flex-1 accent-[#2848F0] cursor-pointer"
+                                    />
+                                    <div className="flex items-center border border-zinc-200 rounded-md bg-white overflow-hidden w-20 shrink-0">
+                                      <input
+                                        type="number"
+                                        min={20}
+                                        max={1600}
+                                        value={curWidth}
+                                        onChange={(e) => handleWidthChange(Number(e.target.value))}
+                                        className="w-full p-1 text-xs font-mono text-center focus:outline-none"
+                                      />
+                                      <span className="text-[10px] text-zinc-400 pr-1 select-none font-mono">px</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* ALTO */}
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-700">
+                                    <span>Alto</span>
+                                    <span className="font-mono text-zinc-500 text-[10px]">{curHeight}px</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="range"
+                                      min={30}
+                                      max={1200}
+                                      step={5}
+                                      value={curHeight}
+                                      onChange={(e) => handleHeightChange(Number(e.target.value))}
+                                      className="flex-1 accent-[#2848F0] cursor-pointer"
+                                    />
+                                    <div className="flex items-center border border-zinc-200 rounded-md bg-white overflow-hidden w-20 shrink-0">
+                                      <input
+                                        type="number"
+                                        min={20}
+                                        max={1600}
+                                        value={curHeight}
+                                        onChange={(e) => handleHeightChange(Number(e.target.value))}
+                                        className="w-full p-1 text-xs font-mono text-center focus:outline-none"
+                                      />
+                                      <span className="text-[10px] text-zinc-400 pr-1 select-none font-mono">px</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* BOTÓN RESTAURAR TAMAÑO ORIGINAL (IMAGEN 1) */}
+                                <button
+                                  type="button"
+                                  onClick={handleResetSize}
+                                  className="w-full py-1.5 px-2 bg-white border border-zinc-200 hover:border-[#2848F0] hover:text-[#2848F0] rounded-lg text-[11px] font-semibold text-zinc-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+                                >
+                                  <RotateCcw className="w-3 h-3 text-[#2848F0]" />
+                                  <span>↺ Restaurar tamaño original</span>
+                                </button>
+                              </div>
+
+                              {/* BORDES REDONDEADOS (RADIO) */}
+                              <div className="space-y-2">
+                                <NumberControl
+                                  label="Bordes redondeados (Radio)"
+                                  value={selectedElement.styles.borderRadius || 0}
+                                  min={0}
+                                  max={150}
+                                  onChange={(val) => updateSelectedElement({ borderRadius: val })}
+                                />
+                                <div className="flex items-center gap-1.5 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ borderRadius: 0 })}
+                                    className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
+                                      (selectedElement.styles.borderRadius || 0) === 0 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                    }`}
+                                  >
+                                    Cuadrado (0)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ borderRadius: 16 })}
+                                    className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
+                                      selectedElement.styles.borderRadius === 16 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                    }`}
+                                  >
+                                    Suave (16px)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ borderRadius: 999 })}
+                                    className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
+                                      (selectedElement.styles.borderRadius || 0) >= 150 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                    }`}
+                                  >
+                                    Círculo (Avatar)
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* ALINEACIÓN DE LA IMAGEN */}
+                              <div>
+                                <label className="font-semibold text-zinc-700 block mb-1">Alineación de la imagen:</label>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ textAlign: 'left' })}
+                                    className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
+                                      selectedElement.styles.textAlign === 'left' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                    }`}
+                                  >
+                                    Izquierda
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ textAlign: 'center' })}
+                                    className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
+                                      (!selectedElement.styles.textAlign || selectedElement.styles.textAlign === 'center') ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                    }`}
+                                  >
+                                    Centrado
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ textAlign: 'right' })}
+                                    className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
+                                      selectedElement.styles.textAlign === 'right' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                    }`}
+                                  >
+                                    Derecha
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* SOMBRA Y OPACIDAD */}
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="font-semibold text-zinc-700 block mb-1">Sombra:</label>
+                                  <select
+                                    value={selectedElement.styles.shadow || 'none'}
+                                    onChange={(e) => updateSelectedElement({ shadow: e.target.value as any })}
+                                    className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                                  >
+                                    <option value="none">Sin sombra</option>
+                                    <option value="sm">Suave (sm)</option>
+                                    <option value="md">Media (md)</option>
+                                    <option value="lg">Pronunciada (lg)</option>
+                                    <option value="xl">Elevada (xl)</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="font-semibold text-zinc-700 block mb-1">Opacidad:</label>
+                                  <select
+                                    value={selectedElement.styles.opacity ?? 1}
+                                    onChange={(e) => updateSelectedElement({ opacity: Number(e.target.value) })}
+                                    className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                                  >
+                                    <option value={1}>100% (Normal)</option>
+                                    <option value={0.85}>85%</option>
+                                    <option value={0.7}>70%</option>
+                                    <option value={0.5}>50%</option>
+                                  </select>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* 3. LINK DE IMAGEN */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('imageLink')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <LinkIcon className="w-3.5 h-3.5 text-[#2848F0]" />
+                            3. LINK DE IMAGEN
+                          </span>
+                          {openSections.imageLink ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openSections.imageLink && (
+                          <div className="p-3 space-y-3 bg-white">
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">URL de destino al hacer clic:</label>
+                              <input
+                                type="text"
+                                value={selectedElement.styles.linkUrl || selectedElement.content.linkUrl || ''}
+                                onChange={(e) => {
+                                  const url = e.target.value;
+                                  updateSelectedElement({ linkUrl: url }, { linkUrl: url });
+                                }}
+                                placeholder="https://ejemplo.com/pagina-oferta"
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
+                              />
+                              <p className="text-[10px] text-zinc-400 mt-1">
+                                Si se deja en blanco no pasa nada con el clic.
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-xs font-semibold text-zinc-700">Abrir en nueva ventana / pestaña:</span>
+                              <input
+                                type="checkbox"
+                                checked={selectedElement.styles.linkOpenNewTab ?? selectedElement.content.linkOpenNewTab ?? true}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  updateSelectedElement({ linkOpenNewTab: checked }, { linkOpenNewTab: checked });
+                                }}
+                                className="w-4 h-4 text-[#2848F0] rounded cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 4. BORDE EXTERIOR DE IMAGEN */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('imageBorder')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Palette className="w-3.5 h-3.5 text-emerald-600" />
+                            4. Borde Exterior de Imagen
+                          </span>
+                          {openSections.imageBorder ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openSections.imageBorder && (
+                          <div className="p-3 space-y-3 bg-white">
+                            <NumberControl
+                              label="Grosor de borde"
+                              value={selectedElement.styles.borderWidth || 0}
+                              min={0}
+                              max={16}
+                              onChange={(val) => updateSelectedElement({ borderWidth: val })}
+                            />
+                            <HexColorPicker
+                              label="Color del borde:"
+                              value={selectedElement.styles.borderColor || '#E4E4E7'}
+                              onChange={(val) => updateSelectedElement({ borderColor: val })}
+                            />
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1">Estilo de borde:</label>
+                              <select
+                                value={selectedElement.styles.borderStyle || 'solid'}
+                                onChange={(e) => updateSelectedElement({ borderStyle: e.target.value as any })}
+                                className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                              >
+                                <option value="solid">Sólido</option>
+                                <option value="dashed">Rayado (Dashed)</option>
+                                <option value="dotted">Punteado (Dotted)</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* 5. CONTENT & SOURCE FOR VIDEO (NO TIPOGRAFÍA!) */}
-                  {selectedElement.type === 'video' && (() => {
-                    const currentInfo = getEmbedVideoInfo(selectedElement.content.videoUrl);
-                    return (
-                      <div className="space-y-3.5 border border-zinc-200 rounded-xl p-3 bg-zinc-50/50">
-                        <div className="flex items-center justify-between">
-                          <label className="font-bold text-zinc-800 flex items-center gap-1.5">
-                            <Video className="w-4 h-4 text-red-500" />
-                            <span>Origen del Video</span>
-                          </label>
-                          <span className="text-[10px] text-zinc-500 font-mono bg-zinc-200/60 px-2 py-0.5 rounded-full">
-                            YouTube / Vimeo / MP4
+                  {/* 5. MULTIMEDIA - VIDEO: ORIGEN, AJUSTES, OPCIONES, COVER PORTADA */}
+                  {selectedElement.type === 'video' && (
+                    <div className="space-y-3">
+                      {/* ORIGEN DE VIDEO */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('videoSource')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Video className="w-3.5 h-3.5 text-red-500" />
+                            Origen del Video
                           </span>
-                        </div>
+                          {openSections.videoSource ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
 
-                        <div>
-                          <label className="font-semibold text-zinc-700 block mb-1">URL del video:</label>
-                          <input
-                            type="text"
-                            value={selectedElement.content.videoUrl || ''}
-                            onChange={(e) => updateSelectedElement({}, { videoUrl: e.target.value })}
-                            placeholder="https://www.youtube.com/watch?v=..."
-                            className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
-                          />
-                          <p className="text-[11px] text-zinc-500 mt-1">
-                            Pega el enlace de tu video de YouTube (ej. <span className="font-mono text-zinc-700">https://www.youtube.com/watch?v=...</span> o <span className="font-mono text-zinc-700">https://youtu.be/...</span>). El video se reproducirá directamente en el lienzo y en la vista previa.
-                          </p>
-                        </div>
+                        {openSections.videoSource && (
+                          <div className="p-3 space-y-3 bg-white">
+                            {/* Desplegable de Fuente */}
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Fuente</label>
+                              <select
+                                value={selectedElement.content.videoSource || 'youtube'}
+                                onChange={(e) => updateSelectedElement({}, { videoSource: e.target.value as any })}
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white focus:outline-[#2848F0]"
+                              >
+                                <option value="youtube">YouTube</option>
+                                <option value="vimeo">Vimeo</option>
+                                <option value="wistia">Wistia</option>
+                                <option value="upload">Subir Video</option>
+                                <option value="external">Video Externo</option>
+                                <option value="server">Alojado en Servidor</option>
+                              </select>
+                            </div>
 
-                        {/* Format detection status badge */}
-                        {selectedElement.content.videoUrl && (
-                          <div className="flex items-center gap-1.5 text-xs p-2 rounded-lg bg-white border border-zinc-200">
-                            {currentInfo.isValid ? (
-                              <>
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                                <span className="text-emerald-700 font-medium">
-                                  {currentInfo.type === 'youtube'
-                                    ? '✓ Video de YouTube válido detectado (Listo para reproducir)'
-                                    : currentInfo.type === 'vimeo'
-                                    ? '✓ Video de Vimeo válido detectado'
-                                    : currentInfo.type === 'loom'
-                                    ? '✓ Video de Loom válido detectado'
-                                    : '✓ Video directo detectable'}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                                <span className="text-amber-700 font-medium text-[11px]">
-                                  Ingresa una URL válida de YouTube para cargar la vista previa interactiva.
-                                </span>
-                              </>
+                            {/* Input para colocar la URL (limpio, sin textos debajo ni check verde) */}
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">URL del video:</label>
+                              <input
+                                type="text"
+                                value={selectedElement.content.videoUrl || ''}
+                                onChange={(e) => updateSelectedElement({}, { videoUrl: e.target.value })}
+                                placeholder="https://www.youtube.com/watch?v=..."
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
+                              />
+                            </div>
+
+                            {/* Cargar enlace de video de prueba */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateSelectedElement({}, {
+                                  videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                                  videoSource: 'youtube',
+                                })
+                              }
+                              className="w-full py-2 text-[11px] font-semibold text-zinc-700 bg-zinc-50 border border-zinc-200 rounded-lg hover:border-[#2848F0] hover:text-[#2848F0] cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                            >
+                              <RefreshCw className="w-3 h-3 text-[#2848F0]" />
+                              <span>Cargar enlace de video de prueba (YouTube)</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* AJUSTES DEL REPRODUCTOR */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('videoSettings')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Sliders className="w-3.5 h-3.5 text-red-500" />
+                            Ajustes del Reproductor
+                          </span>
+                          {openSections.videoSettings ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openSections.videoSettings && (
+                          <div className="p-3 space-y-3.5 bg-white">
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Relación de aspecto (Formato):</label>
+                              <select
+                                value={selectedElement.styles.aspectRatio || '16/9'}
+                                onChange={(e) => updateSelectedElement({ aspectRatio: e.target.value as any })}
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white"
+                              >
+                                <option value="16/9">16:9 Panorámico estándar (YouTube / Vimeo VSL)</option>
+                                <option value="4/3">4:3 Clásico</option>
+                                <option value="9/16">9:16 Vertical (Reels / TikTok / Shorts)</option>
+                                <option value="1/1">1:1 Cuadrado</option>
+                              </select>
+                            </div>
+
+                            {/* BORDES: Espesor, Tipo, Color */}
+                            <div className="space-y-2.5 p-2.5 bg-zinc-50 rounded-xl border border-zinc-200">
+                              <span className="text-xs font-bold text-zinc-800 block">Bordes del reproductor</span>
+                              <NumberControl
+                                label="Espesor de borde"
+                                value={selectedElement.styles.borderWidth || 0}
+                                min={0}
+                                max={20}
+                                onChange={(val) => updateSelectedElement({ borderWidth: val })}
+                              />
+                              <div>
+                                <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Tipo de borde:</label>
+                                <select
+                                  value={selectedElement.styles.borderStyle || 'solid'}
+                                  onChange={(e) => updateSelectedElement({ borderStyle: e.target.value as any })}
+                                  className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                                >
+                                  <option value="solid">Sólido</option>
+                                  <option value="dashed">Rayado (Dashed)</option>
+                                  <option value="dotted">Punteado (Dotted)</option>
+                                </select>
+                              </div>
+                              <HexColorPicker
+                                label="Color de borde:"
+                                value={selectedElement.styles.borderColor || '#18181b'}
+                                onChange={(val) => updateSelectedElement({ borderColor: val })}
+                              />
+                            </div>
+
+                            {/* Bordes redondeados en la misma fila para ahorrar espacio */}
+                            <div>
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className="font-semibold text-zinc-700 text-[11px]">Bordes redondeados (Radio):</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={48}
+                                  value={selectedElement.styles.borderRadius ?? 0}
+                                  onChange={(e) => updateSelectedElement({ borderRadius: Number(e.target.value) })}
+                                  className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
+                                />
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={selectedElement.styles.borderRadius ?? 0}
+                                    onChange={(e) => updateSelectedElement({ borderRadius: Math.max(0, parseInt(e.target.value) || 0) })}
+                                    className="w-14 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
+                                  />
+                                  <span className="text-[11px] text-zinc-500 font-mono">px</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Ancho máximo del reproductor: seleccionable y con input para introducir número */}
+                            <div className="space-y-1.5">
+                              <label className="font-semibold text-zinc-700 block text-[11px]">Ancho máximo del reproductor:</label>
+                              <div className="grid grid-cols-4 gap-1">
+                                {['480px', '640px', '750px', '100%'].map((w) => (
+                                  <button
+                                    key={w}
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ maxWidth: w })}
+                                    className={`py-1 px-1 border rounded text-[11px] font-semibold cursor-pointer ${
+                                      selectedElement.styles.maxWidth === w
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                    }`}
+                                  >
+                                    {w}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-1.5 pt-1">
+                                <span className="text-[10px] text-zinc-500 shrink-0">O escribir valor:</span>
+                                <input
+                                  type="text"
+                                  value={selectedElement.styles.maxWidth || '750px'}
+                                  onChange={(e) => updateSelectedElement({ maxWidth: e.target.value })}
+                                  placeholder="Ej: 750px o 85%"
+                                  className="flex-1 p-1.5 text-xs border border-zinc-200 rounded-lg bg-white font-mono focus:outline-[#2848F0]"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Alineación */}
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Alineación del video:</label>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateSelectedElement({ textAlign: 'left' })}
+                                  className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
+                                    selectedElement.styles.textAlign === 'left' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                  }`}
+                                >
+                                  Izquierda
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateSelectedElement({ textAlign: 'center' })}
+                                  className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
+                                    (!selectedElement.styles.textAlign || selectedElement.styles.textAlign === 'center') ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                  }`}
+                                >
+                                  Centrado
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateSelectedElement({ textAlign: 'right' })}
+                                  className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
+                                    selectedElement.styles.textAlign === 'right' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                  }`}
+                                >
+                                  Derecha
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* OPCIONES DEL VIDEO: AUTOREPRODUCIR, SILENCIAR, BUCLE */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('videoOptions')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-blue-600" />
+                            OPCIONES DEL VIDEO
+                          </span>
+                          {openSections.videoOptions ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openSections.videoOptions && (
+                          <div className="p-3 space-y-2.5 bg-white text-xs">
+                            <label className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 hover:bg-zinc-50 cursor-pointer">
+                              <div>
+                                <span className="font-semibold text-zinc-800 block">Autoreproducir (Autoplay)</span>
+                                <span className="text-[10px] text-zinc-400">Iniciar automáticamente al cargar la página</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedElement.content.videoAutoplay ?? false}
+                                onChange={(e) => updateSelectedElement({}, { videoAutoplay: e.target.checked })}
+                                className="w-4 h-4 text-[#2848F0] rounded cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 hover:bg-zinc-50 cursor-pointer">
+                              <div>
+                                <span className="font-semibold text-zinc-800 block">Silenciar video (Mute)</span>
+                                <span className="text-[10px] text-zinc-400">Requerido por navegadores para autoplay sin sonido</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedElement.content.videoMuted ?? false}
+                                onChange={(e) => updateSelectedElement({}, { videoMuted: e.target.checked })}
+                                className="w-4 h-4 text-[#2848F0] rounded cursor-pointer"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 hover:bg-zinc-50 cursor-pointer">
+                              <div>
+                                <span className="font-semibold text-zinc-800 block">Bucle infinito (Loop)</span>
+                                <span className="text-[10px] text-zinc-400">Reiniciar el video inmediatamente al terminar</span>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={selectedElement.content.videoLoop ?? false}
+                                onChange={(e) => updateSelectedElement({}, { videoLoop: e.target.checked })}
+                                className="w-4 h-4 text-[#2848F0] rounded cursor-pointer"
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* COVER PORTADA: IMAGEN O PORTADA COMPUESTA CON 4 ELEMENTOS (IMAGEN 2) */}
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('videoCover')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                            COVER PORTADA
+                          </span>
+                          {openSections.videoCover ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openSections.videoCover && (
+                          <div className="p-3 space-y-3.5 bg-white text-xs">
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1">Tipo de Portada:</label>
+                              <div className="grid grid-cols-3 gap-1">
+                                {[
+                                  { id: 'none', label: 'Sin Portada' },
+                                  { id: 'image', label: 'Subir Imagen' },
+                                  { id: 'custom', label: 'Sin Imagen con CTA' },
+                                ].map((tab) => (
+                                  <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => updateSelectedElement({}, { videoCoverType: tab.id as any })}
+                                    className={`py-1.5 px-1 rounded-lg border text-[11px] font-semibold text-center cursor-pointer transition-colors ${
+                                      (selectedElement.content.videoCoverType || 'none') === tab.id
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                                    }`}
+                                  >
+                                    {tab.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* OPCIÓN 1: SUBIR IMAGEN */}
+                            {selectedElement.content.videoCoverType === 'image' && (
+                              <div className="space-y-3 p-3 bg-zinc-50 rounded-xl border border-zinc-200">
+                                <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">URL de Imagen de Portada:</label>
+                                <input
+                                  type="text"
+                                  value={selectedElement.content.videoCoverImage || ''}
+                                  onChange={(e) => updateSelectedElement({}, { videoCoverImage: e.target.value })}
+                                  placeholder="https://images.unsplash.com/..."
+                                  className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white font-mono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateSelectedElement({}, {
+                                      videoCoverImage: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200&auto=format&fit=crop&q=80',
+                                    })
+                                  }
+                                  className="w-full py-1.5 text-[11px] bg-white border border-zinc-200 rounded-lg hover:border-[#2848F0] text-zinc-700 cursor-pointer"
+                                >
+                                  Cargar imagen de muestra
+                                </button>
+                              </div>
+                            )}
+
+                            {/* OPCIÓN 2: SIN IMAGEN CON CTA */}
+                            {selectedElement.content.videoCoverType === 'custom' && (
+                              <div className="space-y-4">
+                                <div className="p-2 rounded-lg bg-blue-50/70 border border-blue-200 text-[11px] text-[#2848F0]">
+                                  Diseño de portada interactiva con llamada a la acción (CTA). Al hacer clic se oculta y arranca el video de inmediato.
+                                </div>
+
+                                {/* ICONO DE PLAY */}
+                                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-3">
+                                  <div className="font-bold text-zinc-800 text-xs">
+                                    <span>Icono de Play</span>
+                                  </div>
+
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <label className="text-[11px] font-semibold text-zinc-700">Forma del icono:</label>
+                                      <span className="text-[10px] text-zinc-500 font-mono">
+                                        {selectedElement.content.videoCoverPlayIcon || 'play'}
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto p-1 bg-white rounded-lg border border-zinc-200">
+                                      {[
+                                        { id: 'play', label: 'Play', icon: Play, fill: true },
+                                        { id: 'play_circle', label: 'Círculo', icon: PlayCircle },
+                                        { id: 'play_square', label: 'Cuadrado', icon: Square },
+                                        { id: 'video', label: 'Video', icon: Video },
+                                        { id: 'film', label: 'Película', icon: Film },
+                                        { id: 'tv', label: 'Pantalla', icon: Tv },
+                                        { id: 'sparkle', label: 'Destello', icon: Sparkles },
+                                        { id: 'flame', label: 'Fuego', icon: Flame, fill: true },
+                                        { id: 'zap', label: 'Rayo', icon: Zap, fill: true },
+                                        { id: 'volume_2', label: 'Sonido', icon: Volume2 },
+                                        { id: 'eye', label: 'Ver', icon: Eye },
+                                        { id: 'heart', label: 'Corazón', icon: Heart, fill: true },
+                                      ].map((ic) => {
+                                        const IconComp = ic.icon;
+                                        const isSelected = (selectedElement.content.videoCoverPlayIcon || 'play') === ic.id;
+                                        return (
+                                          <button
+                                            key={ic.id}
+                                            type="button"
+                                            onClick={() => updateSelectedElement({}, { videoCoverPlayIcon: ic.id as any })}
+                                            className={`p-1.5 rounded-md border flex flex-col items-center justify-center gap-1 cursor-pointer transition-all ${
+                                              isSelected
+                                                ? 'bg-[#2848F0] text-white border-[#2848F0] shadow-xs'
+                                                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                                            }`}
+                                            title={ic.label}
+                                          >
+                                            <IconComp className={`w-4 h-4 ${ic.fill ? 'fill-current' : ''}`} />
+                                            <span className="text-[9px] font-medium truncate max-w-full">{ic.label}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-zinc-700 block mb-1">Forma del botón:</label>
+                                    <div className="grid grid-cols-3 gap-1">
+                                      {[
+                                        { id: 'circle', label: 'Círculo' },
+                                        { id: 'rounded', label: 'Redondeado' },
+                                        { id: 'square', label: 'Cuadrado' },
+                                      ].map((sh) => (
+                                        <button
+                                          key={sh.id}
+                                          type="button"
+                                          onClick={() => updateSelectedElement({}, { videoCoverButtonShape: sh.id as any })}
+                                          className={`py-1 text-[10px] rounded border font-semibold cursor-pointer ${
+                                            (selectedElement.content.videoCoverButtonShape || 'circle') === sh.id
+                                              ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                                          }`}
+                                        >
+                                          {sh.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <HexColorPicker
+                                      label="Color del Icono"
+                                      value={selectedElement.content.videoCoverPlayColor || '#FFFFFF'}
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverPlayColor: val })}
+                                    />
+                                    <HexColorPicker
+                                      label="Color del Botón"
+                                      value={selectedElement.content.videoCoverPlayBg || '#FF5A5F'}
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverPlayBg: val })}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <div className="flex justify-between items-center text-[11px] mb-1">
+                                      <span className="font-semibold text-zinc-700">Tamaño del botón:</span>
+                                      <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverPlaySize || 56}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min={36}
+                                      max={96}
+                                      step={2}
+                                      value={selectedElement.content.videoCoverPlaySize || 56}
+                                      onChange={(e) => updateSelectedElement({}, { videoCoverPlaySize: Number(e.target.value) })}
+                                      className="w-full accent-[#2848F0] cursor-pointer"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* TEXTO ARRIBA DEL ICONO DE PLAY */}
+                                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2.5">
+                                  <div className="font-bold text-zinc-800 flex items-center justify-between">
+                                    <span>Texto Superior</span>
+                                    <span className="text-[10px] text-zinc-400">Encima de play</span>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-zinc-600 block mb-1">Texto:</label>
+                                    <input
+                                      type="text"
+                                      value={selectedElement.content.videoCoverText ?? 'DALE CLICK AQUÍ'}
+                                      onChange={(e) => updateSelectedElement({}, { videoCoverText: e.target.value })}
+                                      placeholder="Click Aquí Para Reproducir"
+                                      className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white font-medium"
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-[11px] font-semibold text-zinc-600 block mb-1">Fuente:</label>
+                                      <select
+                                        value={selectedElement.content.videoCoverTextFont || 'Poppins'}
+                                        onChange={(e) => updateSelectedElement({}, { videoCoverTextFont: e.target.value })}
+                                        className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                                      >
+                                        {AVAILABLE_FONTS.map((f) => (
+                                          <option key={f.value} value={f.value}>
+                                            {f.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div>
+                                      <label className="text-[11px] font-semibold text-zinc-600 block mb-1">Formato:</label>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateSelectedElement({}, {
+                                            videoCoverTextBold: !(selectedElement.content.videoCoverTextBold ?? true),
+                                          })
+                                        }
+                                        className={`w-full py-1.5 text-xs font-bold rounded-lg border cursor-pointer ${
+                                          (selectedElement.content.videoCoverTextBold ?? true)
+                                            ? 'bg-blue-50 text-[#2848F0] border-blue-200'
+                                            : 'bg-white text-zinc-600 border-zinc-200'
+                                        }`}
+                                      >
+                                        {(selectedElement.content.videoCoverTextBold ?? true) ? 'Negrita Activa' : 'Normal'}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <div className="flex justify-between items-center text-[11px] mb-1">
+                                      <span className="font-semibold text-zinc-700">Tamaño del texto:</span>
+                                      <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverTextSize || 22}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min={12}
+                                      max={36}
+                                      value={selectedElement.content.videoCoverTextSize || 22}
+                                      onChange={(e) => updateSelectedElement({}, { videoCoverTextSize: Number(e.target.value) })}
+                                      className="w-full accent-[#2848F0] cursor-pointer"
+                                    />
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <HexColorPicker
+                                      label="Color de Texto"
+                                      value={selectedElement.content.videoCoverTextColor || '#121111'}
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverTextColor: val })}
+                                    />
+                                    <HexColorPicker
+                                      label="Fondo del Texto"
+                                      value={selectedElement.content.videoCoverTextBg || '#FFFFFF'}
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverTextBg: val })}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* FLECHA QUE SEÑALA EL BOTÓN DE PLAY */}
+                                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2.5">
+                                  <div className="font-bold text-zinc-800 flex items-center justify-between">
+                                    <span>Flecha Señalizadora</span>
+                                    <span className="text-[10px] text-zinc-400">Apunta al play</span>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-zinc-600 block mb-1">Forma de la Flecha:</label>
+                                    <div className="grid grid-cols-4 gap-1">
+                                      {[
+                                        { id: 'curved', label: 'Curva' },
+                                        { id: 'straight', label: 'Recta' },
+                                        { id: 'corner', label: 'Esquina' },
+                                        { id: 'hand', label: 'Puntero' },
+                                      ].map((arr) => (
+                                        <button
+                                          key={arr.id}
+                                          type="button"
+                                          onClick={() => updateSelectedElement({}, { videoCoverArrowType: arr.id as any })}
+                                          className={`py-1 text-[10px] rounded border font-medium cursor-pointer ${
+                                            (selectedElement.content.videoCoverArrowType || 'curved') === arr.id
+                                              ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                              : 'bg-white text-zinc-700 border-zinc-200'
+                                          }`}
+                                        >
+                                          {arr.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <HexColorPicker
+                                      label="Color de la Flecha"
+                                      value={selectedElement.content.videoCoverArrowColor || '#121111'}
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverArrowColor: val })}
+                                    />
+                                    <div>
+                                      <div className="flex justify-between items-center text-[11px] mb-1">
+                                        <span className="font-semibold text-zinc-700">Tamaño:</span>
+                                        <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverArrowSize || 26}px</span>
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min={16}
+                                        max={54}
+                                        value={selectedElement.content.videoCoverArrowSize || 26}
+                                        onChange={(e) => updateSelectedElement({}, { videoCoverArrowSize: Number(e.target.value) })}
+                                        className="w-full accent-[#2848F0] cursor-pointer"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* ROTACIÓN SOBRE SU EJE MEDIO */}
+                                  <div>
+                                    <div className="flex justify-between items-center text-[11px] mb-1">
+                                      <span className="font-semibold text-zinc-700">Girar sobre su eje medio:</span>
+                                      <span className="font-mono text-[#2848F0] font-bold">{selectedElement.content.videoCoverArrowRotation || 0}°</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min={0}
+                                      max={360}
+                                      step={5}
+                                      value={selectedElement.content.videoCoverArrowRotation || 0}
+                                      onChange={(e) => updateSelectedElement({}, { videoCoverArrowRotation: Number(e.target.value) })}
+                                      className="w-full accent-[#2848F0] cursor-pointer"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* FONDO (SÓLIDO, GRADIENTE, PATRÓN) */}
+                                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2.5">
+                                  <div className="font-bold text-zinc-800 flex items-center justify-between">
+                                    <span>Fondo del Cover</span>
+                                    <span className="text-[10px] text-zinc-400">Color y Opacidad</span>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-zinc-600 block mb-1">Tipo de Fondo:</label>
+                                    <div className="grid grid-cols-3 gap-1">
+                                      {[
+                                        { id: 'solid', label: 'Sólido' },
+                                        { id: 'gradient', label: 'Gradiente' },
+                                        { id: 'pattern', label: 'Patrón' },
+                                      ].map((bg) => (
+                                        <button
+                                          key={bg.id}
+                                          type="button"
+                                          onClick={() => updateSelectedElement({}, { videoCoverBgType: bg.id as any })}
+                                          className={`py-1 text-[10px] rounded border font-medium cursor-pointer ${
+                                            (selectedElement.content.videoCoverBgType || 'solid') === bg.id
+                                              ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                              : 'bg-white text-zinc-700 border-zinc-200'
+                                          }`}
+                                        >
+                                          {bg.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <HexColorPicker
+                                    label="Color del Fondo"
+                                    value={selectedElement.content.videoCoverBgColor || '#F4F4F5'}
+                                    onChange={(val) => updateSelectedElement({}, { videoCoverBgColor: val })}
+                                  />
+
+                                  <div>
+                                    <div className="flex justify-between items-center text-[11px] mb-1">
+                                      <span className="font-semibold text-zinc-700">Opacidad del Fondo:</span>
+                                      <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverBgOpacity ?? 100}%</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min={0}
+                                      max={100}
+                                      value={selectedElement.content.videoCoverBgOpacity ?? 100}
+                                      onChange={(e) => updateSelectedElement({}, { videoCoverBgOpacity: Number(e.target.value) })}
+                                      className="w-full accent-[#2848F0] cursor-pointer"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}
-
-                        {/* Quick Sample Video Buttons */}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateSelectedElement({}, {
-                              videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-                            })
-                          }
-                          className="w-full py-1.5 text-[11px] font-medium text-zinc-700 bg-white border border-zinc-200 rounded-lg hover:border-[#2848F0] hover:text-[#2848F0] cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
-                        >
-                          <RefreshCw className="w-3 h-3 text-[#2848F0]" />
-                          <span>Cargar enlace de video de prueba (YouTube)</span>
-                        </button>
                       </div>
-                    );
-                  })()}
+                    </div>
+                  )}
 
                   {/* 6. CONTENT FOR FORM */}
                   {selectedElement.type === 'form' && (
@@ -4244,207 +5225,284 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
                   {/* 11. CONTENT FOR AUDIO / MUSIC PLAYER */}
                   {selectedElement.type === 'audio' && (
-                    <div className="space-y-3.5 border border-amber-200 rounded-xl p-3 bg-amber-50/20">
-                      <div className="flex items-center justify-between">
-                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
-                          <Music className="w-4 h-4 text-amber-600" />
-                          <span>Reproductor de Música y Audio</span>
-                        </label>
-                      </div>
+                    <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleAccordion('audioSettings')}
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Music className="w-3.5 h-3.5 text-amber-600" />
+                          Origen de Audio
+                        </span>
+                        {openSections.audioSettings ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      </button>
 
-                      {/* Source Mode Selector */}
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1">Tipo de Reproductor:</label>
-                        <div className="grid grid-cols-3 gap-1">
-                          {(['direct', 'spotify', 'soundcloud'] as const).map((type) => (
-                            <button
-                              key={type}
-                              type="button"
-                              onClick={() => updateSelectedElement({}, { audioType: type })}
-                              className={`py-1 text-xs font-bold rounded-lg border capitalize cursor-pointer ${
-                                (selectedElement.content.audioType || 'direct') === type
-                                  ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                              }`}
+                      {openSections.audioSettings && (
+                        <div className="p-3 space-y-3 bg-white text-xs">
+                          {/* Desplegable Fuente */}
+                          <div>
+                            <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Fuente</label>
+                            <select
+                              value={selectedElement.content.audioSource || (selectedElement.content.audioType === 'spotify' ? 'spotify' : selectedElement.content.audioType === 'soundcloud' ? 'soundcloud' : 'external')}
+                              onChange={(e) => {
+                                const src = e.target.value as any;
+                                const mappedType = src === 'spotify' ? 'spotify' : src === 'soundcloud' ? 'soundcloud' : 'direct';
+                                updateSelectedElement({}, { audioSource: src, audioType: mappedType });
+                              }}
+                              className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white focus:outline-[#2848F0]"
                             >
-                              {type === 'direct' ? 'MP3 Directo' : type}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* URL input */}
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1">
-                          {(selectedElement.content.audioType || 'direct') === 'direct'
-                            ? 'URL del archivo MP3 / Audio:'
-                            : (selectedElement.content.audioType || 'direct') === 'spotify'
-                            ? 'URL del Track o Playlist en Spotify:'
-                            : 'URL del Track en SoundCloud:'}
-                        </label>
-                        <input
-                          type="text"
-                          value={selectedElement.content.audioUrl || ''}
-                          onChange={(e) => updateSelectedElement({}, { audioUrl: e.target.value })}
-                          placeholder={
-                            (selectedElement.content.audioType || 'direct') === 'direct'
-                              ? 'https://.../audio.mp3'
-                              : 'https://open.spotify.com/track/...'
-                          }
-                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
-                        />
-                      </div>
-
-                      {(selectedElement.content.audioType || 'direct') === 'direct' && (
-                        <>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="font-semibold text-zinc-700 block mb-1">Título:</label>
-                              <input
-                                type="text"
-                                value={selectedElement.content.audioTitle || ''}
-                                onChange={(e) => updateSelectedElement({}, { audioTitle: e.target.value })}
-                                placeholder="Título del audio"
-                                className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
-                              />
-                            </div>
-                            <div>
-                              <label className="font-semibold text-zinc-700 block mb-1">Artista / Autor:</label>
-                              <input
-                                type="text"
-                                value={selectedElement.content.audioArtist || ''}
-                                onChange={(e) => updateSelectedElement({}, { audioArtist: e.target.value })}
-                                placeholder="Scale Sales Pro"
-                                className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
-                              />
-                            </div>
+                              <option value="soundcloud">1) SoundCloud</option>
+                              <option value="spotify">2) Spotify</option>
+                              <option value="external">3) Audio Externo</option>
+                              <option value="upload">4) Subir Audio</option>
+                              <option value="server">5) Alojado en Servidor</option>
+                            </select>
                           </div>
 
-                          <div className="flex items-center justify-between pt-1">
-                            <span className="text-xs font-semibold text-zinc-700">Repetir en bucle (Loop):</span>
+                          {/* Input de URL limpio (sin check ni textos debajo) */}
+                          <div>
+                            <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">URL del audio o playlist:</label>
                             <input
-                              type="checkbox"
-                              checked={selectedElement.content.audioLoop ?? false}
-                              onChange={(e) => updateSelectedElement({}, { audioLoop: e.target.checked })}
-                              className="w-4 h-4 text-[#2848F0] rounded cursor-pointer"
+                              type="text"
+                              value={selectedElement.content.audioUrl || ''}
+                              onChange={(e) => updateSelectedElement({}, { audioUrl: e.target.value })}
+                              placeholder={
+                                (selectedElement.content.audioSource === 'spotify' || selectedElement.content.audioType === 'spotify')
+                                  ? 'https://open.spotify.com/playlist/... o track'
+                                  : (selectedElement.content.audioSource === 'soundcloud' || selectedElement.content.audioType === 'soundcloud')
+                                  ? 'https://soundcloud.com/...'
+                                  : 'https://.../audio.mp3'
+                              }
+                              className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
                             />
                           </div>
-                        </>
+
+                          {/* Cargar enlace de audio de prueba */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateSelectedElement({}, {
+                                audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+                                audioSource: 'external',
+                                audioType: 'direct',
+                                audioTitle: 'Audio Demostración SSP',
+                                audioArtist: 'Scale Sales Pro',
+                              })
+                            }
+                            className="w-full py-1.5 text-[11px] font-semibold text-zinc-700 bg-zinc-50 border border-zinc-200 rounded-lg hover:border-[#2848F0] hover:text-[#2848F0] cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
+                          >
+                            <RefreshCw className="w-3 h-3 text-amber-600" />
+                            <span>Cargar audio de prueba</span>
+                          </button>
+
+                          {/* Opciones directas para audio propio */}
+                          {(selectedElement.content.audioType === 'direct' || !selectedElement.content.audioType || selectedElement.content.audioSource === 'external' || selectedElement.content.audioSource === 'upload' || selectedElement.content.audioSource === 'server') && (
+                            <div className="space-y-2.5 pt-2 border-t border-zinc-100">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Título:</label>
+                                  <input
+                                    type="text"
+                                    value={selectedElement.content.audioTitle || ''}
+                                    onChange={(e) => updateSelectedElement({}, { audioTitle: e.target.value })}
+                                    placeholder="Título del audio"
+                                    className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Artista / Autor:</label>
+                                  <input
+                                    type="text"
+                                    value={selectedElement.content.audioArtist || ''}
+                                    onChange={(e) => updateSelectedElement({}, { audioArtist: e.target.value })}
+                                    placeholder="Scale Sales Pro"
+                                    className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-1">
+                                <span className="text-xs font-semibold text-zinc-700">Repetir en bucle (Loop):</span>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedElement.content.audioLoop ?? false}
+                                  onChange={(e) => updateSelectedElement({}, { audioLoop: e.target.checked })}
+                                  className="w-4 h-4 text-[#2848F0] rounded cursor-pointer"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Aviso para playlists de Spotify / SoundCloud */}
+                          {(selectedElement.content.audioSource === 'spotify' || selectedElement.content.audioType === 'spotify' || selectedElement.content.audioSource === 'soundcloud' || selectedElement.content.audioType === 'soundcloud') && (
+                            <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800">
+                              🎵 Las playlists y álbumes de Spotify y SoundCloud se muestran en formato interactivo embebido con lista de hasta 20 pistas.
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
 
                   {/* 12. CONTENT FOR ICON */}
-                  {selectedElement.type === 'icon' && (
-                    <div className="space-y-3.5 border border-zinc-200 rounded-xl p-3 bg-zinc-50/50">
-                      <div className="flex items-center justify-between">
-                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
-                          <Smile className="w-4 h-4 text-indigo-600" />
-                          <span>Selector de Icono Vectorial</span>
-                        </label>
-                      </div>
-
-                      {/* Icon grid catalog */}
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1.5">Icono seleccionado:</label>
-                        <div className="grid grid-cols-6 gap-1.5 max-h-40 overflow-y-auto p-1.5 bg-white border border-zinc-200 rounded-xl">
-                          {POPULAR_ICONS.map((name) => {
-                            const isCurr = (selectedElement.content.iconName || 'Star') === name;
-                            return (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => updateSelectedElement({}, { iconName: name })}
-                                className={`p-2 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-xs ${
-                                  isCurr
-                                    ? 'bg-[#2848F0] text-white shadow-xs'
-                                    : 'hover:bg-zinc-100 text-zinc-700'
-                                }`}
-                                title={name}
-                              >
-                                <span className="text-[10px] font-bold truncate">{name.substring(0, 4)}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Size */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-semibold text-zinc-700">Tamaño del Icono:</span>
-                          <span className="font-mono text-xs font-bold text-indigo-600">
-                            {selectedElement.content.iconSize || 40}px
+                  {selectedElement.type === 'icon' && (() => {
+                    const iconName = selectedElement.content.iconName || 'Star';
+                    const SelectedIconComponent = (LucideIcons as any)[iconName] || LucideIcons.Star;
+                    return (
+                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccordion('iconSettings')}
+                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer text-xs"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Smile className="w-3.5 h-3.5 text-indigo-600" />
+                            Selector de Icono
                           </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={20}
-                          max={96}
-                          step={4}
-                          value={selectedElement.content.iconSize || 40}
-                          onChange={(e) => updateSelectedElement({}, { iconSize: Number(e.target.value) })}
-                          className="w-full accent-indigo-600 cursor-pointer"
-                        />
+                          {openSections.iconSettings ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {openSections.iconSettings && (
+                          <div className="p-3 space-y-3.5 bg-white text-xs">
+                            {/* Preview visual del icono actual con forma gráfica */}
+                            <div className="p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <div
+                                  className="w-10 h-10 rounded-lg flex items-center justify-center border border-zinc-200 shadow-2xs"
+                                  style={{
+                                    backgroundColor: selectedElement.content.iconShape !== 'none'
+                                      ? (selectedElement.content.iconBgColor || '#EFF6FF')
+                                      : '#FFFFFF',
+                                    borderRadius: selectedElement.content.iconShape === 'circle'
+                                      ? '9999px'
+                                      : selectedElement.content.iconShape === 'rounded'
+                                      ? '10px'
+                                      : '4px',
+                                  }}
+                                >
+                                  <SelectedIconComponent
+                                    style={{
+                                      width: '24px',
+                                      height: '24px',
+                                      color: selectedElement.content.iconColor || '#2848F0',
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-zinc-800 block">{iconName}</span>
+                                  <span className="text-[10px] text-zinc-400">Icono seleccionado activo</span>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-mono text-[#2848F0] font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
+                                Lucide Icon
+                              </span>
+                            </div>
+
+                            {/* Catálogo de iconos en cuadrícula con formas gráficas reales */}
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1.5 text-[11px]">Elegir icono visual:</label>
+                              <div className="grid grid-cols-6 gap-1.5 max-h-44 overflow-y-auto p-1.5 bg-white border border-zinc-200 rounded-xl">
+                                {POPULAR_ICONS.map((name) => {
+                                  const isCurr = iconName === name;
+                                  const IconItemComponent = (LucideIcons as any)[name] || LucideIcons.Star;
+                                  return (
+                                    <button
+                                      key={name}
+                                      type="button"
+                                      onClick={() => updateSelectedElement({}, { iconName: name })}
+                                      className={`p-2 rounded-lg flex flex-col items-center justify-center transition-all cursor-pointer ${
+                                        isCurr
+                                          ? 'bg-[#2848F0] text-white shadow-xs scale-105 ring-2 ring-[#2848F0]/30'
+                                          : 'hover:bg-zinc-100 text-zinc-700 border border-zinc-100'
+                                      }`}
+                                      title={name}
+                                    >
+                                      <IconItemComponent className="w-5 h-5 shrink-0" />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* TAMAÑO Y COLOR EN UNA SOLA LÍNEA / FILA */}
+                            <div className="grid grid-cols-2 gap-2 p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 items-center">
+                              <div>
+                                <div className="flex justify-between items-center text-[11px] mb-1">
+                                  <span className="font-semibold text-zinc-700">Tamaño:</span>
+                                  <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.iconSize || 40}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={16}
+                                  max={96}
+                                  step={2}
+                                  value={selectedElement.content.iconSize || 40}
+                                  onChange={(e) => updateSelectedElement({}, { iconSize: Number(e.target.value) })}
+                                  className="w-full accent-[#2848F0] cursor-pointer"
+                                />
+                              </div>
+
+                              <div>
+                                <HexColorPicker
+                                  label="Color del Icono"
+                                  value={selectedElement.content.iconColor || '#2848F0'}
+                                  onChange={(val) => updateSelectedElement({}, { iconColor: val })}
+                                />
+                              </div>
+                            </div>
+
+                            {/* FORMA DEL ICONO: NINGUNA, CÍRCULO, CUADRADO, REDONDEADO */}
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Forma del icono:</label>
+                              <select
+                                value={selectedElement.content.iconShape || 'circle'}
+                                onChange={(e) => updateSelectedElement({}, { iconShape: e.target.value as any })}
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white"
+                              >
+                                <option value="none">Ninguna (Sin fondo)</option>
+                                <option value="circle">Círculo</option>
+                                <option value="square">Cuadrado</option>
+                                <option value="rounded">Redondeado</option>
+                              </select>
+                            </div>
+
+                            {/* COLOR DE FONDO DEL CONTENEDOR (CUANDO FORMA !== 'NONE') */}
+                            {selectedElement.content.iconShape && selectedElement.content.iconShape !== 'none' && (
+                              <div>
+                                <HexColorPicker
+                                  label="Color de Fondo del contenedor"
+                                  value={selectedElement.content.iconBgColor || '#EFF6FF'}
+                                  onChange={(val) => updateSelectedElement({}, { iconBgColor: val })}
+                                />
+                              </div>
+                            )}
+
+                            {/* ALINEACIÓN */}
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Alineación:</label>
+                              <div className="grid grid-cols-3 gap-1">
+                                {(['left', 'center', 'right'] as const).map((align) => (
+                                  <button
+                                    key={align}
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ textAlign: align })}
+                                    className={`py-1 text-xs font-medium rounded-lg border capitalize cursor-pointer ${
+                                      (selectedElement.styles.textAlign || 'center') === align
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                                    }`}
+                                  >
+                                    {align === 'left' ? 'Izquierda' : align === 'center' ? 'Centro' : 'Derecha'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Colors */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <HexColorPicker
-                            label="Color del Icono"
-                            value={selectedElement.content.iconColor || '#2848F0'}
-                            onChange={(val) => updateSelectedElement({}, { iconColor: val })}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="font-semibold text-zinc-700 block mb-1">Forma del Contenedor:</label>
-                          <select
-                            value={selectedElement.content.iconShape || 'circle'}
-                            onChange={(e) => updateSelectedElement({}, { iconShape: e.target.value as any })}
-                            className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
-                          >
-                            <option value="none">Sin fondo</option>
-                            <option value="circle">Círculo</option>
-                            <option value="rounded">Redondeado</option>
-                            <option value="square">Cuadrado</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {selectedElement.content.iconShape && selectedElement.content.iconShape !== 'none' && (
-                        <div>
-                          <HexColorPicker
-                            label="Color de Fondo del Contenedor"
-                            value={selectedElement.content.iconBgColor || '#EFF6FF'}
-                            onChange={(val) => updateSelectedElement({}, { iconBgColor: val })}
-                          />
-                        </div>
-                      )}
-
-                      {/* Alignment */}
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1">Alineación:</label>
-                        <div className="grid grid-cols-3 gap-1">
-                          {(['left', 'center', 'right'] as const).map((align) => (
-                            <button
-                              key={align}
-                              type="button"
-                              onClick={() => updateSelectedElement({ textAlign: align })}
-                              className={`py-1 text-xs font-medium rounded-lg border capitalize cursor-pointer ${
-                                (selectedElement.styles.textAlign || 'center') === align
-                                  ? 'bg-[#2848F0] text-white border-[#2848F0]'
-                                  : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
-                              }`}
-                            >
-                              {align === 'left' ? 'Izquierda' : align === 'center' ? 'Centro' : 'Derecha'}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* 13. CONTENT FOR SIMPLE FORM */}
                   {selectedElement.type === 'simple_form' && (
@@ -5343,385 +6401,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     </div>
                   )}
 
-                  {/* ============================================================== */}
-                  {/* ACCORDION: AJUSTES Y TRANSFORMACIÓN DE IMAGEN (SOLO PARA IMAGEN) */}
-                  {/* ROTAR, REDONDEAR BORDES, TAMAÑO/ANCHO, ALINEACIÓN, SOMBRA, OPACIDAD */}
-                  {/* ============================================================== */}
-                  {selectedElement.type === 'image' && (
-                    <>
-                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                        <button
-                          onClick={() => toggleAccordion('imageAdjustments')}
-                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <Sliders className="w-3.5 h-3.5 text-[#2848F0]" />
-                            Ajustes y Forma de la Imagen
-                          </span>
-                          {openSections.imageAdjustments ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                        </button>
 
-                        {openSections.imageAdjustments && (
-                          <div className="p-3 space-y-4 bg-white">
-                            {/* 1. ROTACIÓN DE IMAGEN */}
-                            <div className="space-y-2">
-                              <NumberControl
-                                label="Rotar imagen (Grados)"
-                                value={selectedElement.styles.rotation || 0}
-                                min={0}
-                                max={360}
-                                unit="°"
-                                onChange={(val) => updateSelectedElement({ rotation: val })}
-                              />
-                              <div className="flex items-center gap-1.5 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const current = selectedElement?.styles.rotation || 0;
-                                    updateSelectedElement({ rotation: (current - 90 + 360) % 360 });
-                                  }}
-                                  className="flex-1 py-1 px-2 border border-zinc-200 hover:border-[#2848F0] hover:bg-blue-50/50 rounded text-[11px] font-semibold text-zinc-700 flex items-center justify-center gap-1 cursor-pointer"
-                                  title="Girar 90 grados a la izquierda"
-                                >
-                                  <RotateCcw className="w-3 h-3 text-[#2848F0]" />
-                                  <span>-90°</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const current = selectedElement?.styles.rotation || 0;
-                                    updateSelectedElement({ rotation: (current + 90) % 360 });
-                                  }}
-                                  className="flex-1 py-1 px-2 border border-zinc-200 hover:border-[#2848F0] hover:bg-blue-50/50 rounded text-[11px] font-semibold text-zinc-700 flex items-center justify-center gap-1 cursor-pointer"
-                                  title="Girar 90 grados a la derecha"
-                                >
-                                  <RotateCw className="w-3 h-3 text-[#2848F0]" />
-                                  <span>+90°</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ rotation: 0 })}
-                                  className="px-2 py-1 border border-zinc-200 hover:bg-zinc-100 rounded text-[11px] text-zinc-500 cursor-pointer"
-                                  title="Restablecer ángulo normal"
-                                >
-                                  0° Reset
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* 2. REDONDEAR BORDES DE IMAGEN */}
-                            <div className="space-y-2">
-                              <NumberControl
-                                label="Bordes redondeados (Radio)"
-                                value={selectedElement.styles.borderRadius || 0}
-                                min={0}
-                                max={150}
-                                onChange={(val) => updateSelectedElement({ borderRadius: val })}
-                              />
-                              <div className="flex items-center gap-1.5 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ borderRadius: 0 })}
-                                  className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
-                                    (selectedElement.styles.borderRadius || 0) === 0 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                  }`}
-                                >
-                                  Cuadrado (0)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ borderRadius: 16 })}
-                                  className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
-                                    selectedElement.styles.borderRadius === 16 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                  }`}
-                                >
-                                  Suave (16px)
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ borderRadius: 999 })}
-                                  className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
-                                    (selectedElement.styles.borderRadius || 0) >= 150 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                  }`}
-                                >
-                                  Círculo (Avatar)
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* 3. TAMAÑO / ANCHO DE IMAGEN */}
-                            <div className="space-y-2">
-                              <NumberControl
-                                label="Ancho de imagen"
-                                value={selectedElement.styles.imageWidth || 450}
-                                min={50}
-                                max={900}
-                                onChange={(val) => updateSelectedElement({ imageWidth: val })}
-                              />
-                              <div className="grid grid-cols-4 gap-1 pt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ imageWidth: 200 })}
-                                  className="py-1 px-1 border border-zinc-200 rounded text-[10px] text-center bg-white hover:border-[#2848F0] cursor-pointer"
-                                >
-                                  200px
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ imageWidth: 380 })}
-                                  className="py-1 px-1 border border-zinc-200 rounded text-[10px] text-center bg-white hover:border-[#2848F0] cursor-pointer"
-                                >
-                                  380px
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ imageWidth: 550 })}
-                                  className="py-1 px-1 border border-zinc-200 rounded text-[10px] text-center bg-white hover:border-[#2848F0] cursor-pointer"
-                                >
-                                  550px
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ imageWidth: 800 })}
-                                  className="py-1 px-1 border border-zinc-200 rounded text-[10px] text-center bg-white hover:border-[#2848F0] cursor-pointer"
-                                >
-                                  Max (800)
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* 4. ALINEACIÓN DE LA IMAGEN */}
-                            <div>
-                              <label className="font-semibold text-zinc-700 block mb-1">Alineación de la imagen:</label>
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ textAlign: 'left' })}
-                                  className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                    selectedElement.styles.textAlign === 'left' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                  }`}
-                                >
-                                  Izquierda
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ textAlign: 'center' })}
-                                  className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                    (!selectedElement.styles.textAlign || selectedElement.styles.textAlign === 'center') ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                  }`}
-                                >
-                                  Centrado
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateSelectedElement({ textAlign: 'right' })}
-                                  className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                    selectedElement.styles.textAlign === 'right' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                  }`}
-                                >
-                                  Derecha
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* 5. SOMBRA Y OPACIDAD */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="font-semibold text-zinc-700 block mb-1">Sombra:</label>
-                                <select
-                                  value={selectedElement.styles.shadow || 'none'}
-                                  onChange={(e) => updateSelectedElement({ shadow: e.target.value as any })}
-                                  className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
-                                >
-                                  <option value="none">Sin sombra</option>
-                                  <option value="sm">Suave (sm)</option>
-                                  <option value="md">Media (md)</option>
-                                  <option value="lg">Pronunciada (lg)</option>
-                                  <option value="xl">Elevada (xl)</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="font-semibold text-zinc-700 block mb-1">Opacidad:</label>
-                                <select
-                                  value={selectedElement.styles.opacity ?? 1}
-                                  onChange={(e) => updateSelectedElement({ opacity: Number(e.target.value) })}
-                                  className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
-                                >
-                                  <option value={1}>100% (Normal)</option>
-                                  <option value={0.85}>85%</option>
-                                  <option value={0.7}>70%</option>
-                                  <option value={0.5}>50%</option>
-                                </select>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* BORDE EXTERIOR DE IMAGEN */}
-                      <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                        <button
-                          onClick={() => toggleAccordion('imageBorder')}
-                          className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
-                        >
-                          <span className="flex items-center gap-1.5">
-                            <Palette className="w-3.5 h-3.5 text-emerald-600" />
-                            Borde Exterior de Imagen
-                          </span>
-                          {openSections.imageBorder ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                        </button>
-
-                        {openSections.imageBorder && (
-                          <div className="p-3 space-y-3 bg-white">
-                            <NumberControl
-                              label="Grosor de borde"
-                              value={selectedElement.styles.borderWidth || 0}
-                              min={0}
-                              max={16}
-                              onChange={(val) => updateSelectedElement({ borderWidth: val })}
-                            />
-                            <HexColorPicker
-                              label="Color del borde:"
-                              value={selectedElement.styles.borderColor || '#E4E4E7'}
-                              onChange={(val) => updateSelectedElement({ borderColor: val })}
-                            />
-                            <div>
-                              <label className="font-semibold text-zinc-700 block mb-1">Estilo de borde:</label>
-                              <select
-                                value={selectedElement.styles.borderStyle || 'solid'}
-                                onChange={(e) => updateSelectedElement({ borderStyle: e.target.value as any })}
-                                className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
-                              >
-                                <option value="solid">Sólido</option>
-                                <option value="dashed">Rayado (Dashed)</option>
-                                <option value="dotted">Punteado (Dotted)</option>
-                              </select>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                  {/* ============================================================== */}
-                  {/* ACCORDION: AJUSTES DE VIDEO (SOLO PARA VIDEO) */}
-                  {/* ANCHO MÁXIMO, RELACIÓN DE ASPECTO, BORDES, ALINEACIÓN */}
-                  {/* ============================================================== */}
-                  {selectedElement.type === 'video' && (
-                    <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => toggleAccordion('videoSettings')}
-                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
-                      >
-                        <span className="flex items-center gap-1.5">
-                          <Sliders className="w-3.5 h-3.5 text-red-500" />
-                          Ajustes del Reproductor de Video
-                        </span>
-                        {openSections.videoSettings ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                      </button>
-
-                      {openSections.videoSettings && (
-                        <div className="p-3 space-y-3.5 bg-white">
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1">Relación de aspecto (Formato):</label>
-                            <select
-                              value={selectedElement.styles.aspectRatio || '16/9'}
-                              onChange={(e) => updateSelectedElement({ aspectRatio: e.target.value as any })}
-                              className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white"
-                            >
-                              <option value="16/9">16:9 Panorámico estándar (YouTube / Vimeo VSL)</option>
-                              <option value="4/3">4:3 Clásico</option>
-                              <option value="9/16">9:16 Vertical (Reels / TikTok / Shorts)</option>
-                              <option value="1/1">1:1 Cuadrado</option>
-                            </select>
-                          </div>
-
-                          <NumberControl
-                            label="Bordes redondeados del marco"
-                            value={selectedElement.styles.borderRadius || 12}
-                            min={0}
-                            max={40}
-                            onChange={(val) => updateSelectedElement({ borderRadius: val })}
-                          />
-
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1">Ancho máximo del reproductor:</label>
-                            <div className="grid grid-cols-4 gap-1 mb-2">
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedElement({ maxWidth: '480px' })}
-                                className={`py-1 px-1 border rounded text-[11px] font-semibold cursor-pointer ${
-                                  selectedElement.styles.maxWidth === '480px' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                }`}
-                              >
-                                480px
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedElement({ maxWidth: '640px' })}
-                                className={`py-1 px-1 border rounded text-[11px] font-semibold cursor-pointer ${
-                                  selectedElement.styles.maxWidth === '640px' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                }`}
-                              >
-                                640px
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedElement({ maxWidth: '750px' })}
-                                className={`py-1 px-1 border rounded text-[11px] font-semibold cursor-pointer ${
-                                  (!selectedElement.styles.maxWidth || selectedElement.styles.maxWidth === '750px') ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                }`}
-                              >
-                                750px
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedElement({ maxWidth: '100%' })}
-                                className={`py-1 px-1 border rounded text-[11px] font-semibold cursor-pointer ${
-                                  selectedElement.styles.maxWidth === '100%' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                }`}
-                              >
-                                100%
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1">Alineación del video:</label>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedElement({ textAlign: 'left' })}
-                                className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                  selectedElement.styles.textAlign === 'left' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                }`}
-                              >
-                                Izquierda
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedElement({ textAlign: 'center' })}
-                                className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                  (!selectedElement.styles.textAlign || selectedElement.styles.textAlign === 'center') ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                }`}
-                              >
-                                Centrado
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateSelectedElement({ textAlign: 'right' })}
-                                className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                  selectedElement.styles.textAlign === 'right' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                }`}
-                              >
-                                Derecha
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   {/* ============================================================== */}
                   {/* ============================================================== */}
@@ -6730,7 +7410,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               if (effectiveBgType === 'solid') {
                 sectionStyle.backgroundColor = section.bgColor || '#FFFFFF';
               } else if (effectiveBgType === 'gradient') {
-                sectionStyle.background = section.bgGradient || 'linear-gradient(135deg, #18181B 0%, #09090B 100%)';
+                sectionStyle.backgroundImage = section.bgGradient || 'linear-gradient(135deg, #18181B 0%, #09090B 100%)';
               } else if (effectiveBgType === 'image' && section.bgImageUrl) {
                 sectionStyle.backgroundImage = `url("${section.bgImageUrl}")`;
                 sectionStyle.backgroundSize = 'cover';
@@ -7611,19 +8291,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                             <button
                                               type="button"
                                               onClick={() => {
-                                                const currentRot = element.styles.rotation || 0;
-                                                updateSelectedElement({ rotation: (currentRot + 90) % 360 });
-                                              }}
-                                              className="p-1 px-1.5 rounded hover:bg-zinc-100 text-[#2848F0] flex items-center gap-1 cursor-pointer font-semibold text-[10px]"
-                                              title="Girar imagen +90°"
-                                            >
-                                              <RotateCw className="w-3 h-3" />
-                                              <span>+90°</span>
-                                            </button>
-                                            <div className="w-[1px] h-3 bg-zinc-200" />
-                                            <button
-                                              type="button"
-                                              onClick={() => {
                                                 const currentRad = element.styles.borderRadius || 0;
                                                 updateSelectedElement({ borderRadius: currentRad > 0 ? 0 : 16 });
                                               }}
@@ -7888,7 +8555,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                         <EmbeddedVideoPlayer
                                           videoUrl={element.content.videoUrl}
                                           aspectRatio={element.styles.aspectRatio || '16/9'}
-                                          borderRadius={element.styles.borderRadius ?? 12}
+                                          borderRadius={element.styles.borderRadius ?? 0}
                                           maxWidth={element.styles.maxWidth || '750px'}
                                           borderWidth={element.styles.borderWidth}
                                           borderColor={element.styles.borderColor}
@@ -7904,62 +8571,103 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                           onSetSampleVideo={(sampleUrl) => {
                                             updateElementContent(element.id, { videoUrl: sampleUrl });
                                           }}
+                                          videoSource={element.content.videoSource}
+                                          videoAutoplay={element.content.videoAutoplay}
+                                          videoMuted={element.content.videoMuted}
+                                          videoLoop={element.content.videoLoop}
+                                          videoCoverType={element.content.videoCoverType}
+                                          videoCoverImage={element.content.videoCoverImage}
+                                          videoCoverText={element.content.videoCoverText}
+                                          videoCoverTextFont={element.content.videoCoverTextFont}
+                                          videoCoverTextSize={element.content.videoCoverTextSize}
+                                          videoCoverTextColor={element.content.videoCoverTextColor}
+                                          videoCoverTextBg={element.content.videoCoverTextBg}
+                                          videoCoverTextBold={element.content.videoCoverTextBold}
+                                          videoCoverPlayIcon={element.content.videoCoverPlayIcon}
+                                          videoCoverButtonShape={element.content.videoCoverButtonShape}
+                                          videoCoverPlayColor={element.content.videoCoverPlayColor}
+                                          videoCoverPlayBg={element.content.videoCoverPlayBg}
+                                          videoCoverPlaySize={element.content.videoCoverPlaySize}
+                                          videoCoverArrowType={element.content.videoCoverArrowType}
+                                          videoCoverArrowColor={element.content.videoCoverArrowColor}
+                                          videoCoverArrowSize={element.content.videoCoverArrowSize}
+                                          videoCoverArrowRotation={element.content.videoCoverArrowRotation}
+                                          videoCoverBgType={element.content.videoCoverBgType}
+                                          videoCoverBgColor={element.content.videoCoverBgColor}
+                                          videoCoverBgOpacity={element.content.videoCoverBgOpacity}
                                         />
                                       </div>
                                     )}
 
-                                    {element.type === 'image' && (
-                                      <div
-                                        style={{
-                                          display: 'flex',
-                                          justifyContent:
-                                            element.styles.textAlign === 'left'
-                                              ? 'flex-start'
-                                              : element.styles.textAlign === 'right'
-                                              ? 'flex-end'
-                                              : 'center',
-                                        }}
-                                      >
+                                    {element.type === 'image' && (() => {
+                                      const linkUrl = element.styles.linkUrl || element.content.linkUrl;
+                                      const linkOpenNewTab = element.styles.linkOpenNewTab ?? element.content.linkOpenNewTab ?? true;
+                                      const imgNode = (
+                                        <img
+                                          src={
+                                            element.content.src ||
+                                            'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80'
+                                          }
+                                          alt={element.content.alt || 'Imagen Scale Sales Pro'}
+                                          style={{
+                                            borderRadius: `${element.styles.borderRadius ?? 0}px`,
+                                            width: element.styles.imageWidth ? `${element.styles.imageWidth}px` : '450px',
+                                            height: element.styles.imageHeight ? `${element.styles.imageHeight}px` : 'auto',
+                                            maxWidth: '100%',
+                                            objectFit: element.styles.imageHeight ? 'cover' : undefined,
+                                            opacity: element.styles.opacity ?? 1,
+                                            border: element.styles.borderWidth
+                                              ? `${element.styles.borderWidth}px ${element.styles.borderStyle || 'solid'} ${
+                                                  element.styles.borderColor || '#E4E4E7'
+                                                }`
+                                              : undefined,
+                                            boxShadow:
+                                              element.styles.shadow === 'sm'
+                                                ? '0 1px 2px 0 rgb(0 0 0 / 0.05)'
+                                                : element.styles.shadow === 'md'
+                                                ? '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                                                : element.styles.shadow === 'lg'
+                                                ? '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                                                : element.styles.shadow === 'xl'
+                                                ? '0 20px 25px -5px rgb(0 0 0 / 0.1)'
+                                                : undefined,
+                                          }}
+                                          className="select-none transition-all"
+                                        />
+                                      );
+
+                                      return (
                                         <div
                                           style={{
-                                            transform: `rotate(${element.styles.rotation || 0}deg)`,
-                                            transition: 'transform 0.2s ease',
-                                            display: 'inline-block',
-                                            maxWidth: '100%',
+                                            display: 'flex',
+                                            justifyContent:
+                                              element.styles.textAlign === 'left'
+                                                ? 'flex-start'
+                                                : element.styles.textAlign === 'right'
+                                                ? 'flex-end'
+                                                : 'center',
                                           }}
                                         >
-                                          <img
-                                            src={
-                                              element.content.src ||
-                                              'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80'
-                                            }
-                                            alt={element.content.alt || 'Imagen Scale Sales Pro'}
-                                            style={{
-                                              borderRadius: `${element.styles.borderRadius || 0}px`,
-                                              width: element.styles.imageWidth ? `${element.styles.imageWidth}px` : '450px',
-                                              maxWidth: '100%',
-                                              opacity: element.styles.opacity ?? 1,
-                                              border: element.styles.borderWidth
-                                                ? `${element.styles.borderWidth}px ${element.styles.borderStyle || 'solid'} ${
-                                                    element.styles.borderColor || '#E4E4E7'
-                                                  }`
-                                                : undefined,
-                                              boxShadow:
-                                                element.styles.shadow === 'sm'
-                                                  ? '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                                                  : element.styles.shadow === 'md'
-                                                  ? '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                                                  : element.styles.shadow === 'lg'
-                                                  ? '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                                                  : element.styles.shadow === 'xl'
-                                                  ? '0 20px 25px -5px rgb(0 0 0 / 0.1)'
-                                                  : undefined,
-                                            }}
-                                            className="h-auto object-cover select-none pointer-events-none transition-all"
-                                          />
+                                          <div style={{ display: 'inline-block', maxWidth: '100%' }}>
+                                            {linkUrl ? (
+                                              <a
+                                                href={isPreviewMode ? linkUrl : undefined}
+                                                target={linkOpenNewTab ? '_blank' : '_self'}
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => {
+                                                  if (!isPreviewMode) e.preventDefault();
+                                                }}
+                                                className="cursor-pointer inline-block"
+                                              >
+                                                {imgNode}
+                                              </a>
+                                            ) : (
+                                              imgNode
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      );
+                                    })()}
 
                                     {element.type === 'divider' && (
                                       <div

@@ -117,6 +117,12 @@ export interface ElementStyles {
   opacity?: number;
   shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
   imageWidth?: number;
+  imageHeight?: number;
+  imageWidthUnit?: 'px' | '%';
+  imageHeightUnit?: 'px' | '%';
+  aspectRatioLocked?: boolean;
+  linkUrl?: string;
+  linkOpenNewTab?: boolean;
   aspectRatio?: '16/9' | '4/3' | '9/16' | '1/1' | 'auto';
   buttonDestination?: 'next_page' | 'calendar' | 'url';
   buttonUrl?: string;
@@ -192,18 +198,46 @@ export interface PageBlockElement {
     html?: string;
     src?: string;
     alt?: string;
-    videoUrl?: string; // YouTube / Vimeo
+    linkUrl?: string;
+    linkOpenNewTab?: boolean;
+    videoUrl?: string; // YouTube / Vimeo / etc.
+    videoSource?: 'youtube' | 'vimeo' | 'wistia' | 'upload' | 'external' | 'server';
+    videoAutoplay?: boolean;
+    videoMuted?: boolean;
+    videoLoop?: boolean;
+    videoCoverType?: 'none' | 'image' | 'custom';
+    videoCoverImage?: string;
+    videoCoverText?: string;
+    videoCoverTextFont?: string;
+    videoCoverTextSize?: number;
+    videoCoverTextColor?: string;
+    videoCoverTextBg?: string;
+    videoCoverTextBold?: boolean;
+    videoCoverPlayIcon?: 'play' | 'play_circle' | 'play_square' | 'video' | 'film' | 'tv' | 'sparkle' | 'flame' | 'zap' | 'volume_2' | 'eye' | 'heart' | 'disc' | string;
+    videoCoverButtonShape?: 'circle' | 'square' | 'rounded';
+    videoCoverPlayColor?: string;
+    videoCoverPlayBg?: string;
+    videoCoverPlaySize?: number;
+    videoCoverArrowType?: 'curved' | 'straight' | 'corner' | 'hand';
+    videoCoverArrowColor?: string;
+    videoCoverArrowSize?: number;
+    videoCoverArrowRotation?: number;
+    videoCoverBgType?: 'solid' | 'gradient' | 'pattern';
+    videoCoverBgColor?: string;
+    videoCoverBgOpacity?: number;
     buttonText?: string;
     formId?: string;
     // Spacer
     spacerHeight?: number;
     // Audio / Hybrid Player
     audioType?: 'direct' | 'spotify' | 'soundcloud';
+    audioSource?: 'soundcloud' | 'spotify' | 'external' | 'upload' | 'server';
     audioUrl?: string;
     audioTitle?: string;
     audioArtist?: string;
     audioAutoplay?: boolean;
     audioLoop?: boolean;
+    audioPlaylistTracks?: { title: string; artist?: string; duration?: string; url?: string }[];
     // Icon
     iconName?: string;
     iconSize?: number;
