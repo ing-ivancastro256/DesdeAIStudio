@@ -1892,6 +1892,32 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           marginRight: 0,
         };
         break;
+      case 'form_button':
+        newElement.content = {
+          buttonText: 'Enviar Información',
+          buttonSubtext: '🔒 Tus datos están 100% seguros',
+          buttonIcon: 'Send',
+        };
+        newElement.styles = {
+          fontSize: 16,
+          fontFamily: 'Poppins',
+          textColor: '#FFFFFF',
+          bgColor: '#2848F0',
+          isBold: true,
+          paddingTop: 14,
+          paddingBottom: 14,
+          paddingLeft: 28,
+          paddingRight: 28,
+          marginTop: 0,
+          marginBottom: 16,
+          marginLeft: 0,
+          marginRight: 0,
+          borderRadius: 8,
+          textAlign: 'center',
+          fullWidth: true,
+          buttonDestination: 'next_page',
+        };
+        break;
       default:
         break;
     }
@@ -6200,6 +6226,83 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     </div>
                   )}
 
+                  {/* 20. FORM BUTTON INSPECTOR */}
+                  {selectedElement.type === 'form_button' && (
+                    <div className="space-y-3.5 border border-indigo-200 rounded-xl p-3 bg-indigo-50/20">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
+                          <MousePointerClick className="w-4 h-4 text-indigo-600" />
+                          <span>Botón de Formulario</span>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Texto principal del botón:</label>
+                        <input
+                          type="text"
+                          value={selectedElement.content.buttonText || ''}
+                          onChange={(e) => updateSelectedElement({}, { buttonText: e.target.value })}
+                          placeholder="Enviar Información"
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white font-medium focus:outline-[#2848F0]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Subtexto / Garantía (opcional):</label>
+                        <input
+                          type="text"
+                          value={selectedElement.content.buttonSubtext || ''}
+                          onChange={(e) => updateSelectedElement({}, { buttonSubtext: e.target.value })}
+                          placeholder="🔒 Tus datos están 100% seguros"
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white focus:outline-[#2848F0]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-zinc-700 block mb-1">Acción del formulario al hacer clic:</label>
+                        <select
+                          value={selectedElement.styles.buttonDestination || 'next_page'}
+                          onChange={(e) =>
+                            updateSelectedElement({
+                              buttonDestination: e.target.value as any,
+                            })
+                          }
+                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white focus:outline-[#2848F0]"
+                        >
+                          <option value="next_page">Enviar formulario y avanzar a siguiente página (Recomendado)</option>
+                          <option value="calendar">Enviar formulario y agendar en calendario</option>
+                          <option value="url">Enviar formulario y abrir enlace externo (URL)</option>
+                        </select>
+                      </div>
+
+                      {selectedElement.styles.buttonDestination === 'url' && (
+                        <div>
+                          <label className="font-semibold text-zinc-700 block mb-1">URL de destino:</label>
+                          <input
+                            type="text"
+                            placeholder="https://wa.me/... o https://..."
+                            value={selectedElement.styles.buttonUrl || ''}
+                            onChange={(e) => updateSelectedElement({ buttonUrl: e.target.value })}
+                            className="w-full p-2 text-xs border border-zinc-200 rounded-lg bg-white focus:outline-[#2848F0]"
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2 border-t border-zinc-200">
+                        <span className="text-xs font-semibold text-zinc-700">Ancho completo (100% columna):</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedElement.styles.fullWidth !== false}
+                            onChange={(e) => updateSelectedElement({ fullWidth: e.target.checked })}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#2848F0]"></div>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   {/* ============================================================== */}
                   {/* ACCORDION: TIPOGRAFÍA (SOLO PARA ELEMENTOS DE TEXTO Y BOTÓN) */}
                   {/* EXCLUIDO ESTRICTAMENTE DE IMÁGENES, VIDEOS, SEPARADORES, ETC.  */}
@@ -6208,7 +6311,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     selectedElement.type === 'subheading' ||
                     selectedElement.type === 'paragraph' ||
                     selectedElement.type === 'bullet_list' ||
-                    selectedElement.type === 'button') && (
+                    selectedElement.type === 'button' ||
+                    selectedElement.type === 'form_button') && (
                     <div className="border border-zinc-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => toggleAccordion('typography')}
@@ -6271,8 +6375,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               <button
                                 type="button"
                                 onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  handleToggleInlineFormat('bold');
+                                   e.preventDefault();
+                                   handleToggleInlineFormat('bold');
                                 }}
                                 className={`p-1.5 px-2.5 rounded-lg border font-bold cursor-pointer transition-colors ${
                                   selectedElement.styles.isBold ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100'
@@ -6357,7 +6461,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     selectedElement.type === 'subheading' ||
                     selectedElement.type === 'paragraph' ||
                     selectedElement.type === 'bullet_list' ||
-                    selectedElement.type === 'button') && (
+                    selectedElement.type === 'button' ||
+                    selectedElement.type === 'form_button') && (
                     <div className="border border-zinc-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => toggleAccordion('colors')}
@@ -6365,7 +6470,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       >
                         <span className="flex items-center gap-1.5">
                           <Palette className="w-3.5 h-3.5 text-zinc-500" />
-                          {selectedElement.type === 'button' ? 'Color y Fondo' : 'Color del texto'}
+                          {(selectedElement.type === 'button' || selectedElement.type === 'form_button') ? 'Color y Fondo' : 'Color del texto'}
                         </span>
                         {openSections.colors ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                       </button>
@@ -6380,7 +6485,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             onChange={(val) => handleTextColorChange(val)}
                           />
 
-                          {selectedElement.type === 'button' && (
+                          {(selectedElement.type === 'button' || selectedElement.type === 'form_button') && (
                             <>
                               <HexColorPicker
                                 label="Color de fondo del botón:"
@@ -6389,7 +6494,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               />
                               <NumberControl
                                 label="Borde redondeado (Radio)"
-                                value={selectedElement.styles.borderRadius || 8}
+                                value={selectedElement.styles.borderRadius ?? 8}
                                 min={0}
                                 max={48}
                                 onChange={(val) => updateSelectedElement({ borderRadius: val })}
@@ -6945,12 +7050,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         </div>
                       </div>
 
-                      {/* 5. FORMULARIOS */}
+                      {/* 5. FORMULARIO */}
                       <div>
                         <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-['Inter']">
-                          Formularios
+                          FORMULARIO
                         </div>
                         <div className="grid grid-cols-2 gap-2">
+                          {/* 1. Formulario Completo */}
                           <button
                             draggable
                             onDragStart={(e) => {
@@ -6958,25 +7064,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
                             onClick={() => addElement('simple_form')}
-                            className="col-span-2 p-2.5 border border-emerald-200 bg-emerald-50/20 hover:border-emerald-500 hover:bg-emerald-50 rounded-xl flex items-center justify-center gap-2 transition-all text-emerald-950 cursor-grab active:cursor-grabbing group shadow-2xs"
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs text-center min-h-[76px]"
+                            title="Formulario Completo"
                           >
-                            <FileText className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-bold">Formulario</span>
+                            <FileText className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium leading-tight">Formulario Completo</span>
                           </button>
 
-                          <button
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'checkbox');
-                              e.dataTransfer.effectAllowed = 'copy';
-                            }}
-                            onClick={() => addElement('checkbox')}
-                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
-                          >
-                            <CheckSquare className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium">Casilla de Verificación</span>
-                          </button>
-
+                          {/* 2. Campo de Formulario */}
                           <button
                             draggable
                             onDragStart={(e) => {
@@ -6984,10 +7079,41 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
                             onClick={() => addElement('input_field')}
-                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs"
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs text-center min-h-[76px]"
+                            title="Campo de Formulario"
                           >
                             <TextCursorInput className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium">Campo de Formulario</span>
+                            <span className="text-[11px] font-medium leading-tight">Campo de Formulario</span>
+                          </button>
+
+                          {/* 3. Casilla de Verificación */}
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'checkbox');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('checkbox')}
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs text-center min-h-[76px]"
+                            title="Casilla de Verificación"
+                          >
+                            <CheckSquare className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium leading-tight">Casilla de Verificación</span>
+                          </button>
+
+                          {/* 4. Botón de Formulario */}
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/ssp-element-type', 'form_button');
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onClick={() => addElement('form_button')}
+                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs text-center min-h-[76px]"
+                            title="Botón de Formulario"
+                          >
+                            <MousePointerClick className="w-5 h-5 text-indigo-600 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium leading-tight">Botón de Formulario</span>
                           </button>
                         </div>
                       </div>
@@ -8234,7 +8360,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                           element.type === 'subheading' ||
                                           element.type === 'paragraph' ||
                                           element.type === 'bullet_list' ||
-                                          element.type === 'button') && (
+                                          element.type === 'button' ||
+                                          element.type === 'form_button') && (
                                           <>
                                             <button
                                               type="button"
@@ -8851,6 +8978,72 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                           type={element.content.fieldType || 'email'}
                                           required={element.content.fieldRequired}
                                         />
+                                      </div>
+                                    )}
+
+                                    {element.type === 'form_button' && (
+                                      <div
+                                        style={{
+                                          textAlign: element.styles.textAlign || 'center',
+                                          display: 'flex',
+                                          justifyContent:
+                                            element.styles.textAlign === 'left'
+                                              ? 'flex-start'
+                                              : element.styles.textAlign === 'right'
+                                              ? 'flex-end'
+                                              : 'center',
+                                          width: '100%',
+                                        }}
+                                        className="w-full py-1.5"
+                                      >
+                                        <button
+                                          type="button"
+                                          style={{
+                                            width: element.styles.fullWidth !== false ? '100%' : 'auto',
+                                            backgroundColor: element.styles.bgColor || pageSettings.primaryColor || '#2848F0',
+                                            color: element.styles.textColor || '#FFFFFF',
+                                            fontSize: `${element.styles.fontSize || 16}px`,
+                                            fontFamily: element.styles.fontFamily || pageSettings.bodyFontFamily || 'Poppins',
+                                            fontWeight: element.styles.isBold ? 700 : 600,
+                                            fontStyle: element.styles.isItalic ? 'italic' : 'normal',
+                                            textDecoration: element.styles.isUnderline ? 'underline' : 'none',
+                                            paddingTop: `${element.styles.paddingTop || 14}px`,
+                                            paddingBottom: `${element.styles.paddingBottom || 14}px`,
+                                            paddingLeft: `${element.styles.paddingLeft || 28}px`,
+                                            paddingRight: `${element.styles.paddingRight || 28}px`,
+                                            borderRadius: `${element.styles.borderRadius ?? 8}px`,
+                                            boxShadow: element.styles.boxShadow || '0 4px 14px 0 rgba(40, 72, 240, 0.35)',
+                                          }}
+                                          className="hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer flex flex-col items-center justify-center gap-1 group shadow-md"
+                                        >
+                                          <div className="flex items-center justify-center gap-2">
+                                            <span
+                                              contentEditable={!isPreviewMode && isSelected}
+                                              suppressContentEditableWarning={true}
+                                              onBlur={(e) => {
+                                                const newText = e.currentTarget.innerText;
+                                                updateSelectedElement({}, { buttonText: newText });
+                                              }}
+                                              className="outline-none"
+                                            >
+                                              {element.content.buttonText || 'Enviar Información'}
+                                            </span>
+                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                                          </div>
+                                          {element.content.buttonSubtext && (
+                                            <span
+                                              contentEditable={!isPreviewMode && isSelected}
+                                              suppressContentEditableWarning={true}
+                                              onBlur={(e) => {
+                                                const newSub = e.currentTarget.innerText;
+                                                updateSelectedElement({}, { buttonSubtext: newSub });
+                                              }}
+                                              className="text-[11px] opacity-85 font-normal tracking-wide outline-none"
+                                            >
+                                              {element.content.buttonSubtext}
+                                            </span>
+                                          )}
+                                        </button>
                                       </div>
                                     )}
                                   </div>

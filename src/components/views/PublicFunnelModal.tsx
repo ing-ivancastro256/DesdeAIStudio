@@ -916,6 +916,67 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           </div>
         );
 
+      case 'form_button':
+        return (
+          <div
+            key={element.id || eIdx}
+            style={{
+              display: 'flex',
+              justifyContent:
+                element.styles?.textAlign === 'left'
+                  ? 'flex-start'
+                  : element.styles?.textAlign === 'right'
+                  ? 'flex-end'
+                  : 'center',
+              marginTop: `${element.styles?.marginTop || 0}px`,
+              marginBottom: `${element.styles?.marginBottom ?? 16}px`,
+              width: '100%',
+            }}
+          >
+            <button
+              onClick={() => {
+                showToast && showToast('¡Formulario enviado con éxito!');
+                if (element.styles?.buttonDestination === 'calendar') {
+                  const calendarEl = document.getElementById('ssp-calendar-section');
+                  if (calendarEl) calendarEl.scrollIntoView({ behavior: 'smooth' });
+                  else advanceToNextStep();
+                } else if (element.styles?.buttonDestination === 'url' && element.styles?.buttonUrl) {
+                  window.open(element.styles.buttonUrl, '_blank');
+                } else {
+                  advanceToNextStep();
+                }
+              }}
+              style={{
+                width: element.styles?.fullWidth !== false ? '100%' : 'auto',
+                backgroundColor: element.styles?.bgColor || activePage?.settings?.primaryColor || '#2848F0',
+                color: element.styles?.textColor || '#FFFFFF',
+                fontSize: `${element.styles?.fontSize || 16}px`,
+                fontFamily: element.styles?.fontFamily || activePage?.settings?.bodyFontFamily || 'Poppins',
+                fontWeight: element.styles?.isBold ? 700 : 600,
+                fontStyle: element.styles?.isItalic ? 'italic' : 'normal',
+                textDecoration: element.styles?.isUnderline ? 'underline' : 'none',
+                paddingTop: `${element.styles?.paddingTop || 14}px`,
+                paddingBottom: `${element.styles?.paddingBottom || 14}px`,
+                paddingLeft: `${element.styles?.paddingLeft || 28}px`,
+                paddingRight: `${element.styles?.paddingRight || 28}px`,
+                borderRadius: `${element.styles?.borderRadius ?? 8}px`,
+                boxShadow: '0 4px 14px 0 rgba(40, 72, 240, 0.35)',
+              }}
+              className="hover:brightness-105 active:scale-[0.99] transition-all flex flex-col items-center justify-center gap-1 cursor-pointer group shadow-md"
+            >
+              <div className="flex items-center justify-center gap-2">
+                <span>{element.content.buttonText || 'Enviar Información'}</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </div>
+              {element.content.buttonSubtext && (
+                <span className="text-[11px] opacity-85 font-normal tracking-wide">
+                  {element.content.buttonSubtext}
+                </span>
+              )}
+            </button>
+          </div>
+        );
+
       default:
         return (
           <div key={element.id || eIdx} className="my-2 p-2 text-xs text-zinc-500">
