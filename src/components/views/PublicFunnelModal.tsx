@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { PageBlockSection, PageBlockElement } from '../../types';
+import { PageBlockSection, PageBlockRow, PageBlockElement } from '../../types';
+import { getColumnSurfaceStyle, getColumnShadowClass } from '../../utils/editorTreeUtils';
 import {
   X,
   ArrowRight,
@@ -152,22 +153,27 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
     activePage?.sections && activePage.sections.length > 0
   );
 
-  // Check if form or calendar widgets are already present inside page sections
-  const hasFormWidget = Boolean(
-    activePage?.sections?.some((sec) =>
-      sec.rows?.some((row) =>
-        row.columns?.some((col) => col.elements?.some((el) => el.type === 'form'))
+  const hasElementOfType = (t: string) =>
+    Boolean(
+      activePage?.sections?.some((sec) =>
+        sec.rows?.some((row) =>
+          row.columns?.some((col) =>
+            col.elements?.some(
+              (el) =>
+                el.type === t ||
+                (el.type === 'inner_columns' &&
+                  el.nestedRow?.columns?.some((nc) =>
+                    nc.elements?.some((nel) => nel.type === t)
+                  ))
+            )
+          )
+        )
       )
-    )
-  );
+    );
 
-  const hasCalendarWidget = Boolean(
-    activePage?.sections?.some((sec) =>
-      sec.rows?.some((row) =>
-        row.columns?.some((col) => col.elements?.some((el) => el.type === 'calendar'))
-      )
-    )
-  );
+  // Check if form or calendar widgets are already present inside page sections
+  const hasFormWidget = hasElementOfType('form');
+  const hasCalendarWidget = hasElementOfType('calendar');
 
   // Render Interactive Form Widget
   const renderQualificationForm = () => (
@@ -1064,6 +1070,23 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           </div>
         );
 
+      case 'inner_columns':
+        if (element.nestedRow) {
+          return (
+            <div
+              key={element.id || eIdx}
+              style={{
+                marginTop: `${element.styles?.marginTop || 0}px`,
+                marginBottom: `${element.styles?.marginBottom ?? 16}px`,
+              }}
+              className="w-full"
+            >
+              {renderRowBlock(element.nestedRow, eIdx)}
+            </div>
+          );
+        }
+        return null;
+
       default:
         return (
           <div key={element.id || eIdx} className="my-2 p-2 text-xs text-zinc-500">
@@ -1071,6 +1094,67 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           </div>
         );
     }
+  };
+
+  const renderRowBlock = (row: PageBlockRow, rIdx: number) => {
+    const pageMaxW =
+      activePage?.settings?.pageWidthType === 'full'
+        ? undefined
+        : activePage?.settings?.pageContentMaxWidth || 1200;
+
+    const rowStyle: React.CSSProperties = {
+      maxWidth:
+        (row.widthType || 'boxed') === 'boxed' && row.maxWidth
+          ? `${pageMaxW ? Math.min(row.maxWidth, pageMaxW) : row.maxWidth}px`
+          : row.widthType === 'full'
+          ? '100%'
+          : undefined,
+      marginLeft: 'auto',
+      marginRight: 'auto',
+      marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : '0px',
+      marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '0px',
+      paddingTop: row.paddingTop !== undefined ? `${row.paddingTop}px` : undefined,
+      paddingBottom: row.paddingBottom !== undefined ? `${row.paddingBottom}px` : undefined,
+      paddingLeft: row.paddingLeft !== undefined ? `${row.paddingLeft}px` : undefined,
+      paddingRight: row.paddingRight !== undefined ? `${row.paddingRight}px` : undefined,
+      backgroundColor: row.bgColor || undefined,
+      borderRadius: `${row.borderRadius ?? 0}px`,
+      borderWidth: row.borderWidth !== undefined ? `${row.borderWidth}px` : undefined,
+      borderColor: row.borderColor || undefined,
+      borderStyle: row.borderStyle || (row.borderWidth ? 'solid' : undefined),
+    };
+
+    return (
+      <DelayedAppearance
+        key={row.id || rIdx}
+        delayMinutes={row.delayMinutes}
+        delaySeconds={row.delaySeconds}
+        active={true}
+      >
+        <div style={rowStyle} className="relative transition-all">
+          <div className="flex flex-wrap -mx-3 items-stretch">
+            {row.columns.map((column, cIdx) => {
+              const colSurfaceStyle = getColumnSurfaceStyle(column, { isPreview: true });
+              const colShadowClass = getColumnShadowClass(column.shadow);
+              return (
+                <div
+                  key={column.id || cIdx}
+                  style={{ width: `${column.widthPercentage}%` }}
+                  className="px-3 flex flex-col"
+                >
+                  <div
+                    style={colSurfaceStyle}
+                    className={`w-full flex-1 transition-all ${colShadowClass}`}
+                  >
+                    {column.elements.map((element, eIdx) => renderElement(element, eIdx))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </DelayedAppearance>
+    );
   };
 
   // Render a Full Section with background, paddings, overlay & columns
@@ -1139,66 +1223,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
               width: '100%',
             }}
           >
-            {section.rows.map((row, rIdx) => {
-              const rowShadowClass =
-                row.shadow === 'sm'
-                  ? 'shadow-xs'
-                  : row.shadow === 'md'
-                  ? 'shadow-md'
-                  : row.shadow === 'lg'
-                  ? 'shadow-xl'
-                  : row.shadow === 'xl'
-                  ? 'shadow-2xl'
-                  : '';
-
-              const rowStyle: React.CSSProperties = {
-                maxWidth:
-                  row.widthType === 'boxed' && row.maxWidth
-                    ? `${row.maxWidth}px`
-                    : row.widthType === 'full'
-                    ? '100%'
-                    : undefined,
-                marginLeft: 'auto',
-                marginRight: 'auto',
-                marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : '0px',
-                marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '0px',
-                paddingTop: row.paddingTop !== undefined ? `${row.paddingTop}px` : undefined,
-                paddingBottom: row.paddingBottom !== undefined ? `${row.paddingBottom}px` : undefined,
-                paddingLeft: row.paddingLeft !== undefined ? `${row.paddingLeft}px` : undefined,
-                paddingRight: row.paddingRight !== undefined ? `${row.paddingRight}px` : undefined,
-                backgroundColor: row.bgColor || undefined,
-                borderRadius: row.borderRadius !== undefined ? `${row.borderRadius}px` : undefined,
-                borderWidth: row.borderWidth !== undefined ? `${row.borderWidth}px` : undefined,
-                borderColor: row.borderColor || undefined,
-                borderStyle: row.borderStyle || (row.borderWidth ? 'solid' : undefined),
-              };
-
-              return (
-                <DelayedAppearance
-                  key={row.id || rIdx}
-                  delayMinutes={row.delayMinutes}
-                  delaySeconds={row.delaySeconds}
-                  active={true}
-                >
-                  <div
-                    style={rowStyle}
-                    className={`relative transition-all ${rowShadowClass}`}
-                  >
-                    <div className="flex flex-wrap -mx-3">
-                      {row.columns.map((column, cIdx) => (
-                        <div
-                          key={column.id || cIdx}
-                          style={{ width: `${column.widthPercentage}%` }}
-                          className="px-3"
-                        >
-                          {column.elements.map((element, eIdx) => renderElement(element, eIdx))}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </DelayedAppearance>
-              );
-            })}
+            {section.rows.map((row, rIdx) => renderRowBlock(row, rIdx))}
           </div>
         </div>
       </DelayedAppearance>

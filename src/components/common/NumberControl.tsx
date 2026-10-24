@@ -34,13 +34,20 @@ export const NumberControl: React.FC<NumberControlProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
     if (raw === '' || /^\d*$/.test(raw)) {
-      setLocalText(raw);
       if (raw !== '') {
         const num = parseInt(raw, 10);
         if (!isNaN(num)) {
+          if (max !== undefined && num > max) {
+            setLocalText(String(max));
+            onChange(max);
+            return;
+          }
+          setLocalText(raw);
           onChange(num);
+          return;
         }
       }
+      setLocalText(raw);
     }
   };
 

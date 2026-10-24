@@ -106,6 +106,7 @@ import { DelayedAppearance } from '../common/DelayedAppearance';
 import { SectionInspector } from './SectionInspector';
 import { PageSettingsInspector } from './PageSettingsInspector';
 import { RowInspector } from './RowInspector';
+import { ColumnInspector } from './ColumnInspector';
 import { StructureNavigator } from './StructureNavigator';
 import { RichTextElement } from './elements/RichTextElement';
 import { WordPressWysiwygEditor } from './elements/WordPressWysiwygEditor';
@@ -128,6 +129,29 @@ import {
   CheckboxWidget,
   InputFieldWidget,
 } from './elements/ConversionWidgets';
+import {
+  cloneRowWithFreshIds,
+  createInnerColumnsRow,
+  createInnerColumnsElement,
+  updateElementInSections,
+  updateColumnInSections,
+  updateRowInSections,
+  resizeRowColumnsCount,
+  insertElementIntoColumn,
+  findColumnDepth,
+  findElementById,
+  removeElementFromSections,
+  moveElementInSections,
+  duplicateElementInSections,
+  reorderElementsInColInSections,
+  duplicateRowInSections,
+  deleteRowInSections,
+  moveRowInSections,
+  findEditorSelectionContext,
+  getColumnSurfaceStyle,
+  getColumnShadowClass,
+  formatRowDisplayName,
+} from '../../utils/editorTreeUtils';
 
 interface VisualEditorProps {
   initialPage?: FunnelPage;
@@ -291,6 +315,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [showStructurePanel, setShowStructurePanel] = useState<boolean>(true);
   const [fullscreenWysiwygElementId, setFullscreenWysiwygElementId] = useState<string | null>(null);
   const [hoveredSectionId, setHoveredSectionId] = useState<string | null>(null);
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
+  const [hoveredColumnId, setHoveredColumnId] = useState<string | null>(null);
   const [templateToApply, setTemplateToApply] = useState<PageTemplate | null>(null);
   const [showTemplateConfirmModal, setShowTemplateConfirmModal] = useState<boolean>(false);
   const [templatePreviewModal, setTemplatePreviewModal] = useState<PageTemplate | null>(null);
@@ -371,8 +397,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [history, setHistory] = useState<PageBlockSection[][]>([sections]);
   const [historyIndex, setHistoryIndex] = useState<number>(0);
 
-  // Selected element for Property Inspector
+  // Selected element / column / row / section for Property Inspector
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
@@ -477,6 +504,81 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [isDraggingVideoFile, setIsDraggingVideoFile] = useState<boolean>(false);
   const [isDraggingVideoCover, setIsDraggingVideoCover] = useState<boolean>(false);
 
+  // Canvas DOM measurement for governing maximum width of inner containers / div blocks
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const [measuredCanvasWidth, setMeasuredCanvasWidth] = useState<number>(1200);
+
+  useEffect(() => {
+    const el = canvasContainerRef.current;
+    if (!el) return;
+    const syncCanvasWidth = () => {
+      if (viewportMode === 'mobile') return;
+      const width = Math.round(el.getBoundingClientRect().width);
+      if (width > 0) {
+        setMeasuredCanvasWidth(width);
+      }
+    };
+    syncCanvasWidth();
+    const observer = new ResizeObserver(() => {
+      syncCanvasWidth();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [
+    viewportMode,
+    pageSettings.pageWidthType,
+    pageSettings.pageContentMaxWidth,
+    showStructurePanel,
+    isPreviewMode,
+  ]);
+
+  const effectiveCanvasMaxWidth =
+    pageSettings.pageWidthType === 'full'
+      ? Math.max(320, measuredCanvasWidth || 1200)
+      : Math.max(320, pageSettings.pageContentMaxWidth || 1200);
+
+  // Automatically clamp any row / inner container maxWidth exceeding effectiveCanvasMaxWidth
+  useEffect(() => {
+    setSections((prevSections) => {
+      let changed = false;
+      const clampRow = (r: PageBlockRow): PageBlockRow => {
+        let nextRow = r;
+        if (r.maxWidth !== undefined && r.maxWidth > effectiveCanvasMaxWidth) {
+          changed = true;
+          nextRow = { ...nextRow, maxWidth: effectiveCanvasMaxWidth };
+        }
+        const nextCols = nextRow.columns.map((col) => {
+          let colChanged = false;
+          const nextEls = col.elements.map((el) => {
+            if (el.type === 'inner_columns' && el.nestedRow) {
+              const clampedNested = clampRow(el.nestedRow);
+              if (clampedNested !== el.nestedRow) {
+                colChanged = true;
+                return { ...el, nestedRow: clampedNested };
+              }
+            }
+            return el;
+          });
+          return colChanged ? { ...col, elements: nextEls } : col;
+        });
+        if (nextCols.some((c, idx) => c !== nextRow.columns[idx])) {
+          nextRow = { ...nextRow, columns: nextCols };
+        }
+        return nextRow;
+      };
+
+      const nextSections = prevSections.map((sec) => {
+        const nextRows = sec.rows.map(clampRow);
+        if (nextRows.some((r, idx) => r !== sec.rows[idx])) {
+          return { ...sec, rows: nextRows };
+        }
+        return sec;
+      });
+
+      return changed ? nextSections : prevSections;
+    });
+  }, [effectiveCanvasMaxWidth]);
+
   // Collapsible accordions in Properties panel
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     typography: true,
@@ -519,11 +621,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   }, [selectedElementId]);
 
   const toggleAccordion = (key: string) => {
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+    setOpenSections((prev) => ({ ...prev, [key]: !(prev[key] !== false) }));
   };
 
   const handleReturnToLibrary = () => {
     setSelectedElementId(null);
+    setSelectedColumnId(null);
     setSelectedRowId(null);
     setSelectedSectionId(null);
     setShowButtonIconPicker(false);
@@ -559,66 +662,42 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     }
   };
 
-  // Find currently selected element and its container
-  let selectedElement: PageBlockElement | null = null;
-  let selectedCol: PageBlockColumn | null = null;
-  let selectedRow: PageBlockRow | null = null;
-  let selectedSec: PageBlockSection | null = null;
+  // Full 2-level selection context (supports outer sections, rows, nested inner_columns rows, columns, and elements)
+  const selectionCtx = findEditorSelectionContext(sections, {
+    selectedSectionId,
+    selectedRowId,
+    selectedColumnId,
+    selectedElementId,
+  });
 
-  for (const sec of sections) {
-    if (sec.id === selectedSectionId) {
-      selectedSec = sec;
-    }
-    for (const row of sec.rows) {
-      if (row.id === selectedRowId) {
-        selectedRow = row;
-        selectedSec = sec;
-      }
-      for (const col of row.columns) {
-        for (const el of col.elements) {
-          if (el.id === selectedElementId) {
-            selectedElement = el;
-            selectedCol = col;
-            selectedRow = row;
-            selectedSec = sec;
-            break;
-          }
-        }
-      }
-    }
-  }
+  const selectedElement = selectionCtx.selectedElement;
+  const selectedCol = selectionCtx.selectedCol;
+  const selectedRow = selectionCtx.selectedRow;
+  const selectedSec = selectionCtx.selectedSec;
 
   // Find element being edited in Fullscreen WordPress WYSIWYG
-  let fullscreenWysiwygElement: PageBlockElement | null = null;
-  if (fullscreenWysiwygElementId) {
-    for (const sec of sections) {
-      for (const row of sec.rows) {
-        for (const col of row.columns) {
-          for (const el of col.elements) {
-            if (el.id === fullscreenWysiwygElementId) {
-              fullscreenWysiwygElement = el;
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Active Row instance for inspector (when row is selected and element is not selected)
-  const activeRowForInspector = !selectedElement && selectedRowId
-    ? selectedRow
+  const fullscreenWysiwygElement = fullscreenWysiwygElementId
+    ? findElementById(sections, fullscreenWysiwygElementId)
     : null;
 
-  // Selected Section instance for inspector (when element and row are not selected)
-  const activeSectionForInspector = !selectedElement && !selectedRowId && selectedSectionId
-    ? sections.find((s) => s.id === selectedSectionId) || null
-    : null;
+  // Active Column instance for inspector (when a column is selected and no element is selected)
+  const activeColForInspector =
+    !selectedElement && selectedColumnId ? selectionCtx.selectedCol : null;
+
+  // Active Row instance for inspector (when row is selected and neither element nor column is selected)
+  const activeRowForInspector =
+    !selectedElement && !activeColForInspector ? selectionCtx.selectedRow : null;
+
+  // Selected Section instance for inspector (when element, column, and row are not selected)
+  const activeSectionForInspector =
+    !selectedElement && !activeColForInspector && !activeRowForInspector && selectedSectionId
+      ? sections.find((s) => s.id === selectedSectionId) || null
+      : null;
 
   // Ref for debouncing history saves during fast continuous updates (like dragging color picker)
   const historyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Update element styles or content in live state
+  // Update element styles or content in live state (supports depth 0 & depth 1)
   const updateSelectedElement = (
     updatedStyles: Partial<PageBlockElement['styles']>,
     updatedContent?: Partial<PageBlockElement['content']>
@@ -627,22 +706,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
     let updatedSections: PageBlockSection[] = [];
     setSections((prev) => {
-      const next = prev.map((sec) => ({
-        ...sec,
-        rows: sec.rows.map((row) => ({
-          ...row,
-          columns: row.columns.map((col) => ({
-            ...col,
-            elements: col.elements.map((el) => {
-              if (el.id !== selectedElementId) return el;
-              return {
-                ...el,
-                styles: { ...el.styles, ...updatedStyles },
-                content: updatedContent ? { ...el.content, ...updatedContent } : el.content,
-              };
-            }),
-          })),
-        })),
+      const next = updateElementInSections(prev, selectedElementId, (el) => ({
+        ...el,
+        styles: { ...el.styles, ...updatedStyles },
+        content: updatedContent ? { ...el.content, ...updatedContent } : el.content,
       }));
       updatedSections = next;
       return next;
@@ -650,8 +717,29 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
     setHasUnsavedChanges(true);
 
-    // Debounce history snapshot slightly (250ms) so continuous dragging in color pickers
-    // or sliders updates the canvas instantly at 60fps without deep-clone overhead!
+    if (historyDebounceRef.current) {
+      clearTimeout(historyDebounceRef.current);
+    }
+    historyDebounceRef.current = setTimeout(() => {
+      if (updatedSections.length > 0) {
+        pushHistory(updatedSections);
+      }
+    }, 250);
+  };
+
+  // Update individual column styles in live state (supports depth 0 & depth 1)
+  const updateSelectedColumn = (updatedProps: Partial<PageBlockColumn>) => {
+    if (!selectedColumnId) return;
+
+    let updatedSections: PageBlockSection[] = [];
+    setSections((prev) => {
+      const next = updateColumnInSections(prev, selectedColumnId, updatedProps);
+      updatedSections = next;
+      return next;
+    });
+
+    setHasUnsavedChanges(true);
+
     if (historyDebounceRef.current) {
       clearTimeout(historyDebounceRef.current);
     }
@@ -668,21 +756,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     updatedContent: Partial<PageBlockElement['content']>
   ) => {
     setSections((prevSections) =>
-      prevSections.map((sec) => ({
-        ...sec,
-        rows: sec.rows.map((row) => ({
-          ...row,
-          columns: row.columns.map((col) => ({
-            ...col,
-            elements: col.elements.map((el) => {
-              if (el.id !== elementId) return el;
-              return {
-                ...el,
-                content: { ...el.content, ...updatedContent },
-              };
-            }),
-          })),
-        })),
+      updateElementInSections(prevSections, elementId, (el) => ({
+        ...el,
+        content: { ...el.content, ...updatedContent },
       }))
     );
     setHasUnsavedChanges(true);
@@ -957,43 +1033,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     }
   };
 
-  // Element Actions: Move up, down, duplicate, delete
+  // Element Actions: Move up, down, duplicate, delete (supports depth 0 & depth 1)
   const moveElement = (direction: 'up' | 'down', targetId?: string) => {
     const idToMove = targetId || selectedElementId;
     if (!idToMove) return;
 
-    let targetColId: string | null = null;
-    for (const sec of sections) {
-      for (const row of sec.rows) {
-        for (const col of row.columns) {
-          if (col.elements.some((e) => e.id === idToMove)) {
-            targetColId = col.id;
-            break;
-          }
-        }
-      }
-    }
-    if (!targetColId) return;
-
-    const nextSections = sections.map((sec) => ({
-      ...sec,
-      rows: sec.rows.map((row) => ({
-        ...row,
-        columns: row.columns.map((col) => {
-          if (col.id !== targetColId) return col;
-          const idx = col.elements.findIndex((e) => e.id === idToMove);
-          if (idx === -1) return col;
-          const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-          if (targetIdx < 0 || targetIdx >= col.elements.length) return col;
-
-          const updatedElements = [...col.elements];
-          const [moved] = updatedElements.splice(idx, 1);
-          updatedElements.splice(targetIdx, 0, moved);
-
-          return { ...col, elements: updatedElements };
-        }),
-      })),
-    }));
+    const { nextSections, moved } = moveElementInSections(sections, idToMove, direction);
+    if (!moved) return;
 
     pushHistory(nextSections);
     showToast(`Elemento movido hacia ${direction === 'up' ? 'arriba' : 'abajo'}`);
@@ -1003,45 +1049,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     const idToDuplicate = targetId || selectedElementId;
     if (!idToDuplicate) return;
 
-    let targetColId: string | null = null;
-    let newElementId = '';
-    for (const sec of sections) {
-      for (const row of sec.rows) {
-        for (const col of row.columns) {
-          if (col.elements.some((e) => e.id === idToDuplicate)) {
-            targetColId = col.id;
-            break;
-          }
-        }
-      }
-    }
-    if (!targetColId) return;
-
-    const nextSections = sections.map((sec) => ({
-      ...sec,
-      rows: sec.rows.map((row) => ({
-        ...row,
-        columns: row.columns.map((col) => {
-          if (col.id !== targetColId) return col;
-          const idx = col.elements.findIndex((e) => e.id === idToDuplicate);
-          if (idx === -1) return col;
-          const original = col.elements[idx];
-          newElementId = `el_${Date.now()}_copy`;
-          const duplicated: PageBlockElement = {
-            ...JSON.parse(JSON.stringify(original)),
-            id: newElementId,
-          };
-          const updatedElements = [...col.elements];
-          updatedElements.splice(idx + 1, 0, duplicated);
-          return { ...col, elements: updatedElements };
-        }),
-      })),
-    }));
+    const { nextSections, newElement } = duplicateElementInSections(sections, idToDuplicate);
+    if (!newElement) return;
 
     pushHistory(nextSections);
-    if (newElementId) {
-      setSelectedElementId(newElementId);
-    }
+    setSelectedColumnId(null);
+    setSelectedElementId(newElement.id);
     showToast('Elemento duplicado / clonado con éxito');
   };
 
@@ -1049,17 +1062,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     const idToDelete = targetId || selectedElementId;
     if (!idToDelete) return;
 
-    const nextSections = sections.map((sec) => ({
-      ...sec,
-      rows: sec.rows.map((row) => ({
-        ...row,
-        columns: row.columns.map((col) => ({
-          ...col,
-          elements: col.elements.filter((e) => e.id !== idToDelete),
-        })),
-      })),
-    }));
-
+    const { nextSections } = removeElementFromSections(sections, idToDelete);
     if (selectedElementId === idToDelete) {
       setSelectedElementId(null);
     }
@@ -1109,6 +1112,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     newSections.splice(clampedIdx, 0, movingSec);
     pushHistory(newSections);
     setSelectedSectionId(movingSec.id);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
     setSelectedElementId(null);
     showToast(`Sección "${movingSec.name}" reordenada`);
   };
@@ -1125,26 +1130,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     const duplicatedSec: PageBlockSection = JSON.parse(JSON.stringify(original));
     duplicatedSec.id = newSecId;
     duplicatedSec.name = `${original.name} (Copia)`;
-
-    // Regenerate unique IDs for rows, columns, and elements to prevent collision
-    duplicatedSec.rows = duplicatedSec.rows.map((row, rIdx) => ({
-      ...row,
-      id: `row_${Date.now()}_${rIdx}`,
-      columns: row.columns.map((col, cIdx) => ({
-        ...col,
-        id: `col_${Date.now()}_${rIdx}_${cIdx}`,
-        elements: col.elements.map((el, eIdx) => ({
-          ...el,
-          id: `el_${Date.now()}_${rIdx}_${cIdx}_${eIdx}`,
-        })),
-      })),
-    }));
+    duplicatedSec.rows = duplicatedSec.rows.map((row) => cloneRowWithFreshIds(row));
 
     const newSections = [...sections];
     newSections.splice(idx + 1, 0, duplicatedSec);
 
     pushHistory(newSections);
     setSelectedSectionId(newSecId);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
     setSelectedElementId(null);
     showToast('Sección duplicada exitosamente');
   };
@@ -1157,91 +1151,73 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     pushHistory(nextSections);
     setSelectedSectionId(null);
     setSelectedRowId(null);
+    setSelectedColumnId(null);
     setSelectedElementId(null);
     setHasUnsavedChanges(true);
     showToast('Sección eliminada');
   };
 
-  // Update inner section / row styles
+  // Update inner section / row styles (supports outer & nested rows)
   const updateSelectedRow = (updatedProps: Partial<PageBlockRow>) => {
-    if (!selectedRowId) return;
+    const targetRowId = activeRowForInspector?.id || selectedRowId;
+    if (!targetRowId) return;
+    const nextSections = updateRowInSections(sections, targetRowId, updatedProps);
+    pushHistory(nextSections);
+    setHasUnsavedChanges(true);
+  };
+
+  const changeRowColumnsCount = (rowId: string, count: number) => {
     const nextSections = sections.map((sec) => ({
       ...sec,
       rows: sec.rows.map((row) => {
-        if (row.id !== selectedRowId) return row;
+        if (row.id === rowId) {
+          return resizeRowColumnsCount(row, count);
+        }
         return {
           ...row,
-          ...updatedProps,
+          columns: row.columns.map((col) => ({
+            ...col,
+            elements: col.elements.map((el) =>
+              el.type === 'inner_columns' && el.nestedRow?.id === rowId
+                ? { ...el, nestedRow: resizeRowColumnsCount(el.nestedRow, count) }
+                : el
+            ),
+          })),
         };
       }),
     }));
     pushHistory(nextSections);
     setHasUnsavedChanges(true);
+    showToast(`Distribución actualizada a ${count} ${count === 1 ? 'columna' : 'columnas'}`);
   };
 
   const duplicateRow = (rowId?: string) => {
-    const targetRowId = rowId || selectedRowId;
+    const targetRowId = rowId || activeRowForInspector?.id || selectedRowId;
     if (!targetRowId) return;
 
-    let clonedId: string | null = null;
-    const nextSections = sections.map((sec) => {
-      const rowIdx = sec.rows.findIndex((r) => r.id === targetRowId);
-      if (rowIdx === -1) return sec;
-      const targetRow = sec.rows[rowIdx];
-      clonedId = `row_${Date.now()}`;
-      const clonedRow: PageBlockRow = {
-        ...JSON.parse(JSON.stringify(targetRow)),
-        id: clonedId,
-        name: `${targetRow.name || 'Sección Interna'} (Copia)`,
-        columns: targetRow.columns.map((c) => ({
-          ...c,
-          id: `col_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          elements: c.elements.map((el) => ({
-            ...el,
-            id: `el_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          })),
-        })),
-      };
-      const newRows = [...sec.rows];
-      newRows.splice(rowIdx + 1, 0, clonedRow);
-      return {
-        ...sec,
-        rows: newRows,
-      };
-    });
+    const { nextSections, newRowId } = duplicateRowInSections(sections, targetRowId);
+    if (!newRowId) return;
+
     pushHistory(nextSections);
-    if (clonedId) {
-      setSelectedRowId(clonedId);
-      setSelectedElementId(null);
-    }
+    setSelectedRowId(newRowId);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
     setHasUnsavedChanges(true);
     showToast('Sección interna duplicada');
   };
 
   const deleteRow = (rowId?: string) => {
-    const targetRowId = rowId || selectedRowId;
+    const targetRowId = rowId || activeRowForInspector?.id || selectedRowId;
     if (!targetRowId) return;
 
-    let rowDeleted = false;
-    const nextSections = sections
-      .map((sec) => {
-        const remainingRows = sec.rows.filter((r) => r.id !== targetRowId);
-        if (remainingRows.length !== sec.rows.length) {
-          rowDeleted = true;
-        }
-        return {
-          ...sec,
-          rows: remainingRows,
-        };
-      })
-      .filter((sec) => sec.rows.length > 0);
-
-    if (rowDeleted) {
+    const { nextSections, deleted } = deleteRowInSections(sections, targetRowId);
+    if (deleted) {
       pushHistory(nextSections);
       setSelectedRowId(null);
+      setSelectedColumnId(null);
       setSelectedElementId(null);
       setHasUnsavedChanges(true);
-      showToast('Sección / Fila eliminada');
+      showToast('Sección interna eliminada');
     }
   };
 
@@ -1263,18 +1239,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     const newSections: PageBlockSection[] = template.sections.map((sec, sIdx) => ({
       ...JSON.parse(JSON.stringify(sec)),
       id: `sec_${Date.now()}_${sIdx}`,
-      rows: sec.rows.map((row, rIdx) => ({
-        ...JSON.parse(JSON.stringify(row)),
-        id: `row_${Date.now()}_${sIdx}_${rIdx}`,
-        columns: row.columns.map((col, cIdx) => ({
-          ...JSON.parse(JSON.stringify(col)),
-          id: `col_${Date.now()}_${sIdx}_${rIdx}_${cIdx}`,
-          elements: col.elements.map((el, eIdx) => ({
-            ...JSON.parse(JSON.stringify(el)),
-            id: `el_${Date.now()}_${sIdx}_${rIdx}_${cIdx}_${eIdx}`,
-          })),
-        })),
-      })),
+      rows: sec.rows.map((row) => cloneRowWithFreshIds(row)),
     }));
 
     if (template.pageSettings) {
@@ -1286,6 +1251,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
     pushHistory(newSections);
     setSelectedElementId(null);
+    setSelectedColumnId(null);
     setSelectedRowId(null);
     setSelectedSectionId(null);
     setHasUnsavedChanges(true);
@@ -1295,28 +1261,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     showToast(`Plantilla "${template.name}" cargada correctamente`);
   };
 
-  const moveRow = (direction: 'up' | 'down', secId?: string, rowId?: string) => {
-    const idToMove = rowId || selectedRowId;
+  const moveRow = (direction: 'up' | 'down', _secId?: string, rowId?: string) => {
+    const idToMove = rowId || activeRowForInspector?.id || selectedRowId;
     if (!idToMove) return;
 
-    let moved = false;
-    const nextSections = sections.map((sec) => {
-      const idx = sec.rows.findIndex((r) => r.id === idToMove);
-      if (idx === -1) return sec;
-      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (targetIdx < 0 || targetIdx >= sec.rows.length) return sec;
-
-      const newRows = [...sec.rows];
-      const [r] = newRows.splice(idx, 1);
-      newRows.splice(targetIdx, 0, r);
-      moved = true;
-      return { ...sec, rows: newRows };
-    });
-
+    const { nextSections, moved } = moveRowInSections(sections, idToMove, direction);
     if (moved) {
       pushHistory(nextSections);
       setSelectedRowId(idToMove);
-      showToast(`Fila movida hacia ${direction === 'up' ? 'arriba' : 'abajo'}`);
+      showToast(`Sección interna movida hacia ${direction === 'up' ? 'arriba' : 'abajo'}`);
     }
   };
 
@@ -1335,19 +1288,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
   const reorderElementsInCol = (colId: string, fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
-    const nextSections = sections.map((sec) => ({
-      ...sec,
-      rows: sec.rows.map((row) => ({
-        ...row,
-        columns: row.columns.map((col) => {
-          if (col.id !== colId) return col;
-          const newElements = [...col.elements];
-          const [moved] = newElements.splice(fromIndex, 1);
-          newElements.splice(toIndex, 0, moved);
-          return { ...col, elements: newElements };
-        }),
-      })),
-    }));
+    const nextSections = reorderElementsInColInSections(sections, colId, fromIndex, toIndex);
     pushHistory(nextSections);
     showToast('Orden de elementos actualizado');
   };
@@ -1559,6 +1500,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     }
     pushHistory(nextSections);
     setSelectedSectionId(newSec.id);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
     setSelectedElementId(null);
     showToast(`Nueva sección "${newSec.name}" insertada`);
   };
@@ -2062,7 +2005,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             id: `row_${Date.now()}`,
             name: 'Contenedor',
             widthType: 'boxed',
-            maxWidth: 1200,
+            maxWidth: Math.min(1200, effectiveCanvasMaxWidth),
             columns: [
               {
                 id: `col_${Date.now()}`,
@@ -2075,36 +2018,47 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       };
       pushHistory([brandNewSection]);
       setSelectedSectionId(brandNewSection.id);
+      setSelectedColumnId(null);
       setSelectedElementId(newElement.id);
       const label = options?.level ? options.level.toUpperCase() : type.toUpperCase();
       showToast(`Elemento ${label} añadido al lienzo`);
       return;
     }
 
-    const nextSections = sections.map((sec, secIdx) => {
-      if (secIdx !== 0) return sec;
-      return {
-        ...sec,
-        rows: sec.rows.map((row, rowIdx) => {
-          if (rowIdx !== 0) return row;
-          return {
-            ...row,
-            columns: row.columns.map((col, colIdx) => {
-              if (colIdx !== 0) return col;
-              return { ...col, elements: [...col.elements, newElement] };
-            }),
-          };
-        }),
-      };
-    });
+    let targetColId: string | null = null;
+    let targetIndex = 0;
 
+    if (selectionCtx.selectedElement && selectionCtx.selectedCol) {
+      targetColId = selectionCtx.selectedCol.id;
+      const foundIdx = selectionCtx.selectedCol.elements.findIndex(
+        (el) => el.id === selectionCtx.selectedElement!.id
+      );
+      targetIndex = foundIdx !== -1 ? foundIdx + 1 : selectionCtx.selectedCol.elements.length;
+    } else if (selectionCtx.selectedCol) {
+      targetColId = selectionCtx.selectedCol.id;
+      targetIndex = selectionCtx.selectedCol.elements.length;
+    } else if (selectionCtx.selectedRow && selectionCtx.selectedRow.columns.length > 0) {
+      targetColId = selectionCtx.selectedRow.columns[0].id;
+      targetIndex = selectionCtx.selectedRow.columns[0].elements.length;
+    } else if (selectionCtx.selectedSec && selectionCtx.selectedSec.rows[0]?.columns[0]) {
+      targetColId = selectionCtx.selectedSec.rows[0].columns[0].id;
+      targetIndex = selectionCtx.selectedSec.rows[0].columns[0].elements.length;
+    } else if (sections[0]?.rows[0]?.columns[0]) {
+      targetColId = sections[0].rows[0].columns[0].id;
+      targetIndex = sections[0].rows[0].columns[0].elements.length;
+    }
+
+    if (!targetColId) return;
+
+    const nextSections = insertElementIntoColumn(sections, targetColId, targetIndex, newElement);
     pushHistory(nextSections);
+    setSelectedColumnId(null);
     setSelectedElementId(newElement.id);
     const label = options?.level ? options.level.toUpperCase() : type.toUpperCase();
     showToast(`Elemento ${label} añadido al lienzo`);
   };
 
-  // Insert element dropped from sidebar into a specific column and index
+  // Insert element dropped from sidebar into a specific column and index (supports depth 0 & depth 1)
   const insertElementAt = (
     type: ElementType,
     colId: string,
@@ -2112,109 +2066,77 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     options?: { level?: 'h1' | 'h2' | 'h3' | 'h4' }
   ) => {
     const newElement = createNewElement(type, options);
-
-    const nextSections = sections.map((sec) => ({
-      ...sec,
-      rows: sec.rows.map((row) => ({
-        ...row,
-        columns: row.columns.map((col) => {
-          if (col.id !== colId) return col;
-          const updatedElements = [...col.elements];
-          updatedElements.splice(atIndex, 0, newElement);
-          return { ...col, elements: updatedElements };
-        }),
-      })),
-    }));
-
+    const nextSections = insertElementIntoColumn(sections, colId, atIndex, newElement);
     pushHistory(nextSections);
+    setSelectedColumnId(null);
     setSelectedElementId(newElement.id);
   };
 
-  // Reorder existing element within canvas when dragged
+  // Insert nested inner columns (1-4 cols) at exact drop index inside a depth-0 block column (max 1 nested level)
+  const insertNestedColumnsAt = (numCols: number, colId: string, atIndex: number) => {
+    const depth = findColumnDepth(sections, colId);
+    if (depth === null) return;
+    if (depth >= 1) {
+      showToast('Solo se permite una sección interna dentro de un bloque (máximo 1 nivel)');
+      return;
+    }
+
+    const innerColsEl = createInnerColumnsElement(numCols);
+    const nextSections = insertElementIntoColumn(sections, colId, atIndex, innerColsEl);
+    pushHistory(nextSections);
+
+    if (innerColsEl.nestedRow) {
+      setSelectedRowId(innerColsEl.nestedRow.id);
+    }
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    showToast(`Columnas internas (${numCols} Col) insertadas`);
+  };
+
+  // Reorder existing element within canvas when dragged (supports depth 0 & depth 1, blocks >1 nested level)
   const reorderCanvasElement = (sourceId: string, targetColId: string, targetIdx: number) => {
-    let movedElement: PageBlockElement | null = null;
+    const sourceEl = findElementById(sections, sourceId);
+    if (!sourceEl) return;
 
-    // Remove source element
-    const sectionsWithoutMoved = sections.map((sec) => ({
-      ...sec,
-      rows: sec.rows.map((row) => ({
-        ...row,
-        columns: row.columns.map((col) => {
-          const found = col.elements.find((e) => e.id === sourceId);
-          if (found) {
-            movedElement = found;
-            return {
-              ...col,
-              elements: col.elements.filter((e) => e.id !== sourceId),
-            };
-          }
-          return col;
-        }),
-      })),
-    }));
+    const targetDepth = findColumnDepth(sections, targetColId);
+    if (sourceEl.type === 'inner_columns' && targetDepth === 1) {
+      showToast('Solo se permite una sección interna dentro de un bloque (máximo 1 nivel)');
+      return;
+    }
 
-    if (!movedElement) return;
+    const { nextSections, removedElement, sourceColId, sourceIndex } = removeElementFromSections(
+      sections,
+      sourceId
+    );
+    if (!removedElement) return;
 
-    // Insert into target column at target index
-    const finalSections = sectionsWithoutMoved.map((sec) => ({
-      ...sec,
-      rows: sec.rows.map((row) => ({
-        ...row,
-        columns: row.columns.map((col) => {
-          if (col.id !== targetColId) return col;
-          const updatedElements = [...col.elements];
-          const insertPos = Math.max(0, Math.min(updatedElements.length, targetIdx));
-          updatedElements.splice(insertPos, 0, movedElement!);
-          return { ...col, elements: updatedElements };
-        }),
-      })),
-    }));
+    const adjustedIdx =
+      sourceColId === targetColId && sourceIndex !== -1 && sourceIndex < targetIdx
+        ? targetIdx - 1
+        : targetIdx;
+
+    const finalSections = insertElementIntoColumn(
+      nextSections,
+      targetColId,
+      adjustedIdx,
+      removedElement
+    );
 
     pushHistory(finalSections);
-    setSelectedElementId(sourceId);
+    setSelectedColumnId(null);
+    if (removedElement.type === 'inner_columns' && removedElement.nestedRow) {
+      setSelectedRowId(removedElement.nestedRow.id);
+      setSelectedElementId(null);
+    } else {
+      setSelectedElementId(sourceId);
+    }
     showToast('Orden del elemento actualizado');
   };
 
   // Add layout row (columnas internas) with 1, 2, 3 or 4 columns
   const addColumnsLayout = (numCols: number, targetSectionId?: string, targetRowIndex?: number) => {
-    const widthPercentage = 100 / numCols;
-    const newColumns: PageBlockColumn[] = Array.from({ length: numCols }, (_, i) => ({
-      id: `col_${Date.now()}_${i}`,
-      widthPercentage,
-      elements: [
-        {
-          id: `el_placeholder_${Date.now()}_${i}`,
-          type: 'paragraph',
-          content: { text: `Columna ${i + 1}: Haz clic para editar o arrastra elementos aquí.` },
-          styles: {
-            fontSize: 14,
-            fontFamily: 'Inter',
-            textColor: '#5B5B66',
-            textAlign: 'center',
-            paddingTop: 16,
-            paddingBottom: 16,
-            marginTop: 0,
-            marginBottom: 0,
-            marginLeft: 0,
-            marginRight: 0,
-          },
-        },
-      ],
-    }));
-
-    const newRow: PageBlockRow = {
-      id: `row_${Date.now()}`,
-      name: `Sección Interna (${numCols} Col)`,
-      marginTop: 0,
-      marginBottom: 0,
-      paddingTop: 0,
-      paddingBottom: 0,
-      paddingLeft: 0,
-      paddingRight: 0,
-      columns: newColumns,
-    };
-
     if (sections.length === 0) {
+      const newRow = createInnerColumnsRow(numCols);
       const brandNewSection: PageBlockSection = {
         id: `sec_${Date.now()}`,
         name: 'Sección 1',
@@ -2231,53 +2153,83 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       pushHistory([brandNewSection]);
       setSelectedSectionId(brandNewSection.id);
       setSelectedRowId(newRow.id);
+      setSelectedColumnId(null);
       setSelectedElementId(null);
       showToast(`Columnas internas (${numCols} Col) agregadas`);
       return;
     }
 
-    const secIdToTarget =
-      targetSectionId ||
-      selectedSectionId ||
-      (selectedRowId ? sections.find((s) => s.rows.some((r) => r.id === selectedRowId))?.id : null) ||
-      (selectedElementId
-        ? sections.find((s) => s.rows.some((r) => r.columns.some((c) => c.elements.some((el) => el.id === selectedElementId))))
-            ?.id
-        : null) ||
-      sections[0].id;
-
-    let targetIdx = targetRowIndex;
-    const targetSec = sections.find((s) => s.id === secIdToTarget);
-    if (typeof targetIdx !== 'number' && targetSec) {
-      if (selectedRowId) {
-        const foundRowIdx = targetSec.rows.findIndex((r) => r.id === selectedRowId);
-        if (foundRowIdx !== -1) {
-          targetIdx = foundRowIdx + 1;
-        }
-      } else if (selectedElementId) {
-        const foundRowIdx = targetSec.rows.findIndex((r) =>
-          r.columns.some((c) => c.elements.some((el) => el.id === selectedElementId))
-        );
-        if (foundRowIdx !== -1) {
-          targetIdx = foundRowIdx + 1;
-        }
-      }
+    // Explicit row index drop in outer section
+    if (typeof targetRowIndex === 'number' && targetSectionId) {
+      const newRow = createInnerColumnsRow(numCols);
+      const nextSections = sections.map((sec) => {
+        if (sec.id !== targetSectionId) return sec;
+        const newRows = [...sec.rows];
+        const clamped = Math.max(0, Math.min(newRows.length, targetRowIndex));
+        newRows.splice(clamped, 0, newRow);
+        return { ...sec, rows: newRows };
+      });
+      pushHistory(nextSections);
+      setSelectedSectionId(targetSectionId);
+      setSelectedRowId(newRow.id);
+      setSelectedColumnId(null);
+      setSelectedElementId(null);
+      showToast(`Columnas internas (${numCols} Col) agregadas`);
+      return;
     }
 
+    // Clicked in sidebar: enforce max 1 nested level inside outer block
+    if (selectionCtx.isNestedRow) {
+      showToast('Ya estás dentro de una sección interna (máximo 1 nivel por bloque)');
+      return;
+    }
+
+    if (selectionCtx.outerCol) {
+      const insertAt = selectionCtx.selectedElement
+        ? (() => {
+            const idx = selectionCtx.outerCol!.elements.findIndex(
+              (el) => el.id === selectionCtx.selectedElement!.id
+            );
+            return idx !== -1 ? idx + 1 : selectionCtx.outerCol!.elements.length;
+          })()
+        : selectionCtx.outerCol.elements.length;
+      insertNestedColumnsAt(numCols, selectionCtx.outerCol.id, insertAt);
+      return;
+    }
+
+    if (selectionCtx.outerRow && selectionCtx.outerRow.columns.length === 1) {
+      const col = selectionCtx.outerRow.columns[0];
+      insertNestedColumnsAt(numCols, col.id, col.elements.length);
+      return;
+    }
+
+    const targetSec = selectionCtx.selectedSec || sections[0];
+    if (targetSec.rows.length === 1 && targetSec.rows[0].columns.length === 1) {
+      const col = targetSec.rows[0].columns[0];
+      setSelectedSectionId(targetSec.id);
+      insertNestedColumnsAt(numCols, col.id, col.elements.length);
+      return;
+    }
+
+    const newRow = createInnerColumnsRow(numCols);
     const nextSections = sections.map((sec) => {
-      if (sec.id !== secIdToTarget) return sec;
+      if (sec.id !== targetSec.id) return sec;
       const newRows = [...sec.rows];
-      if (typeof targetIdx === 'number' && targetIdx >= 0 && targetIdx <= newRows.length) {
-        newRows.splice(targetIdx, 0, newRow);
-      } else {
-        newRows.push(newRow);
+      if (selectionCtx.outerRow) {
+        const foundIdx = newRows.findIndex((r) => r.id === selectionCtx.outerRow!.id);
+        if (foundIdx !== -1) {
+          newRows.splice(foundIdx + 1, 0, newRow);
+          return { ...sec, rows: newRows };
+        }
       }
+      newRows.push(newRow);
       return { ...sec, rows: newRows };
     });
 
     pushHistory(nextSections);
-    setSelectedSectionId(secIdToTarget);
+    setSelectedSectionId(targetSec.id);
     setSelectedRowId(newRow.id);
+    setSelectedColumnId(null);
     setSelectedElementId(null);
     showToast(`Columnas internas (${numCols} Col) agregadas`);
   };
@@ -3506,18 +3458,24 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       newSections.splice(targetIndex, 0, newSection);
       pushHistory(newSections);
       setSelectedSectionId(newSection.id);
+      setSelectedRowId(null);
+      setSelectedColumnId(null);
       setSelectedElementId(null);
       showToast(`Bloque "${newSection.name}" insertado en la posición seleccionada`);
     } else if (blockType === 'header') {
       newSections.unshift(newSection);
       pushHistory(newSections);
       setSelectedSectionId(newSection.id);
+      setSelectedRowId(null);
+      setSelectedColumnId(null);
       setSelectedElementId(null);
       showToast(`Cabecera "${newSection.name}" añadida al inicio de la página`);
     } else {
       newSections.push(newSection);
       pushHistory(newSections);
       setSelectedSectionId(newSection.id);
+      setSelectedRowId(null);
+      setSelectedColumnId(null);
       setSelectedElementId(null);
       showToast(`Bloque prearmado "${newSection.name}" añadido al final de la página`);
     }
@@ -3567,16 +3525,17 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           <div className="h-4 w-[1px] bg-zinc-200" />
 
           {/* Interactive Breadcrumb path */}
-          <div className="flex items-center text-xs text-[#5B5B66] font-['Inter']">
+          <div className="flex items-center text-xs text-[#5B5B66] font-['Inter'] overflow-x-auto max-w-[460px] no-scrollbar">
             <button
               type="button"
               onClick={() => {
                 setSelectedElementId(null);
+                setSelectedColumnId(null);
                 setSelectedRowId(null);
                 setSelectedSectionId(null);
                 setActiveTab('page');
               }}
-              className="font-semibold text-zinc-900 hover:text-[#2848F0] hover:underline cursor-pointer flex items-center gap-1"
+              className="font-semibold text-zinc-900 hover:text-[#2848F0] hover:underline cursor-pointer flex items-center gap-1 shrink-0"
               title="Configuración Global de la Página (Lienzo)"
             >
               <span>{currentPage.title || 'Página'}</span>
@@ -3588,36 +3547,84 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                 type="button"
                 onClick={() => {
                   setSelectedElementId(null);
+                  setSelectedColumnId(null);
                   setSelectedRowId(null);
                   setSelectedSectionId(selectedSec.id);
                 }}
-                className={`cursor-pointer hover:text-[#2848F0] hover:underline ${
-                  !selectedRow && !selectedElement ? 'text-[#2848F0] font-bold' : 'text-zinc-600'
+                className={`cursor-pointer hover:text-[#2848F0] hover:underline shrink-0 ${
+                  !selectedRow && !selectedCol && !selectedElement ? 'text-[#2848F0] font-bold' : 'text-zinc-600'
                 }`}
                 title="Configuración de la Sección Externa"
               >
                 {selectedSec.name}
               </button>
             ) : (
-              <span className="text-zinc-400">Sección</span>
+              <span className="text-zinc-400 shrink-0">Sección</span>
             )}
 
-            {selectedRow && (
+            {selectionCtx.outerRow && (
               <>
                 <ChevronRight className="w-3.5 h-3.5 mx-1 text-zinc-400 shrink-0" />
                 <button
                   type="button"
                   onClick={() => {
                     setSelectedElementId(null);
-                    setSelectedRowId(selectedRow.id);
+                    setSelectedColumnId(null);
+                    setSelectedRowId(selectionCtx.outerRow!.id);
                   }}
-                  className={`cursor-pointer hover:text-[#2848F0] hover:underline flex items-center gap-1 ${
-                    !selectedElement ? 'text-indigo-600 font-bold' : 'text-zinc-600'
+                  className={`cursor-pointer hover:text-[#2848F0] hover:underline flex items-center gap-1 shrink-0 ${
+                    !selectionCtx.isNestedRow && !selectedCol && !selectedElement
+                      ? 'text-indigo-600 font-bold'
+                      : 'text-zinc-600'
                   }`}
-                  title="Configuración de la Sección Interna (Fila)"
+                  title="Configuración del Bloque / Sección Interna"
                 >
                   <Box className="w-3 h-3 text-indigo-500" />
-                  <span>{selectedRow.name || 'Sección Interna'}</span>
+                  <span>{selectionCtx.outerRow.name || 'Bloque Interno'}</span>
+                </button>
+              </>
+            )}
+
+            {selectionCtx.isNestedRow && selectionCtx.nestedRow && (
+              <>
+                <ChevronRight className="w-3.5 h-3.5 mx-1 text-zinc-400 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedElementId(null);
+                    setSelectedColumnId(null);
+                    setSelectedRowId(selectionCtx.nestedRow!.id);
+                  }}
+                  className={`cursor-pointer hover:text-[#2848F0] hover:underline flex items-center gap-1 shrink-0 ${
+                    !selectedCol && !selectedElement ? 'text-indigo-600 font-bold' : 'text-zinc-600'
+                  }`}
+                  title="Configuración de la Sección Interna Anidada"
+                >
+                  <Box className="w-3 h-3 text-indigo-500" />
+                  <span>{selectionCtx.nestedRow.name || 'Sección Interna'}</span>
+                </button>
+              </>
+            )}
+
+            {selectedCol && (
+              <>
+                <ChevronRight className="w-3.5 h-3.5 mx-1 text-zinc-400 shrink-0" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedElementId(null);
+                    setSelectedColumnId(selectedCol.id);
+                    if (selectionCtx.selectedColParentRow) {
+                      setSelectedRowId(selectionCtx.selectedColParentRow.id);
+                    }
+                  }}
+                  className={`cursor-pointer hover:text-teal-700 hover:underline flex items-center gap-1 shrink-0 ${
+                    !selectedElement ? 'text-teal-600 font-bold' : 'text-zinc-600'
+                  }`}
+                  title="Editar color y estilo de esta columna"
+                >
+                  <ColumnsIcon className="w-3 h-3 text-teal-600" />
+                  <span>{selectedCol.name || `Columna ${selectionCtx.selectedColIndex + 1}`}</span>
                 </button>
               </>
             )}
@@ -3625,7 +3632,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             {selectedElement && (
               <>
                 <ChevronRight className="w-3.5 h-3.5 mx-1 text-zinc-400 shrink-0" />
-                <span className="text-[#2848F0] font-bold">
+                <span className="text-[#2848F0] font-bold shrink-0">
                   {selectedElement.type.toUpperCase()}
                 </span>
               </>
@@ -3686,17 +3693,28 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             <button
               type="button"
               onClick={() => {
-                if (activeTab === 'templates' && !selectedElementId && !selectedRowId && !selectedSectionId) {
+                if (
+                  activeTab === 'templates' &&
+                  !selectedElementId &&
+                  !selectedColumnId &&
+                  !selectedRowId &&
+                  !selectedSectionId
+                ) {
                   setActiveTab('elements');
                 } else {
                   setActiveTab('templates');
                   setSelectedElementId(null);
+                  setSelectedColumnId(null);
                   setSelectedRowId(null);
                   setSelectedSectionId(null);
                 }
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                activeTab === 'templates' && !selectedElement && !selectedRowId && !activeSectionForInspector
+                activeTab === 'templates' &&
+                !selectedElement &&
+                !activeColForInspector &&
+                !activeRowForInspector &&
+                !activeSectionForInspector
                   ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-1 ring-purple-600'
                   : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-900'
               }`}
@@ -8557,12 +8575,38 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   </div>
                 </div>
               </div>
+            ) : activeColForInspector && selectionCtx.selectedColParentRow ? (
+              /* DEDICATED COLUMN INSPECTOR (COLUMNA INDIVIDUAL) */
+              <ColumnInspector
+                column={activeColForInspector}
+                columnIndex={selectionCtx.selectedColIndex}
+                parentRow={selectionCtx.selectedColParentRow}
+                sectionName={selectedSec?.name}
+                onUpdate={(props) => updateSelectedColumn(props)}
+                onSelectSiblingColumn={(colId) => {
+                  setSelectedColumnId(colId);
+                  setSelectedElementId(null);
+                }}
+                onSelectParentRow={() => {
+                  setSelectedRowId(selectionCtx.selectedColParentRow!.id);
+                  setSelectedColumnId(null);
+                  setSelectedElementId(null);
+                }}
+                onClose={handleReturnToLibrary}
+              />
             ) : activeRowForInspector ? (
               /* DEDICATED ROW INSPECTOR (SECCIÓN INTERNA) */
               <RowInspector
                 row={activeRowForInspector}
                 sectionName={selectedSec?.name}
+                canvasMaxWidth={effectiveCanvasMaxWidth}
                 onUpdate={(props) => updateSelectedRow(props)}
+                onChangeColumnsCount={(count) => changeRowColumnsCount(activeRowForInspector.id, count)}
+                onMoveUp={() => moveRow('up', selectedSec?.id, activeRowForInspector.id)}
+                onMoveDown={() => moveRow('down', selectedSec?.id, activeRowForInspector.id)}
+                canMoveUp={selectionCtx.canMoveRowUp}
+                canMoveDown={selectionCtx.canMoveRowDown}
+                canDelete={selectionCtx.canDeleteRow}
                 onDuplicate={() => duplicateRow(activeRowForInspector.id)}
                 onDelete={() => deleteRow(activeRowForInspector.id)}
                 onClose={handleReturnToLibrary}
@@ -8592,6 +8636,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     onClick={() => {
                       setActiveTab('page');
                       setSelectedElementId(null);
+                      setSelectedColumnId(null);
                       setSelectedRowId(null);
                       setSelectedSectionId(null);
                     }}
@@ -8608,6 +8653,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     onClick={() => {
                       setActiveTab('elements');
                       setSelectedElementId(null);
+                      setSelectedColumnId(null);
                       setSelectedRowId(null);
                       setSelectedSectionId(null);
                     }}
@@ -8624,6 +8670,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     onClick={() => {
                       setActiveTab('blocks');
                       setSelectedElementId(null);
+                      setSelectedColumnId(null);
                       setSelectedRowId(null);
                       setSelectedSectionId(null);
                     }}
@@ -9233,11 +9280,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             }}
                             onDragEnd={() => {
                               setDraggingInnerCols(null);
+                              setDropIndicator(null);
                               setRowDropIndicator(null);
+                              setSectionDropIndicator(null);
                             }}
                             onClick={() => addColumnsLayout(1)}
                             className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
-                            title="Arrastra a una sección o haz clic para añadir 1 columna interna"
+                            title="Arrastra dentro de un bloque o haz clic para añadir 1 columna interna"
                           >
                             <div className="w-full h-5 rounded bg-indigo-100 border border-indigo-300 flex items-center justify-center">
                               <span className="text-[9px] font-bold text-indigo-700">100%</span>
@@ -9254,11 +9303,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             }}
                             onDragEnd={() => {
                               setDraggingInnerCols(null);
+                              setDropIndicator(null);
                               setRowDropIndicator(null);
+                              setSectionDropIndicator(null);
                             }}
                             onClick={() => addColumnsLayout(2)}
                             className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
-                            title="Arrastra a una sección o haz clic para añadir 2 columnas internas"
+                            title="Arrastra dentro de un bloque o haz clic para añadir 2 columnas internas"
                           >
                             <div className="w-full h-5 rounded flex gap-1">
                               <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
@@ -9280,11 +9331,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             }}
                             onDragEnd={() => {
                               setDraggingInnerCols(null);
+                              setDropIndicator(null);
                               setRowDropIndicator(null);
+                              setSectionDropIndicator(null);
                             }}
                             onClick={() => addColumnsLayout(3)}
                             className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
-                            title="Arrastra a una sección o haz clic para añadir 3 columnas internas"
+                            title="Arrastra dentro de un bloque o haz clic para añadir 3 columnas internas"
                           >
                             <div className="w-full h-5 rounded flex gap-0.5">
                               <div className="flex-1 bg-indigo-100 border border-indigo-300 rounded flex items-center justify-center">
@@ -9309,7 +9362,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             }}
                             onDragEnd={() => {
                               setDraggingInnerCols(null);
+                              setDropIndicator(null);
                               setRowDropIndicator(null);
+                              setSectionDropIndicator(null);
                             }}
                             onClick={() => addColumnsLayout(4)}
                             className="p-2.5 bg-white border border-indigo-200 hover:border-indigo-600 hover:bg-indigo-50/50 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-800 cursor-grab active:cursor-grabbing group shadow-2xs select-none"
@@ -9424,6 +9479,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             // Unselect when clicking background outside elements and open Page settings
             if (e.target === e.currentTarget && !isPreviewMode) {
               setSelectedElementId(null);
+              setSelectedColumnId(null);
               setSelectedRowId(null);
               setSelectedSectionId(null);
               setActiveTab('page');
@@ -9431,6 +9487,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           }}
         >
           <div
+            ref={canvasContainerRef}
             className={`transition-all duration-300 shadow-xl border flex flex-col relative w-full h-auto min-h-0 ${
               isPreviewMode
                 ? 'mb-16 shadow-2xl overflow-visible'
@@ -9454,6 +9511,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             onClick={(e) => {
               if (e.target === e.currentTarget && !isPreviewMode) {
                 setSelectedElementId(null);
+                setSelectedColumnId(null);
                 setSelectedRowId(null);
                 setSelectedSectionId(null);
                 setActiveTab('page');
@@ -9471,10 +9529,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   const prebuiltType = e.dataTransfer.getData('application/ssp-prebuilt-block');
                   const elType = e.dataTransfer.getData('application/ssp-element-type') as ElementType;
                   const layout = e.dataTransfer.getData('application/ssp-section-layout') as '1col' | '2col' | '3col' | '4col' | undefined;
+                  const innerCols = e.dataTransfer.getData('application/ssp-inner-columns');
                   if (prebuiltType) {
                     insertPrebuiltBlock(prebuiltType);
                   } else if (layout) {
                     insertNewSection(layout);
+                  } else if (innerCols) {
+                    addColumnsLayout(parseInt(innerCols, 10) || 1);
                   } else if (elType) {
                     addElement(elType);
                   }
@@ -9539,10 +9600,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                 marginRight: `${section.marginRight ?? 0}px`,
                 borderTop: section.borderTopWidth ? `${section.borderTopWidth}px solid ${section.borderColor || '#E4E4E7'}` : undefined,
                 borderBottom: section.borderBottomWidth ? `${section.borderBottomWidth}px solid ${section.borderColor || '#E4E4E7'}` : undefined,
-                borderTopLeftRadius: isFirstSection && canvasRadius > 0 ? `${canvasRadius}px` : undefined,
-                borderTopRightRadius: isFirstSection && canvasRadius > 0 ? `${canvasRadius}px` : undefined,
-                borderBottomLeftRadius: isLastSection && canvasRadius > 0 ? `${canvasRadius}px` : undefined,
-                borderBottomRightRadius: isLastSection && canvasRadius > 0 ? `${canvasRadius}px` : undefined,
+                borderTopLeftRadius: isFirstSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
+                borderTopRightRadius: isFirstSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
+                borderBottomLeftRadius: isLastSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
+                borderBottomRightRadius: isLastSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
                 position: 'relative',
               };
 
@@ -9592,6 +9653,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       e.preventDefault();
                       e.stopPropagation();
                       if (isInnerCols) {
+                        setDropIndicator(null);
                         let closestRowIdx = 0;
                         let closestDist = Infinity;
                         let pos: 'before' | 'after' = 'after';
@@ -9725,6 +9787,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       if (isPreviewMode) return;
                       e.stopPropagation();
                       setSelectedSectionId(section.id);
+                      setSelectedRowId(null);
+                      setSelectedColumnId(null);
                       setSelectedElementId(null);
                     }}
                     className={`relative transition-all ${
@@ -9801,6 +9865,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           e.stopPropagation();
                           setSelectedSectionId(section.id);
                           setSelectedElementId(null);
+                          setSelectedColumnId(null);
                           setSelectedRowId(null);
                           const inspectorEl = document.getElementById('inspector-panel-sidebar');
                           if (inspectorEl) {
@@ -9877,216 +9942,131 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
                   {/* Relative content container above overlay */}
                   <div className="relative z-1">
-                {section.rows.map((row, rIdx) => {
-                  const isRowSelected = !isPreviewMode && selectedRowId === row.id && !selectedElementId;
-                  const rowShadowClass =
-                    row.shadow === 'sm'
-                      ? 'shadow-xs'
-                      : row.shadow === 'md'
-                      ? 'shadow-md'
-                      : row.shadow === 'lg'
-                      ? 'shadow-xl'
-                      : row.shadow === 'xl'
-                      ? 'shadow-2xl'
-                      : '';
-
-                  const rowStyle: React.CSSProperties = {
-                    maxWidth:
-                      row.widthType === 'boxed' && row.maxWidth
-                        ? `${row.maxWidth}px`
-                        : row.widthType === 'full'
-                        ? '100%'
-                        : undefined,
-                    marginLeft: 'auto',
-                    marginRight: 'auto',
-                    marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : '0px',
-                    marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '0px',
-                    paddingTop: row.paddingTop !== undefined ? `${row.paddingTop}px` : undefined,
-                    paddingBottom: row.paddingBottom !== undefined ? `${row.paddingBottom}px` : undefined,
-                    paddingLeft: row.paddingLeft !== undefined ? `${row.paddingLeft}px` : undefined,
-                    paddingRight: row.paddingRight !== undefined ? `${row.paddingRight}px` : undefined,
-                    backgroundColor: row.bgColor || undefined,
-                    borderRadius: row.borderRadius !== undefined ? `${row.borderRadius}px` : undefined,
-                    borderWidth: row.borderWidth !== undefined ? `${row.borderWidth}px` : undefined,
-                    borderColor: row.borderColor || undefined,
-                    borderStyle: row.borderStyle || (row.borderWidth ? 'solid' : undefined),
+                {(() => {
+                  const computeDropPositionInColumn = (col: PageBlockColumn, clientY: number) => {
+                    if (col.elements.length === 0) {
+                      return { index: 0, position: 'before' as const, targetIdx: 0 };
+                    }
+                    let closestIdx = col.elements.length - 1;
+                    let closestDist = Infinity;
+                    let pos: 'before' | 'after' = 'after';
+                    for (let idx = 0; idx < col.elements.length; idx++) {
+                      const childEl = col.elements[idx];
+                      const domEl = document.getElementById(childEl.id);
+                      if (domEl) {
+                        const rect = domEl.getBoundingClientRect();
+                        const mid = rect.top + rect.height / 2;
+                        const dist = Math.abs(clientY - mid);
+                        if (dist < closestDist) {
+                          closestDist = dist;
+                          closestIdx = idx;
+                          pos = clientY < mid ? 'before' : 'after';
+                        }
+                      }
+                    }
+                    const targetIdx = pos === 'before' ? closestIdx : closestIdx + 1;
+                    return { index: closestIdx, position: pos, targetIdx };
                   };
 
-                  return (
-                    <React.Fragment key={row.id || rIdx}>
-                      {/* Visual Drop Line Indicator Before Row */}
-                      {!isPreviewMode &&
-                        rowDropIndicator &&
-                        rowDropIndicator.sectionId === section.id &&
-                        rowDropIndicator.rowIndex === rIdx &&
-                        rowDropIndicator.position === 'before' && (
-                          <div className="w-full h-2 bg-indigo-600 rounded-full my-2.5 shadow-md relative flex items-center justify-center animate-pulse z-40">
-                            <div className="absolute -top-3 bg-indigo-600 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
-                              <span>Insertar columnas aquí</span>
-                            </div>
-                          </div>
-                        )}
+                  const renderCanvasRow = (
+                    row: PageBlockRow,
+                    rIdx: number,
+                    depth: 0 | 1,
+                    wrapperEl?: PageBlockElement,
+                    parentElementsCount?: number
+                  ): React.ReactNode => {
+                    const isRowSelected =
+                      !isPreviewMode &&
+                      !selectedColumnId &&
+                      ((selectedRowId === row.id && !selectedElementId) ||
+                        (Boolean(wrapperEl) && selectedElementId === wrapperEl!.id));
+                    const isRowHovered = !isPreviewMode && hoveredRowId === row.id && !selectedElementId;
+                    const isDraggingWrapper = Boolean(wrapperEl && draggingElementId === wrapperEl.id);
+                    const canRowMoveUp = depth === 0 ? rIdx > 0 : rIdx > 0;
+                    const canRowMoveDown =
+                      depth === 0
+                        ? rIdx < section.rows.length - 1
+                        : rIdx < (parentElementsCount ?? 1) - 1;
+                    const canRowDelete = depth === 1 ? true : section.rows.length > 1;
 
-                      <DelayedAppearance
-                        delayMinutes={row.delayMinutes}
-                        delaySeconds={row.delaySeconds}
-                        active={isPreviewMode}
-                        resetTrigger={previewResetCount}
-                      >
-                      <div
-                        id={row.id}
-                        style={rowStyle}
-                        onDragOver={(e) => {
-                          const isInnerCols =
-                            draggingInnerCols !== null ||
-                            e.dataTransfer.types.includes('application/ssp-inner-columns');
-                          if (isInnerCols) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const relativeY = e.clientY - rect.top;
-                            const position = relativeY < rect.height / 2 ? 'before' : 'after';
-                            setRowDropIndicator({
-                              sectionId: section.id,
-                              rowIndex: rIdx,
-                              position,
-                            });
-                          }
-                        }}
-                        onDrop={(e) => {
-                          const innerColsData =
-                            e.dataTransfer.getData('application/ssp-inner-columns') ||
-                            (draggingInnerCols !== null ? String(draggingInnerCols) : null);
-                          if (innerColsData) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const cols = parseInt(innerColsData, 10) || 1;
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const relativeY = e.clientY - rect.top;
-                            const position =
-                              rowDropIndicator &&
-                              rowDropIndicator.sectionId === section.id &&
-                              rowDropIndicator.rowIndex === rIdx
-                                ? rowDropIndicator.position
-                                : relativeY < rect.height / 2
-                                ? 'before'
-                                : 'after';
-                            const targetRowIdx = position === 'before' ? rIdx : rIdx + 1;
-                            setDraggingInnerCols(null);
-                            setRowDropIndicator(null);
-                            setSectionDropIndicator(null);
-                            addColumnsLayout(cols, section.id, targetRowIdx);
-                            return;
-                          }
-                        }}
-                        onClick={(e) => {
-                          if (isPreviewMode) return;
-                          e.stopPropagation();
-                          setSelectedRowId(row.id);
-                          setSelectedElementId(null);
-                          setSelectedSectionId(null);
-                        }}
-                        className={`relative transition-all group/row ${rowShadowClass} ${
-                          !isPreviewMode
-                            ? isRowSelected
-                              ? 'ring-2 ring-indigo-600 rounded-xl bg-indigo-50/10'
-                              : 'hover:ring-1 hover:ring-indigo-300 hover:ring-dashed rounded-xl'
-                            : ''
-                        }`}
-                      >
-                      {/* FLOATING ACTION TOOLBAR FOR SELECTED INTERNAL SECTION (ROW) */}
-                      {!isPreviewMode && isRowSelected && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute -top-7 left-3 bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-t-md uppercase tracking-wider z-30 flex items-center gap-1.5 shadow-md select-none"
-                        >
-                          <div className="flex items-center gap-1">
-                            <Box className="w-3.5 h-3.5 text-white" />
-                            <span>{row.name || `Sección Interna (${row.columns.length} Col)`}</span>
-                          </div>
-                          {((row.delayMinutes || 0) * 60 + (row.delaySeconds || 0)) > 0 && (
-                            <div
-                              className="flex items-center gap-1 bg-indigo-900/90 text-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-mono select-none"
-                              title={`Retardo de aparición programado: ${(row.delayMinutes || 0) > 0 ? `${row.delayMinutes}m ` : ''}${row.delaySeconds || 0}s`}
-                            >
-                              <Clock className="w-3 h-3 text-indigo-300" />
-                              <span>
-                                {(row.delayMinutes || 0) > 0 ? `${row.delayMinutes}m ` : ''}
-                                {row.delaySeconds || 0}s
-                              </span>
+                    const rowStyle: React.CSSProperties = {
+                      maxWidth:
+                        (row.widthType || 'boxed') === 'boxed' && row.maxWidth
+                          ? `${Math.min(row.maxWidth, effectiveCanvasMaxWidth)}px`
+                          : row.widthType === 'full'
+                          ? '100%'
+                          : undefined,
+                      marginLeft: 'auto',
+                      marginRight: 'auto',
+                      marginTop: row.marginTop !== undefined ? `${row.marginTop}px` : '0px',
+                      marginBottom: row.marginBottom !== undefined ? `${row.marginBottom}px` : '0px',
+                      paddingTop: row.paddingTop !== undefined ? `${row.paddingTop}px` : undefined,
+                      paddingBottom: row.paddingBottom !== undefined ? `${row.paddingBottom}px` : undefined,
+                      paddingLeft: row.paddingLeft !== undefined ? `${row.paddingLeft}px` : undefined,
+                      paddingRight: row.paddingRight !== undefined ? `${row.paddingRight}px` : undefined,
+                      backgroundColor: row.bgColor || undefined,
+                      borderRadius: `${row.borderRadius ?? 0}px`,
+                      borderWidth: row.borderWidth !== undefined ? `${row.borderWidth}px` : undefined,
+                      borderColor: row.borderColor || undefined,
+                      borderStyle: row.borderStyle || (row.borderWidth ? 'solid' : undefined),
+                    };
+
+                    return (
+                      <React.Fragment key={row.id || rIdx}>
+                        {/* Visual Drop Line Indicator Before Row (outer rows only) */}
+                        {!isPreviewMode &&
+                          depth === 0 &&
+                          rowDropIndicator &&
+                          rowDropIndicator.sectionId === section.id &&
+                          rowDropIndicator.rowIndex === rIdx &&
+                          rowDropIndicator.position === 'before' && (
+                            <div className="w-full h-2 bg-indigo-600 rounded-full my-2.5 shadow-md relative flex items-center justify-center animate-pulse z-40 pointer-events-none">
+                              <div className="absolute -top-3 bg-indigo-600 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                                <span>Insertar columnas aquí</span>
+                              </div>
                             </div>
                           )}
-                          <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
-                          {/* Row Settings (Tuerca de Configuración) */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedRowId(row.id);
-                              setSelectedSectionId(section.id);
-                              setSelectedElementId(null);
-                              const inspectorEl = document.getElementById('inspector-panel-sidebar');
-                              if (inspectorEl) {
-                                inspectorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                              }
-                            }}
-                            className="p-1 hover:bg-indigo-700 rounded transition-colors cursor-pointer flex items-center"
-                            title="Configuración de la sección interna"
-                          >
-                            <Settings className="w-3 h-3 text-white" />
-                          </button>
-                          <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              duplicateRow(row.id);
-                            }}
-                            className="p-1 hover:bg-indigo-700 rounded transition-colors cursor-pointer flex items-center"
-                            title="Duplicar sección interna"
-                          >
-                            <Copy className="w-3 h-3 text-white" />
-                          </button>
-                          <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteRow(row.id);
-                            }}
-                            disabled={section.rows.length <= 1}
-                            className="p-1 hover:bg-red-600 disabled:opacity-40 rounded transition-colors cursor-pointer flex items-center text-white"
-                            title="Eliminar sección interna"
-                          >
-                            <Trash2 className="w-3 h-3 text-white" />
-                          </button>
-                        </div>
-                      )}
 
-                      <div
-                        className={`flex flex-wrap -mx-3 ${
-                          viewportMode === 'mobile' ? 'flex-col gap-4' : ''
-                        }`}
-                      >
-                    {row.columns.map((column) => {
-                      return (
+                        <DelayedAppearance
+                          delayMinutes={row.delayMinutes}
+                          delaySeconds={row.delaySeconds}
+                          active={isPreviewMode}
+                          resetTrigger={previewResetCount}
+                        >
                         <div
-                          key={column.id}
-                          style={{
-                            width: viewportMode === 'mobile' ? '100%' : `${column.widthPercentage}%`,
+                          id={row.id}
+                          style={rowStyle}
+                          onMouseOver={(e) => {
+                            if (isPreviewMode) return;
+                            e.stopPropagation();
+                            if (hoveredRowId !== row.id) {
+                              setHoveredRowId(row.id);
+                            }
                           }}
-                          className="px-3"
+                          onMouseLeave={() => {
+                            if (!isPreviewMode && hoveredRowId === row.id) {
+                              setHoveredRowId(null);
+                            }
+                          }}
                           onDragOver={(e) => {
                             const isInnerCols =
                               draggingInnerCols !== null ||
                               e.dataTransfer.types.includes('application/ssp-inner-columns');
+                            const draggedEl = draggingElementId ? findElementById(sections, draggingElementId) : null;
+                            if (depth === 1) {
+                              if (isInnerCols || draggedEl?.type === 'inner_columns') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDropIndicator(null);
+                                setRowDropIndicator(null);
+                              }
+                              return;
+                            }
                             if (isInnerCols) {
                               e.preventDefault();
                               e.stopPropagation();
-                              const rowEl = document.getElementById(row.id);
-                              const rect = rowEl
-                                ? rowEl.getBoundingClientRect()
-                                : e.currentTarget.getBoundingClientRect();
+                              setDropIndicator(null);
+                              const rect = e.currentTarget.getBoundingClientRect();
                               const relativeY = e.clientY - rect.top;
                               const position = relativeY < rect.height / 2 ? 'before' : 'after';
                               setRowDropIndicator({
@@ -10094,215 +10074,623 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 rowIndex: rIdx,
                                 position,
                               });
-                              return;
                             }
-                            const isBlockOrSectionDrag =
-                              draggingBlockType ||
-                              draggingSectionId ||
-                              draggingSectionLayout ||
-                              e.dataTransfer.types.includes('application/ssp-prebuilt-block') ||
-                              e.dataTransfer.types.includes('application/ssp-section-id') ||
-                              e.dataTransfer.types.includes('application/ssp-section-layout');
-                            if (isBlockOrSectionDrag) {
-                              return; // Allow bubble to section
-                            }
-                            e.preventDefault();
-                            e.stopPropagation();
                           }}
                           onDrop={(e) => {
                             const innerColsData =
                               e.dataTransfer.getData('application/ssp-inner-columns') ||
                               (draggingInnerCols !== null ? String(draggingInnerCols) : null);
+                            if (depth === 1) {
+                              const sourceId = e.dataTransfer.getData('application/ssp-element-id') || draggingElementId;
+                              const sourceEl = sourceId ? findElementById(sections, sourceId) : null;
+                              if (innerColsData || sourceEl?.type === 'inner_columns') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDraggingInnerCols(null);
+                                setDraggingElementId(null);
+                                setDropIndicator(null);
+                                setRowDropIndicator(null);
+                                showToast('Solo se permite una sección interna dentro de un bloque (máximo 1 nivel)');
+                              }
+                              return;
+                            }
                             if (innerColsData) {
                               e.preventDefault();
                               e.stopPropagation();
                               const cols = parseInt(innerColsData, 10) || 1;
-                              const targetRowIdx =
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const relativeY = e.clientY - rect.top;
+                              const position =
                                 rowDropIndicator &&
                                 rowDropIndicator.sectionId === section.id &&
                                 rowDropIndicator.rowIndex === rIdx
-                                  ? (rowDropIndicator.position === 'before' ? rIdx : rIdx + 1)
-                                  : rIdx + 1;
+                                  ? rowDropIndicator.position
+                                  : relativeY < rect.height / 2
+                                  ? 'before'
+                                  : 'after';
+                              const targetRowIdx = position === 'before' ? rIdx : rIdx + 1;
                               setDraggingInnerCols(null);
+                              setDropIndicator(null);
                               setRowDropIndicator(null);
                               setSectionDropIndicator(null);
                               addColumnsLayout(cols, section.id, targetRowIdx);
                               return;
                             }
-                            const isBlockOrSectionDrag =
-                              draggingBlockType ||
-                              draggingSectionId ||
-                              draggingSectionLayout ||
-                              e.dataTransfer.types.includes('application/ssp-prebuilt-block') ||
-                              e.dataTransfer.types.includes('application/ssp-section-id') ||
-                              e.dataTransfer.types.includes('application/ssp-section-layout');
-                            if (isBlockOrSectionDrag) {
-                              return; // Allow bubble to section
-                            }
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const targetIdx = dropIndicator && dropIndicator.colId === column.id
-                              ? dropIndicator.position === 'before' ? dropIndicator.index : dropIndicator.index + 1
-                              : column.elements.length;
-                            setDropIndicator(null);
-
-                            // Handle sidebar drop
-                            const droppedType = e.dataTransfer.getData('application/ssp-element-type') as ElementType;
-                            const droppedLevel = e.dataTransfer.getData('application/ssp-element-level') as
-                              | 'h1'
-                              | 'h2'
-                              | 'h3'
-                              | 'h4'
-                              | undefined;
-                            if (droppedType) {
-                              insertElementAt(droppedType, column.id, targetIdx, droppedLevel ? { level: droppedLevel } : undefined);
-                              return;
-                            }
-
-                            // Handle canvas internal reorder
-                            const sourceId = e.dataTransfer.getData('application/ssp-element-id');
-                            if (sourceId) {
-                              reorderCanvasElement(sourceId, column.id, targetIdx);
-                            }
                           }}
+                          onClick={(e) => {
+                            if (isPreviewMode) return;
+                            e.stopPropagation();
+                            setSelectedSectionId(section.id);
+                            setSelectedRowId(row.id);
+                            setSelectedColumnId(null);
+                            setSelectedElementId(null);
+                          }}
+                          className={`relative transition-all group/row ${
+                            isDraggingWrapper ? 'opacity-35 scale-[0.99] border-2 border-dashed border-indigo-500' : ''
+                          } ${
+                            !isPreviewMode
+                              ? isRowSelected
+                                ? 'ring-2 ring-indigo-600 bg-indigo-50/10'
+                                : isRowHovered
+                                ? 'ring-1 ring-indigo-400/80 ring-dashed'
+                                : ''
+                              : ''
+                          }`}
                         >
+                        {/* FLOATING ACTION TOOLBAR FOR SELECTED OR HOVERED INTERNAL SECTION (ROW) */}
+                        {!isPreviewMode && (isRowSelected || isRowHovered) && (
                           <div
-                            className={`transition-all ${
-                              isPreviewMode
-                                ? 'border-none p-0 min-h-0'
-                                : `min-h-[70px] p-2.5 rounded-xl border ${
-                                    dropIndicator?.colId === column.id
-                                      ? 'border-2 border-dashed border-[#2848F0] bg-blue-50/20'
-                                      : 'border border-dashed border-zinc-300/80 hover:border-zinc-400'
-                                  }`
-                            }`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute -top-7 left-3 bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-t-md uppercase tracking-wider z-30 flex items-center gap-1.5 shadow-md select-none"
                           >
-                            {!isPreviewMode && column.elements.length === 0 && (
-                              <div className="text-center py-6 text-xs text-zinc-400 italic">
-                                Arrastra y suelta un elemento aquí
+                            <div
+                              draggable={Boolean(wrapperEl && !isPreviewMode)}
+                              onDragStart={(e) => {
+                                if (!wrapperEl || isPreviewMode) return;
+                                e.stopPropagation();
+                                setDraggingElementId(wrapperEl.id);
+                                e.dataTransfer.setData('application/ssp-element-id', wrapperEl.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDragEnd={() => {
+                                setDraggingElementId(null);
+                                setDropIndicator(null);
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSectionId(section.id);
+                                setSelectedRowId(row.id);
+                                setSelectedColumnId(null);
+                                setSelectedElementId(null);
+                              }}
+                              className={`flex items-center gap-1 px-1 py-0.5 rounded hover:bg-indigo-700 transition-colors ${
+                                wrapperEl ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                              }`}
+                              title={
+                                wrapperEl
+                                  ? 'Clic para editar sección interna o arrastra para reordenar dentro del bloque'
+                                  : 'Clic para editar sección interna'
+                              }
+                            >
+                              {wrapperEl ? (
+                                <Move className="w-3 h-3 text-white" />
+                              ) : (
+                                <Box className="w-3.5 h-3.5 text-white" />
+                              )}
+                              <span>{formatRowDisplayName(row.name, 'Sección Interna')}</span>
+                            </div>
+                            {((row.delayMinutes || 0) * 60 + (row.delaySeconds || 0)) > 0 && (
+                              <div
+                                className="flex items-center gap-1 bg-indigo-900/90 text-indigo-200 px-1.5 py-0.5 rounded text-[10px] font-mono select-none"
+                                title={`Retardo de aparición programado: ${(row.delayMinutes || 0) > 0 ? `${row.delayMinutes}m ` : ''}${row.delaySeconds || 0}s`}
+                              >
+                                <Clock className="w-3 h-3 text-indigo-300" />
+                                <span>
+                                  {(row.delayMinutes || 0) > 0 ? `${row.delayMinutes}m ` : ''}
+                                  {row.delaySeconds || 0}s
+                                </span>
                               </div>
                             )}
+                            <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
+                            {/* Row Settings (Tuerca de Configuración) */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedRowId(row.id);
+                                setSelectedSectionId(section.id);
+                                setSelectedColumnId(null);
+                                setSelectedElementId(null);
+                                const inspectorEl = document.getElementById('inspector-panel-sidebar');
+                                if (inspectorEl) {
+                                  inspectorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                              }}
+                              className="p-1 hover:bg-indigo-700 rounded transition-colors cursor-pointer flex items-center"
+                              title="Configuración de la sección interna"
+                            >
+                              <Settings className="w-3 h-3 text-white" />
+                            </button>
+                            <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                duplicateRow(row.id);
+                              }}
+                              className="p-1 hover:bg-indigo-700 rounded transition-colors cursor-pointer flex items-center"
+                              title="Duplicar sección interna"
+                            >
+                              <Copy className="w-3 h-3 text-white" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveRow('up', section.id, row.id);
+                              }}
+                              disabled={!canRowMoveUp}
+                              className="p-0.5 hover:bg-indigo-700 disabled:opacity-40 rounded transition-colors cursor-pointer flex items-center"
+                              title="Subir sección interna"
+                            >
+                              <ArrowUp className="w-3 h-3 text-white" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveRow('down', section.id, row.id);
+                              }}
+                              disabled={!canRowMoveDown}
+                              className="p-0.5 hover:bg-indigo-700 disabled:opacity-40 rounded transition-colors cursor-pointer flex items-center"
+                              title="Bajar sección interna"
+                            >
+                              <ArrowDown className="w-3 h-3 text-white" />
+                            </button>
+                            <div className="w-[1px] h-3 bg-indigo-400 mx-0.5" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteRow(row.id);
+                              }}
+                              disabled={!canRowDelete}
+                              className="p-1 hover:bg-red-600 disabled:opacity-40 rounded transition-colors cursor-pointer flex items-center text-white"
+                              title="Eliminar sección interna"
+                            >
+                              <Trash2 className="w-3 h-3 text-white" />
+                            </button>
+                          </div>
+                        )}
 
-                            {column.elements.map((element, elIdx) => {
-                              const isSelected = selectedElementId === element.id;
-                              const isDraggingThis = draggingElementId === element.id;
+                        <div
+                          className={`flex flex-wrap -mx-3 items-stretch ${
+                            viewportMode === 'mobile' ? 'flex-col gap-4' : ''
+                          }`}
+                        >
+                      {row.columns.map((column, cIdx) => {
+                        const isColumnSelected =
+                          !isPreviewMode && selectedColumnId === column.id && !selectedElementId;
+                        const isColumnHovered =
+                          !isPreviewMode && hoveredColumnId === column.id && !selectedElementId;
+                        const colSurfaceStyle = getColumnSurfaceStyle(column, { isPreview: isPreviewMode });
+                        const colShadowClass = getColumnShadowClass(column.shadow);
+                        const hasCustomColBorder = Boolean(column.borderWidth && column.borderWidth > 0);
 
-                              return (
-                                <React.Fragment key={element.id}>
-                                  {/* HORIZONTAL PLACEMENT DROP LINE INDICATOR (BEFORE) - REQ 2 */}
-                                  {dropIndicator &&
-                                    dropIndicator.colId === column.id &&
-                                    dropIndicator.index === elIdx &&
-                                    dropIndicator.position === 'before' && (
-                                      <div className="w-full h-1.5 bg-[#2848F0] rounded-full my-2 shadow-md relative flex items-center justify-center animate-pulse z-30">
-                                        <div className="absolute -top-2.5 bg-[#2848F0] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
-                                          <span>Soltar aquí</span>
-                                        </div>
-                                      </div>
-                                    )}
+                        return (
+                          <div
+                            key={column.id}
+                            style={{
+                              width: viewportMode === 'mobile' ? '100%' : `${column.widthPercentage}%`,
+                            }}
+                            className="px-3 flex flex-col relative"
+                            onMouseOver={(e) => {
+                              if (isPreviewMode) return;
+                              e.stopPropagation();
+                              if (hoveredColumnId !== column.id) {
+                                setHoveredColumnId(column.id);
+                              }
+                              if (hoveredRowId !== row.id) {
+                                setHoveredRowId(row.id);
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              if (!isPreviewMode && hoveredColumnId === column.id) {
+                                setHoveredColumnId(null);
+                              }
+                            }}
+                            onDragOver={(e) => {
+                              const isBlockOrSectionDrag =
+                                draggingBlockType ||
+                                draggingSectionId ||
+                                draggingSectionLayout ||
+                                e.dataTransfer.types.includes('application/ssp-prebuilt-block') ||
+                                e.dataTransfer.types.includes('application/ssp-section-id') ||
+                                e.dataTransfer.types.includes('application/ssp-section-layout');
+                              if (isBlockOrSectionDrag) {
+                                return; // Allow bubble to section
+                              }
 
-                                  <div
-                                    id={element.id}
-                                    draggable={!isPreviewMode}
-                                    onDragStart={(e) => {
-                                      if (isPreviewMode) return;
-                                      e.stopPropagation();
-                                      setDraggingElementId(element.id);
-                                      e.dataTransfer.setData('application/ssp-element-id', element.id);
-                                      e.dataTransfer.effectAllowed = 'move';
-                                    }}
-                                    onDragEnd={() => {
-                                      setDraggingElementId(null);
-                                      setDropIndicator(null);
-                                    }}
-                                    onDragOver={(e) => {
-                                      const isBlockOrSectionDrag =
-                                        draggingBlockType ||
-                                        draggingSectionId ||
-                                        draggingSectionLayout ||
-                                        e.dataTransfer.types.includes('application/ssp-prebuilt-block') ||
-                                        e.dataTransfer.types.includes('application/ssp-section-id') ||
-                                        e.dataTransfer.types.includes('application/ssp-section-layout');
-                                      if (isBlockOrSectionDrag) {
-                                        return;
-                                      }
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      const relativeY = e.clientY - rect.top;
-                                      const position = relativeY < rect.height / 2 ? 'before' : 'after';
-                                      setDropIndicator({
-                                        colId: column.id,
-                                        index: elIdx,
-                                        position,
-                                      });
-                                    }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (!isPreviewMode) {
-                                        setSelectedElementId(element.id);
-                                        setSelectedSectionId(section.id);
-                                      }
-                                    }}
-                                    style={{
-                                      marginTop: `${element.styles.marginTop || 0}px`,
-                                      marginBottom: `${element.styles.marginBottom ?? 16}px`,
-                                      marginLeft: `${element.styles.marginLeft || 0}px`,
-                                      marginRight: `${element.styles.marginRight || 0}px`,
-                                      paddingTop: `${element.styles.paddingTop || 0}px`,
-                                      paddingBottom: `${element.styles.paddingBottom || 0}px`,
-                                      paddingLeft: `${element.styles.paddingLeft || 0}px`,
-                                      paddingRight: `${element.styles.paddingRight || 0}px`,
-                                      textAlign: element.styles.textAlign || 'left',
-                                    }}
-                                    className={`relative transition-all ${
-                                      isDraggingThis ? 'opacity-30 scale-95 border-2 border-dashed border-[#2848F0]' : ''
-                                    } ${
-                                      !isPreviewMode
-                                        ? isSelected
-                                          ? 'ring-2 ring-[#2848F0] rounded-lg p-2 bg-blue-50/15'
-                                          : 'hover:ring-1 hover:ring-zinc-300 rounded-lg p-2 cursor-pointer'
+                              const isInnerCols =
+                                draggingInnerCols !== null ||
+                                e.dataTransfer.types.includes('application/ssp-inner-columns');
+                              const draggedEl = draggingElementId ? findElementById(sections, draggingElementId) : null;
+
+                              if (depth === 1 && (isInnerCols || draggedEl?.type === 'inner_columns')) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDropIndicator(null);
+                                setRowDropIndicator(null);
+                                return;
+                              }
+
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setRowDropIndicator(null);
+                              setSectionDropIndicator(null);
+
+                              const { index, position } = computeDropPositionInColumn(column, e.clientY);
+                              setDropIndicator((prev) =>
+                                prev && prev.colId === column.id && prev.index === index && prev.position === position
+                                  ? prev
+                                  : { colId: column.id, index, position }
+                              );
+                            }}
+                            onDrop={(e) => {
+                              const isBlockOrSectionDrag =
+                                draggingBlockType ||
+                                draggingSectionId ||
+                                draggingSectionLayout ||
+                                e.dataTransfer.types.includes('application/ssp-prebuilt-block') ||
+                                e.dataTransfer.types.includes('application/ssp-section-id') ||
+                                e.dataTransfer.types.includes('application/ssp-section-layout');
+                              if (isBlockOrSectionDrag) {
+                                return; // Allow bubble to section
+                              }
+
+                              const innerColsData =
+                                e.dataTransfer.getData('application/ssp-inner-columns') ||
+                                (draggingInnerCols !== null ? String(draggingInnerCols) : null);
+
+                              if (innerColsData) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const cols = parseInt(innerColsData, 10) || 1;
+                                if (depth === 1) {
+                                  setDraggingInnerCols(null);
+                                  setDropIndicator(null);
+                                  setRowDropIndicator(null);
+                                  setSectionDropIndicator(null);
+                                  showToast('Solo se permite una sección interna dentro de un bloque (máximo 1 nivel)');
+                                  return;
+                                }
+                                const computed = computeDropPositionInColumn(column, e.clientY);
+                                const targetIdx =
+                                  dropIndicator && dropIndicator.colId === column.id
+                                    ? dropIndicator.position === 'before'
+                                      ? dropIndicator.index
+                                      : dropIndicator.index + 1
+                                    : computed.targetIdx;
+                                setDraggingInnerCols(null);
+                                setDropIndicator(null);
+                                setRowDropIndicator(null);
+                                setSectionDropIndicator(null);
+                                insertNestedColumnsAt(cols, column.id, targetIdx);
+                                return;
+                              }
+
+                              e.preventDefault();
+                              e.stopPropagation();
+
+                              const sourceId = e.dataTransfer.getData('application/ssp-element-id') || draggingElementId;
+                              if (sourceId && depth === 1) {
+                                const srcEl = findElementById(sections, sourceId);
+                                if (srcEl?.type === 'inner_columns') {
+                                  setDraggingElementId(null);
+                                  setDropIndicator(null);
+                                  showToast('Solo se permite una sección interna dentro de un bloque (máximo 1 nivel)');
+                                  return;
+                                }
+                              }
+
+                              const computed = computeDropPositionInColumn(column, e.clientY);
+                              const targetIdx =
+                                dropIndicator && dropIndicator.colId === column.id
+                                  ? dropIndicator.position === 'before'
+                                    ? dropIndicator.index
+                                    : dropIndicator.index + 1
+                                  : computed.targetIdx;
+                              setDropIndicator(null);
+
+                              // Handle sidebar drop
+                              const droppedType = e.dataTransfer.getData('application/ssp-element-type') as ElementType;
+                              const droppedLevel = e.dataTransfer.getData('application/ssp-element-level') as
+                                | 'h1'
+                                | 'h2'
+                                | 'h3'
+                                | 'h4'
+                                | undefined;
+                              if (droppedType) {
+                                insertElementAt(droppedType, column.id, targetIdx, droppedLevel ? { level: droppedLevel } : undefined);
+                                return;
+                              }
+
+                              // Handle canvas internal reorder
+                              if (sourceId) {
+                                reorderCanvasElement(sourceId, column.id, targetIdx);
+                              }
+                            }}
+                          >
+                            {/* FLOATING BADGE TO SELECT & COLOR INDIVIDUAL COLUMN */}
+                            {!isPreviewMode && (isColumnSelected || isColumnHovered) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSectionId(section.id);
+                                  setSelectedRowId(row.id);
+                                  setSelectedColumnId(column.id);
+                                  setSelectedElementId(null);
+                                }}
+                                className={`absolute -top-6 right-3 z-25 flex items-center gap-1 px-2 py-0.5 rounded-t-md text-[10px] font-bold uppercase tracking-wider shadow-sm cursor-pointer select-none transition-colors ${
+                                  isColumnSelected
+                                    ? 'bg-teal-600 text-white'
+                                    : 'bg-teal-600/90 hover:bg-teal-700 text-white'
+                                }`}
+                                title={`Editar color, fondo y estilo de ${column.name || `Columna ${cIdx + 1}`}`}
+                              >
+                                <ColumnsIcon className="w-3 h-3 text-white" />
+                                <span>{column.name || `Columna ${cIdx + 1}`}</span>
+                                <Palette className="w-2.5 h-2.5 text-teal-100 ml-0.5" />
+                              </button>
+                            )}
+
+                            <div
+                              style={colSurfaceStyle}
+                              onClick={(e) => {
+                                if (isPreviewMode) return;
+                                e.stopPropagation();
+                                setSelectedSectionId(section.id);
+                                setSelectedRowId(row.id);
+                                setSelectedColumnId(column.id);
+                                setSelectedElementId(null);
+                              }}
+                              className={`w-full flex-1 relative transition-all ${colShadowClass} ${
+                                isPreviewMode
+                                  ? 'min-h-0'
+                                  : `min-h-[76px] cursor-pointer ${
+                                      !hasCustomColBorder
+                                        ? dropIndicator?.colId === column.id
+                                          ? 'border-2 border-dashed border-[#2848F0] bg-blue-50/20'
+                                          : isColumnSelected
+                                          ? 'border-2 border-solid border-teal-500'
+                                          : 'border border-dashed border-zinc-300/80 hover:border-teal-400'
                                         : ''
-                                    }`}
-                                  >
-                                    {/* FLOATING ACTION BADGE WITH MOVE HANDLE, CLONE (REQ 1), UP/DOWN & TRASH BUTTON */}
-                                    {!isPreviewMode && isSelected && (
-                                      <div
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="absolute -top-7 left-0 bg-[#2848F0] text-white text-[11px] font-bold px-2 py-0.5 rounded-t-md uppercase tracking-wider z-20 flex items-center gap-1.5 shadow-md select-none"
-                                      >
-                                        {/* Drag Handle with 4 arrows */}
+                                    } ${
+                                      isColumnSelected
+                                        ? 'ring-2 ring-teal-500/50 ring-offset-1'
+                                        : isColumnHovered
+                                        ? 'ring-1 ring-teal-400/50'
+                                        : ''
+                                    }`
+                              }`}
+                            >
+                              {!isPreviewMode && column.elements.length === 0 && (
+                                <div className="flex-1 flex flex-col items-center justify-center text-center py-4 px-2 pointer-events-none select-none">
+                                  {dropIndicator?.colId === column.id ? (
+                                    <div className="w-full h-1.5 bg-[#2848F0] rounded-full my-2 shadow-md relative flex items-center justify-center animate-pulse">
+                                      <div className="absolute -top-2.5 bg-[#2848F0] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                                        <span>Soltar aquí</span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span className="text-[11px] font-semibold text-zinc-500">
+                                        {column.name || `Columna ${cIdx + 1}`}
+                                      </span>
+                                      <span className="text-[10px] text-zinc-400 italic mt-0.5">
+                                        Haz clic para editar columna o arrastra elementos aquí
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+
+                              {column.elements.map((element, elIdx) => {
+                                if (element.type === 'inner_columns' && element.nestedRow) {
+                                  return (
+                                    <React.Fragment key={element.id}>
+                                      {!isPreviewMode &&
+                                        dropIndicator &&
+                                        dropIndicator.colId === column.id &&
+                                        dropIndicator.index === elIdx &&
+                                        dropIndicator.position === 'before' && (
+                                          <div className="w-full h-1.5 bg-[#2848F0] rounded-full my-2 shadow-md relative flex items-center justify-center animate-pulse z-30 pointer-events-none">
+                                            <div className="absolute -top-2.5 bg-[#2848F0] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                                              <span>Soltar aquí</span>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                      {depth === 0 && (
                                         <div
-                                          title="Haz clic y arrastra hacia arriba o abajo para reordenar"
-                                          className="flex items-center gap-1 cursor-grab active:cursor-grabbing hover:bg-blue-600 px-1 py-0.5 rounded transition-colors"
-                                        >
-                                          <Move className="w-3.5 h-3.5 text-white" />
-                                          <span className="font-['Poppins'] font-bold">{element.type}</span>
-                                        </div>
-
-                                        {/* Divider */}
-                                        <div className="w-[1px] h-3.5 bg-blue-400" />
-
-                                        {/* Element Settings (Tuerca de Configuración) */}
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedElementId(element.id);
-                                            setSelectedSectionId(section.id);
-                                            setSelectedRowId(null);
-                                            const inspectorEl = document.getElementById('inspector-panel-sidebar');
-                                            if (inspectorEl) {
-                                              inspectorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                            }
+                                          id={element.id}
+                                          style={{
+                                            marginTop: `${element.styles.marginTop || 0}px`,
+                                            marginBottom: `${element.styles.marginBottom ?? 16}px`,
                                           }}
-                                          className="p-1 rounded hover:bg-blue-600 transition-colors cursor-pointer flex items-center justify-center"
-                                          title="Configuración del elemento"
+                                          className="relative w-full"
                                         >
-                                          <Settings className="w-3.5 h-3.5 text-white" />
-                                        </button>
+                                          {renderCanvasRow(
+                                            element.nestedRow,
+                                            elIdx,
+                                            1,
+                                            element,
+                                            column.elements.length
+                                          )}
+                                        </div>
+                                      )}
 
-                                        {/* Divider */}
+                                      {!isPreviewMode &&
+                                        dropIndicator &&
+                                        dropIndicator.colId === column.id &&
+                                        dropIndicator.index === elIdx &&
+                                        dropIndicator.position === 'after' && (
+                                          <div className="w-full h-1.5 bg-[#2848F0] rounded-full my-2 shadow-md relative flex items-center justify-center animate-pulse z-30 pointer-events-none">
+                                            <div className="absolute -top-2.5 bg-[#2848F0] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                                              <span>Soltar aquí</span>
+                                            </div>
+                                          </div>
+                                        )}
+                                    </React.Fragment>
+                                  );
+                                }
+
+                                const isSelected = selectedElementId === element.id;
+                                const isDraggingThis = draggingElementId === element.id;
+
+                                return (
+                                  <React.Fragment key={element.id}>
+                                    {/* HORIZONTAL PLACEMENT DROP LINE INDICATOR (BEFORE) - REQ 2 */}
+                                    {!isPreviewMode &&
+                                      dropIndicator &&
+                                      dropIndicator.colId === column.id &&
+                                      dropIndicator.index === elIdx &&
+                                      dropIndicator.position === 'before' && (
+                                        <div className="w-full h-1.5 bg-[#2848F0] rounded-full my-2 shadow-md relative flex items-center justify-center animate-pulse z-30 pointer-events-none">
+                                          <div className="absolute -top-2.5 bg-[#2848F0] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                                            <span>Soltar aquí</span>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                    <div
+                                      id={element.id}
+                                      draggable={!isPreviewMode}
+                                      onDragStart={(e) => {
+                                        if (isPreviewMode) return;
+                                        e.stopPropagation();
+                                        setDraggingElementId(element.id);
+                                        e.dataTransfer.setData('application/ssp-element-id', element.id);
+                                        e.dataTransfer.effectAllowed = 'move';
+                                      }}
+                                      onDragEnd={() => {
+                                        setDraggingElementId(null);
+                                        setDropIndicator(null);
+                                      }}
+                                      onDragOver={(e) => {
+                                        const isBlockOrSectionDrag =
+                                          draggingBlockType ||
+                                          draggingSectionId ||
+                                          draggingSectionLayout ||
+                                          e.dataTransfer.types.includes('application/ssp-prebuilt-block') ||
+                                          e.dataTransfer.types.includes('application/ssp-section-id') ||
+                                          e.dataTransfer.types.includes('application/ssp-section-layout');
+                                        if (isBlockOrSectionDrag) {
+                                          return;
+                                        }
+                                        const isInnerCols =
+                                          draggingInnerCols !== null ||
+                                          e.dataTransfer.types.includes('application/ssp-inner-columns');
+                                        const draggedEl = draggingElementId
+                                          ? findElementById(sections, draggingElementId)
+                                          : null;
+                                        if (depth === 1 && (isInnerCols || draggedEl?.type === 'inner_columns')) {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setDropIndicator(null);
+                                          setRowDropIndicator(null);
+                                          return;
+                                        }
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setRowDropIndicator(null);
+                                        setSectionDropIndicator(null);
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const relativeY = e.clientY - rect.top;
+                                        const position = relativeY < rect.height / 2 ? 'before' : 'after';
+                                        setDropIndicator((prev) =>
+                                          prev &&
+                                          prev.colId === column.id &&
+                                          prev.index === elIdx &&
+                                          prev.position === position
+                                            ? prev
+                                            : {
+                                                colId: column.id,
+                                                index: elIdx,
+                                                position,
+                                              }
+                                        );
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!isPreviewMode) {
+                                          setSelectedElementId(element.id);
+                                          setSelectedColumnId(null);
+                                          setSelectedRowId(row.id);
+                                          setSelectedSectionId(section.id);
+                                        }
+                                      }}
+                                      style={{
+                                        marginTop: `${element.styles.marginTop || 0}px`,
+                                        marginBottom: `${element.styles.marginBottom ?? 16}px`,
+                                        marginLeft: `${element.styles.marginLeft || 0}px`,
+                                        marginRight: `${element.styles.marginRight || 0}px`,
+                                        paddingTop: `${element.styles.paddingTop || 0}px`,
+                                        paddingBottom: `${element.styles.paddingBottom || 0}px`,
+                                        paddingLeft: `${element.styles.paddingLeft || 0}px`,
+                                        paddingRight: `${element.styles.paddingRight || 0}px`,
+                                        textAlign: element.styles.textAlign || 'left',
+                                      }}
+                                      className={`relative transition-all ${
+                                        isDraggingThis ? 'opacity-30 scale-95 border-2 border-dashed border-[#2848F0]' : ''
+                                      } ${
+                                        !isPreviewMode
+                                          ? isSelected
+                                            ? 'ring-2 ring-[#2848F0] rounded-lg p-2 bg-blue-50/15'
+                                            : 'hover:ring-1 hover:ring-zinc-300 rounded-lg p-2 cursor-pointer'
+                                          : ''
+                                      }`}
+                                    >
+                                      {/* FLOATING ACTION BADGE WITH MOVE HANDLE, CLONE (REQ 1), UP/DOWN & TRASH BUTTON */}
+                                      {!isPreviewMode && isSelected && (
+                                        <div
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="absolute -top-7 left-0 bg-[#2848F0] text-white text-[11px] font-bold px-2 py-0.5 rounded-t-md uppercase tracking-wider z-20 flex items-center gap-1.5 shadow-md select-none"
+                                        >
+                                          {/* Drag Handle with 4 arrows */}
+                                          <div
+                                            title="Haz clic y arrastra hacia arriba o abajo para reordenar"
+                                            className="flex items-center gap-1 cursor-grab active:cursor-grabbing hover:bg-blue-600 px-1 py-0.5 rounded transition-colors"
+                                          >
+                                            <Move className="w-3.5 h-3.5 text-white" />
+                                            <span className="font-['Poppins'] font-bold">{element.type}</span>
+                                          </div>
+
+                                          {/* Divider */}
+                                          <div className="w-[1px] h-3.5 bg-blue-400" />
+
+                                          {/* Element Settings (Tuerca de Configuración) */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedElementId(element.id);
+                                              setSelectedColumnId(null);
+                                              setSelectedSectionId(section.id);
+                                              setSelectedRowId(row.id);
+                                              const inspectorEl = document.getElementById('inspector-panel-sidebar');
+                                              if (inspectorEl) {
+                                                inspectorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                              }
+                                            }}
+                                            className="p-1 rounded hover:bg-blue-600 transition-colors cursor-pointer flex items-center justify-center"
+                                            title="Configuración del elemento"
+                                          >
+                                            <Settings className="w-3.5 h-3.5 text-white" />
+                                          </button>
+
+                                          {/* Divider */}
                                         <div className="w-[1px] h-3.5 bg-blue-400" />
 
                                         {/* DUPLICATE / CLONE BUTTON RIGHT BEFORE ARROW UP (REQ 1) */}
@@ -11171,11 +11559,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                   </div>
 
                                   {/* HORIZONTAL PLACEMENT DROP LINE INDICATOR (AFTER) - REQ 2 */}
-                                  {dropIndicator &&
+                                  {!isPreviewMode &&
+                                    dropIndicator &&
                                     dropIndicator.colId === column.id &&
                                     dropIndicator.index === elIdx &&
                                     dropIndicator.position === 'after' && (
-                                      <div className="w-full h-1.5 bg-[#2848F0] rounded-full my-2 shadow-md relative flex items-center justify-center animate-pulse z-30">
+                                      <div className="w-full h-1.5 bg-[#2848F0] rounded-full my-2 shadow-md relative flex items-center justify-center animate-pulse z-30 pointer-events-none">
                                         <div className="absolute -top-2.5 bg-[#2848F0] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
                                           <span>Soltar aquí</span>
                                         </div>
@@ -11194,11 +11583,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
                 {/* Visual Drop Line Indicator After Row */}
                 {!isPreviewMode &&
+                  depth === 0 &&
                   rowDropIndicator &&
                   rowDropIndicator.sectionId === section.id &&
                   rowDropIndicator.rowIndex === rIdx &&
                   rowDropIndicator.position === 'after' && (
-                    <div className="w-full h-2 bg-indigo-600 rounded-full my-2.5 shadow-md relative flex items-center justify-center animate-pulse z-40">
+                    <div className="w-full h-2 bg-indigo-600 rounded-full my-2.5 shadow-md relative flex items-center justify-center animate-pulse z-40 pointer-events-none">
                       <div className="absolute -top-3 bg-indigo-600 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
                         <span>Insertar columnas aquí</span>
                       </div>
@@ -11206,7 +11596,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   )}
               </React.Fragment>
             );
-          })}
+          };
+
+          return section.rows.map((row, rIdx) => renderCanvasRow(row, rIdx, 0));
+        })()}
                 </div>
               </div>
               </DelayedAppearance>
@@ -11234,25 +11627,36 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               sections={sections}
               selectedSectionId={selectedSectionId}
               selectedRowId={selectedRowId}
+              selectedColumnId={selectedColumnId}
               selectedElementId={selectedElementId}
               onSelectSection={(secId) => {
                 setSelectedSectionId(secId);
                 setSelectedRowId(null);
+                setSelectedColumnId(null);
                 setSelectedElementId(null);
               }}
               onSelectRow={(secId, rId) => {
                 setSelectedSectionId(secId);
                 setSelectedRowId(rId);
+                setSelectedColumnId(null);
                 setSelectedElementId(null);
               }}
-              onSelectElement={(secId, rId, cId, elId) => {
+              onSelectColumn={(secId, rId, colId) => {
                 setSelectedSectionId(secId);
                 setSelectedRowId(rId);
+                setSelectedColumnId(colId);
+                setSelectedElementId(null);
+              }}
+              onSelectElement={(secId, rId, _cId, elId) => {
+                setSelectedSectionId(secId);
+                setSelectedRowId(rId);
+                setSelectedColumnId(null);
                 setSelectedElementId(elId);
               }}
               onSelectPage={() => {
                 setSelectedSectionId(null);
                 setSelectedRowId(null);
+                setSelectedColumnId(null);
                 setSelectedElementId(null);
                 setActiveTab('page');
               }}
@@ -11495,8 +11899,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         {r.columns.map((c, cIdx) => (
                           <div
                             key={cIdx}
-                            style={{ flex: c.widthPercentage >= 50 ? '1 1 320px' : '1 1 240px', minWidth: '260px' }}
-                            className="space-y-4"
+                            style={{
+                              ...getColumnSurfaceStyle(c, { isPreview: true }),
+                              flex: c.widthPercentage >= 50 ? '1 1 320px' : '1 1 240px',
+                              minWidth: '260px',
+                            }}
+                            className={`space-y-4 ${getColumnShadowClass(c.shadow)}`}
                           >
                             {c.elements.map((el, elIdx) => (
                               <div key={elIdx}>

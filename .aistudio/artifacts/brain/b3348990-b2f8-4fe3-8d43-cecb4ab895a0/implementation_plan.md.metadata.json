@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación para modernizar y reestructurar los elementos MULTIMEDIA (Imagen, Video, Audio e Icono) en el editor visual:\n- Imagen: Borde por defecto a 0px, eliminación de rotación, controles conectados de ancho y alto con deslizador, input numérico, candado de proporción y botón de restaurar; nuevo grupo LINK DE IMAGEN con destino y apertura en nueva ventana; reordenamiento estricto de acordeones.\n- Video: Selector de Fuente (YouTube, Vimeo, Wistia, etc.), limpieza de textos/checks redundantes; ajustes avanzados de bordes y ancho máximo; nuevo grupo OPCIONES DEL VIDEO (autoplay, mute, loop); nuevo grupo COVER PORTADA con soporte para imagen o diseño compuesto (icono play personalizable, texto superior estilo banner, flecha direccional orientable y fondo personalizable con reproducción inmediata al clic).\n- Audio: Selector de Fuente, limpieza de alertas, soporte para playlists con vista de hasta 20 pistas y disposición.\n- Icono: Previsualización gráfica de la forma del icono seleccionado, reestructuración en línea de tamaño y color, selector de forma y color de fondo del contenedor.",
-  "updatedAt":  "2026-10-23T13:22:07.306494715Z",
+  "summary":  "Plan de implementación para agregar el control de Ancho de la Sección Externa (En Caja / 100% Ancho con presets y deslizador), establecer la jerarquía estricta de límites de ancho en cascada (Canvas >= Sección Externa >= Bloque Div / Sección Interna), y actualizar el selector de fondo degradado de la Sección Externa con dos selectores de color visuales manteniendo los estilos rápidos y eliminando el campo de CSS personalizado.",
+  "updatedAt":  "2026-10-24T22:53:43.641377757Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

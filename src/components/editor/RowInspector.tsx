@@ -14,16 +14,24 @@ import {
   Copy,
   Trash2,
   Box,
-  Layers,
-  Sparkles,
   Clock,
+  Columns,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
-
 
 interface RowInspectorProps {
   row: PageBlockRow;
   sectionName?: string;
+  canvasMaxWidth?: number;
   onUpdate: (props: Partial<PageBlockRow>) => void;
+  onSelectColumn?: (columnId: string) => void;
+  onChangeColumnsCount?: (count: number) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  canDelete?: boolean;
   onDuplicate?: () => void;
   onDelete?: () => void;
   onClose?: () => void;
@@ -32,7 +40,14 @@ interface RowInspectorProps {
 export const RowInspector: React.FC<RowInspectorProps> = ({
   row,
   sectionName,
+  canvasMaxWidth,
   onUpdate,
+  onChangeColumnsCount,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = false,
+  canMoveDown = false,
+  canDelete = true,
   onDuplicate,
   onDelete,
   onClose,
@@ -40,25 +55,25 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
   const [openSections, setOpenSections] = useState({
     layout: true,
     background: true,
+    columnsList: true,
+    borders: true,
+    delay: true,
     spacing: true,
-    borders: false,
-    shadow: false,
-    delay: false,
   });
 
   const toggleSection = (key: keyof typeof openSections) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const maxAllowedWidth = Math.max(320, Math.round(canvasMaxWidth || 1200));
+  const minAllowedWidth = Math.min(320, maxAllowedWidth);
   const currentWidthType = row.widthType || 'boxed';
-  const currentMaxWidth = row.maxWidth || 1140;
+  const currentMaxWidth = Math.min(row.maxWidth ?? maxAllowedWidth, maxAllowedWidth);
 
+  const basePresetValues = [600, 800, 960, 1140].filter((val) => val < maxAllowedWidth);
   const widthPresets = [
-    { label: '600px', val: 600 },
-    { label: '800px', val: 800 },
-    { label: '960px', val: 960 },
-    { label: '1140px', val: 1140 },
-    { label: '100%', val: 1400 },
+    ...basePresetValues.map((val) => ({ label: `${val}px`, val })),
+    { label: '100%', val: maxAllowedWidth },
   ];
 
   return (
@@ -89,16 +104,39 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
             <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-900 font-['Poppins']">
               Sección Interna
             </h3>
-            <span className="text-[10px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.5 rounded">
-              Contenedor
-            </span>
           </div>
-          <p className="text-[11px] text-zinc-500 mt-0.5 truncate max-w-[200px]">
-            {sectionName ? `Dentro de: ${sectionName}` : `${row.columns.length} columna(s)`}
-          </p>
+          {sectionName && (
+            <p className="text-[11px] text-zinc-500 mt-0.5 truncate max-w-[180px]">
+              Dentro de: {sectionName}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
+          {onMoveUp && (
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={!canMoveUp}
+              className="p-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:text-purple-600 hover:bg-purple-50 disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
+              title="Subir sección interna"
+            >
+              <ArrowUp className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onMoveDown && (
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={!canMoveDown}
+              className="p-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:text-purple-600 hover:bg-purple-50 disabled:opacity-35 disabled:pointer-events-none transition-colors cursor-pointer"
+              title="Bajar sección interna"
+            >
+              <ArrowDown className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {onDuplicate && (
             <button
               type="button"
@@ -110,7 +148,7 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
             </button>
           )}
 
-          {onDelete && (
+          {onDelete && canDelete && (
             <button
               type="button"
               onClick={onDelete}
@@ -120,24 +158,13 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
-
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-zinc-400 hover:text-zinc-700 p-1.5 rounded-md hover:bg-zinc-200/60 transition-colors cursor-pointer text-xs font-semibold ml-1"
-              title="Cerrar inspector"
-            >
-              ✕
-            </button>
-          )}
         </div>
       </div>
 
       {/* Body Scrollable Options */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* ============================================================== */}
-        {/* 1. ANCHO Y DISPOSICIÓN DEL CONTENEDOR                          */}
+        {/* 1. ANCHO DEL CONTENEDOR INTERNO                                */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
@@ -149,17 +176,28 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
               <Maximize2 className="w-3.5 h-3.5 text-purple-600" />
               Ancho del Contenedor Interno
             </span>
-            {openSections.layout ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+            {openSections.layout ? (
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+            )}
           </button>
 
           {openSections.layout && (
             <div className="p-3.5 space-y-3 bg-white text-xs">
               <div>
-                <label className="font-semibold text-zinc-700 block mb-1.5">Comportamiento de Ancho:</label>
+                <label className="font-semibold text-zinc-700 block mb-1.5">
+                  Comportamiento de Ancho:
+                </label>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
-                    onClick={() => onUpdate({ widthType: 'boxed' })}
+                    onClick={() =>
+                      onUpdate({
+                        widthType: 'boxed',
+                        maxWidth: Math.min(row.maxWidth ?? maxAllowedWidth, maxAllowedWidth),
+                      })
+                    }
                     className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
                       currentWidthType === 'boxed'
                         ? 'bg-purple-50 border-purple-600 text-purple-800 font-bold shadow-2xs'
@@ -187,14 +225,24 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
 
               {currentWidthType === 'boxed' && (
                 <div className="space-y-2 pt-1 border-t border-zinc-100">
-                  <label className="font-semibold text-zinc-700 block">Presets de Ancho:</label>
-                  <div className="grid grid-cols-5 gap-1">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-zinc-700">Presets de Ancho:</label>
+                    <span className="text-[10px] font-mono text-zinc-400">
+                      Máx. Canvas: {maxAllowedWidth}px
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
                     {widthPresets.map((preset) => (
                       <button
                         key={preset.label}
                         type="button"
-                        onClick={() => onUpdate({ maxWidth: preset.val })}
-                        className={`py-1 px-1 border rounded text-[10px] text-center transition-all cursor-pointer ${
+                        onClick={() =>
+                          onUpdate({
+                            widthType: 'boxed',
+                            maxWidth: Math.min(preset.val, maxAllowedWidth),
+                          })
+                        }
+                        className={`flex-1 min-w-[52px] py-1 px-1.5 border rounded text-[10px] text-center transition-all cursor-pointer ${
                           currentMaxWidth === preset.val
                             ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-2xs'
                             : 'border-zinc-200 bg-white hover:border-purple-600 text-zinc-700'
@@ -208,11 +256,16 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
                   <NumberControl
                     label="Ancho máximo exacto"
                     value={currentMaxWidth}
-                    min={400}
-                    max={1600}
+                    min={minAllowedWidth}
+                    max={maxAllowedWidth}
                     step={10}
                     unit="px"
-                    onChange={(val) => onUpdate({ maxWidth: val })}
+                    onChange={(val) =>
+                      onUpdate({
+                        widthType: 'boxed',
+                        maxWidth: Math.min(Math.max(minAllowedWidth, val), maxAllowedWidth),
+                      })
+                    }
                   />
                 </div>
               )}
@@ -221,7 +274,7 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* 2. COLOR DE FONDO DE LA SECCIÓN INTERNA                         */}
+        {/* 2. FONDO DEL CONTENEDOR INTERNO                                */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
@@ -233,7 +286,11 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
               <Palette className="w-3.5 h-3.5 text-purple-600" />
               Fondo del Contenedor Interno
             </span>
-            {openSections.background ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+            {openSections.background ? (
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+            )}
           </button>
 
           {openSections.background && (
@@ -249,7 +306,9 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
                   type="button"
                   onClick={() => onUpdate({ bgColor: undefined })}
                   className={`py-1 px-2 border rounded text-[10px] font-semibold cursor-pointer ${
-                    !row.bgColor ? 'bg-purple-600 text-white border-purple-600' : 'border-zinc-200 bg-white text-zinc-700'
+                    !row.bgColor
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'border-zinc-200 bg-white text-zinc-700'
                   }`}
                 >
                   Transparente
@@ -272,49 +331,52 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* 3. ESPACIADO INTERNO Y MÁRGENES (PADDING & MARGIN)              */}
+        {/* 3. COLUMNAS (SOLO SELECTOR DE NÚMERO DE COLUMNAS)              */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
             type="button"
-            onClick={() => toggleSection('spacing')}
+            onClick={() => toggleSection('columnsList')}
             className="w-full px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-xs text-zinc-800 cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-purple-600" />
-              Disposición
+              <Columns className="w-3.5 h-3.5 text-purple-600" />
+              Columnas
             </span>
-            {openSections.spacing ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+            {openSections.columnsList ? (
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+            )}
           </button>
 
-          {openSections.spacing && (
-            <div className="p-3.5 bg-white">
-              <BoxModelSpacingControl
-                marginTop={row.marginTop ?? 0}
-                marginRight={0}
-                marginBottom={row.marginBottom ?? 0}
-                marginLeft={0}
-                paddingTop={row.paddingTop ?? 0}
-                paddingRight={row.paddingRight ?? 0}
-                paddingBottom={row.paddingBottom ?? 0}
-                paddingLeft={row.paddingLeft ?? 0}
-                onChangeMargin={(m) => onUpdate({ marginTop: m.marginTop, marginBottom: m.marginBottom })}
-                onChangePadding={(p) =>
-                  onUpdate({
-                    paddingTop: p.paddingTop,
-                    paddingRight: p.paddingRight,
-                    paddingBottom: p.paddingBottom,
-                    paddingLeft: p.paddingLeft,
-                  })
-                }
-                showPadding={true}
-              />
+          {openSections.columnsList && (
+            <div className="p-3.5 bg-white text-xs">
+              <label className="font-semibold text-zinc-700 block mb-1.5">
+                Número de columnas:
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[1, 2, 3, 4].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => onChangeColumnsCount?.(num)}
+                    className={`py-1.5 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
+                      row.columns.length === num
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                    }`}
+                  >
+                    {num} Col
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         {/* ============================================================== */}
-        {/* 4. BORDES Y REDONDEO DE ESQUINAS                                */}
+        {/* 4. BORDES Y REDONDEO                                           */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
@@ -326,7 +388,11 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
               <Box className="w-3.5 h-3.5 text-purple-600" />
               Bordes y Redondeo
             </span>
-            {openSections.borders ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
+            {openSections.borders ? (
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+            )}
           </button>
 
           {openSections.borders && (
@@ -396,50 +462,12 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* 5. SOMBRA DEL CONTENEDOR                                        */}
+        {/* 5. RETARDO DE APARICIÓN (DELAY)                                */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
             type="button"
-            onClick={() => toggleSection('shadow')}
-            className="w-full px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-xs text-zinc-800 cursor-pointer"
-          >
-            <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-              Sombra del Contenedor
-            </span>
-            {openSections.shadow ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
-          </button>
-
-          {openSections.shadow && (
-            <div className="p-3.5 space-y-2 bg-white text-xs">
-              <div className="grid grid-cols-3 gap-1.5">
-                {(['none', 'sm', 'md', 'lg', 'xl'] as const).map((sh) => (
-                  <button
-                    key={sh}
-                    type="button"
-                    onClick={() => onUpdate({ shadow: sh })}
-                    className={`py-2 px-1 text-[11px] font-semibold border rounded-lg text-center capitalize cursor-pointer transition-all ${
-                      (row.shadow || 'none') === sh
-                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                        : 'border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700'
-                    }`}
-                  >
-                    {sh === 'none' ? 'Sin sombra' : sh}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ============================================================== */}
-        {/* 6. RETARDO DE APARICIÓN (DELAY)                                */}
-        {/* ============================================================== */}
-        <div className="border border-zinc-200 rounded-xl overflow-hidden">
-          <button
-            type="button"
-            onClick={() => toggleSection('delay' as any)}
+            onClick={() => toggleSection('delay')}
             className="w-full px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-xs text-zinc-800 cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
@@ -575,6 +603,52 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
                   )}
                 </div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* 6. DISPOSICIÓN (MÁRGENES Y RELLENO)                            */}
+        {/* ============================================================== */}
+        <div className="border border-zinc-200 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('spacing')}
+            className="w-full px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-xs text-zinc-800 cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-purple-600" />
+              Disposición
+            </span>
+            {openSections.spacing ? (
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+            )}
+          </button>
+
+          {openSections.spacing && (
+            <div className="p-3.5 bg-white">
+              <BoxModelSpacingControl
+                marginTop={row.marginTop ?? 0}
+                marginRight={0}
+                marginBottom={row.marginBottom ?? 0}
+                marginLeft={0}
+                paddingTop={row.paddingTop ?? 0}
+                paddingRight={row.paddingRight ?? 0}
+                paddingBottom={row.paddingBottom ?? 0}
+                paddingLeft={row.paddingLeft ?? 0}
+                onChangeMargin={(m) => onUpdate({ marginTop: m.marginTop, marginBottom: m.marginBottom })}
+                onChangePadding={(p) =>
+                  onUpdate({
+                    paddingTop: p.paddingTop,
+                    paddingRight: p.paddingRight,
+                    paddingBottom: p.paddingBottom,
+                    paddingLeft: p.paddingLeft,
+                  })
+                }
+                showPadding={true}
+              />
             </div>
           )}
         </div>

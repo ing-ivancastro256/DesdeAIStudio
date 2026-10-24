@@ -10,14 +10,11 @@ import {
   Copy,
   Trash2,
   Palette,
-  Sliders,
   ChevronDown,
   ChevronRight,
   Upload,
-  Image as ImageIcon,
   Layout,
   Layers,
-  Sparkles,
   Clock,
 } from 'lucide-react';
 
@@ -79,11 +76,9 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     background: true,
-    padding: true,
-    margin: true,
-    borders: false,
-    layout: false,
-    delay: false,
+    spacing: true,
+    borders: true,
+    delay: true,
   });
 
   const toggleAccordion = (key: string) => {
@@ -433,111 +428,42 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* ACCORDION 2: PADDING / RELLENO INTERNO DE LA SECCIÓN (4 DIRECCIONES) */}
+        {/* ACCORDION 2: DISPOSICIÓN (MARGEN Y RELLENO UNIFICADOS)         */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-lg overflow-hidden">
           <button
-            onClick={() => toggleAccordion('padding')}
+            type="button"
+            onClick={() => toggleAccordion('spacing')}
             className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-emerald-600" />
-              Relleno Interior de Sección (Padding)
+              <Layout className="w-3.5 h-3.5 text-[#2848F0]" />
+              Disposición
             </span>
-            {openSections.padding ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            {openSections.spacing ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           </button>
 
-          {openSections.padding && (
-            <div className="p-3 space-y-3.5 bg-white">
-              <NumberControl
-                label="Padding Superior (Top)"
-                value={section.paddingTop ?? section.paddingY ?? 48}
-                min={0}
-                max={200}
-                onChange={(val) => onUpdate({ paddingTop: val })}
-              />
-
-              <NumberControl
-                label="Padding Inferior (Bottom)"
-                value={section.paddingBottom ?? section.paddingY ?? 48}
-                min={0}
-                max={200}
-                onChange={(val) => onUpdate({ paddingBottom: val })}
-              />
-
-              <NumberControl
-                label="Padding Izquierdo (Left)"
-                value={section.paddingLeft ?? 24}
-                min={0}
-                max={160}
-                onChange={(val) => onUpdate({ paddingLeft: val })}
-              />
-
-              <NumberControl
-                label="Padding Derecho (Right)"
-                value={section.paddingRight ?? 24}
-                min={0}
-                max={160}
-                onChange={(val) => onUpdate({ paddingRight: val })}
+          {openSections.spacing && (
+            <div className="p-3 bg-white">
+              <BoxModelSpacingControl
+                marginTop={section.marginTop ?? 0}
+                marginRight={section.marginRight ?? 0}
+                marginBottom={section.marginBottom ?? 0}
+                marginLeft={section.marginLeft ?? 0}
+                paddingTop={section.paddingTop ?? section.paddingY ?? 48}
+                paddingRight={section.paddingRight ?? 24}
+                paddingBottom={section.paddingBottom ?? section.paddingY ?? 48}
+                paddingLeft={section.paddingLeft ?? 24}
+                onChangeMargin={(margins) => onUpdate(margins)}
+                onChangePadding={(paddings) => onUpdate(paddings)}
+                showPadding={true}
               />
             </div>
           )}
         </div>
 
         {/* ============================================================== */}
-        {/* ACCORDION 3: MARGEN EXTERIOR DE LA SECCIÓN (4 DIRECCIONES) */}
-        {/* ============================================================== */}
-        <div className="border border-zinc-200 rounded-lg overflow-hidden">
-          <button
-            onClick={() => toggleAccordion('margin')}
-            className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
-          >
-            <span className="flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-purple-600" />
-              Margen Exterior de Sección (Margin)
-            </span>
-            {openSections.margin ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          </button>
-
-          {openSections.margin && (
-            <div className="p-3 space-y-3.5 bg-white">
-              <NumberControl
-                label="Margen Superior (Top)"
-                value={section.marginTop ?? 0}
-                min={0}
-                max={160}
-                onChange={(val) => onUpdate({ marginTop: val })}
-              />
-
-              <NumberControl
-                label="Margen Inferior (Bottom)"
-                value={section.marginBottom ?? 0}
-                min={0}
-                max={160}
-                onChange={(val) => onUpdate({ marginBottom: val })}
-              />
-
-              <NumberControl
-                label="Margen Izquierdo (Left)"
-                value={section.marginLeft ?? 0}
-                min={0}
-                max={120}
-                onChange={(val) => onUpdate({ marginLeft: val })}
-              />
-
-              <NumberControl
-                label="Margen Derecho (Right)"
-                value={section.marginRight ?? 0}
-                min={0}
-                max={120}
-                onChange={(val) => onUpdate({ marginRight: val })}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* ============================================================== */}
-        {/* ACCORDION 4: BORDES Y SEPARADORES DE SECCIÓN */}
+        {/* ACCORDION 3: BORDES Y SEPARADORES DE SECCIÓN                   */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-lg overflow-hidden">
           <button

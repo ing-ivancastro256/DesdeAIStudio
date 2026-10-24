@@ -1,153 +1,108 @@
-# Plan de Modernización y Reestructuración Multimedia (Imagen, Video, Audio e Icono)
+# Control de Ancho en Sección Externa, Jerarquía de Anchos en Cascada y Degradado de 2 Colores
 
-Este plan detalla la reestructuración completa de los controles e inspectores de los elementos del grupo **MULTIMEDIA** (`image`, `video`, `audio`, `icon`) en el editor visual y en el visor del embudo, asegurando controles ergonómicos, diseño limpio sin elementos innecesarios y soporte completo para portadas interactivas de video y playlists de audio.
+Este plan incorpora el control completo de **Ancho de la Sección Externa** (`En Caja` / `100% Ancho`, deslizador y presets), establece una jerarquía estricta de anchos en cascada donde ningún contenedor interno puede superar a su contenedor padre (**Canvas ≥ Sección Externa ≥ Bloque Div / Sección Interna**), y moderniza el fondo en degradado de la Sección Externa permitiendo elegir dos colores personalizados junto a los estilos por defecto sin campos de código CSS.
 
-## Decisiones Críticas y Preferencias Confirmadas
+## Decisiones Confirmadas y Revisión del Usuario
 
 > [!IMPORTANT]
-> Se han integrado las siguientes respuestas y elecciones directas del usuario:
-> - **Proporción de Imagen**: Conexión proporcional por defecto entre ancho y alto, con botón de candado interactivo para desbloquear dimensiones libres cuando sea necesario y botón "Restaurar tamaño original".
-> - **Acción de Portada de Video (Cover)**: Al hacer clic en la portada personalizada, la cubierta se oculta suavemente e inicia la reproducción del video de inmediato.
-> - **Playlists de Audio (Spotify / SoundCloud)**: Reproductor enriquecido con visualización interactiva y lista de hasta 20 pistas de la playlist.
+> Se aplican las tres decisiones confirmadas para el comportamiento visual y el diseño del panel de propiedades:
+> - **Comportamiento visual de la Sección Externa en modo `En Caja`**: Al establecer un ancho menor que el del Canvas, se achica toda la caja exterior de la Sección Externa (incluyendo su color de fondo, degradado o imagen, superposición y bordes) manteniéndose centrada horizontalmente dentro del lienzo.
+> - **Ubicación en el panel de Sección Externa**: El nuevo grupo desplegable **Ancho de la Sección Externa** se ubica en primer lugar arriba de todo, justo antes de **Fondo de la Sección**, abierto por defecto al igual que el resto de grupos.
+> - **Degradado en Sección Externa**: Se conservan los estilos rápidos predefinidos, se añaden los **dos selectores de color** (`Color inicial (1)` y `Color final (2)`) con el mismo diseño directo que en Columnas, y se elimina por completo el cuadro de texto `CSS Personalizado`.
 
 ---
 
-## 1. Alcance por Elemento
+## 1. Visión General y Concepto Central
 
-### A. Elemento Imagen (`image`)
-1. **Bordes y Radio por Defecto**:
-   - Nuevas imágenes se inicializan con `borderRadius: 0` (0px) en lugar de esquinas redondeadas forzadas.
-2. **Ajustes y Forma de Imagen**:
-   - **Eliminar control de rotación** (grados).
-   - **Controles de Ancho y Alto sincronizados** (siguiendo *Imagen 1* del usuario):
-     - Fila para **Ancho (Size / Width)**: Deslizador (`range`) + Input numérico con unidad (`px` / `%`).
-     - Fila para **Alto (Height)**: Deslizador (`range`) + Input numérico con unidad (`px` / `%`).
-     - Botón de enlace / candado para alternar entre proporción fija y libre.
-     - Botón/enlace inferior: `↺ Restaurar tamaño original` que restablece las dimensiones naturales de la imagen.
-   - Conservar sombra, opacidad y alineación.
-3. **Nuevo Grupo "LINK DE IMAGEN"**:
-   - Input para URL de destino (`linkUrl`).
-   - Switch o checkbox para `Abrir en nueva pestaña (_blank)`.
-   - Si está vacío, la imagen no realiza ninguna acción al clic.
-   - En canvas (modo vista previa) y embudo público, la imagen se envuelve en enlace `<a>` funcional.
-4. **Orden Estricto de Acordeones**:
-   1. *Origen de la imagen*
-   2. *Ajustes y Forma de Imagen*
-   3. *Link de Imagen*
-   4. *Borde Exterior de Imagen*
-   5. *Disposición (Márgenes y Relleno)*
+- **Qué resuelve**:
+  1. Permite redimensionar el ancho propio de cualquier **Sección Externa** (por ejemplo, el Hero principal o cualquier bloque de sección) alternando entre `100% Ancho` (comportamiento actual que ocupa todo el Canvas) y `En Caja` con medida exacta en píxeles centrada en el lienzo.
+  2. Garantiza coherencia geométrica absoluta en toda la estructura anidada de la página: el **Canvas** gobierna el tope máximo de la **Sección Externa**, y a su vez la **Sección Externa** gobierna el tope máximo de cualquier **Bloque Div / Sección Interna** contenido dentro de ella.
+  3. Facilita la personalización de fondos degradados en la Sección Externa mediante selectores visuales de dos colores sincronizados con los presets rápidos, retirando el campo técnico de CSS manual.
+- **Usuarios y contexto**: Creadores de páginas y embudos que diseñan secciones con fondos de color o degradados acotados respecto al lienzo general y necesitan que todos los bloques internos respeten automáticamente las dimensiones del contenedor que los envuelve.
+- **Valor principal**: Control total de encuadre en cada nivel jerárquico (`Canvas` → `Sección Externa` → `Bloque Div`), fidelidad idéntica entre Modo Edición y Vista Previa, y edición visual sin fricción técnica.
 
 ---
 
-### B. Elemento Video (`video`)
-1. **Origen del Video**:
-   - Selector desplegable **"Fuente"**: `YouTube`, `Vimeo`, `Wistia`, `Subir Video`, `Video Externo`, `Alojado en Servidor`.
-   - Campo para introducir la URL del video.
-   - Eliminación de textos redundantes y del check verde de "listo para reproducir" para lograr una interfaz limpia.
-   - Conservación del botón de carga de video de prueba (`Cargar video de prueba`).
-2. **Ajustes del Reproductor**:
-   - Configuración de bordes:
-     - Grosor de borde (`borderWidth` en px).
-     - Estilo de borde (`borderStyle`: sólido, rayado, punteado).
-     - Color de borde (`borderColor` con selector Hex/paleta).
-   - Bordes redondeados (`borderRadius` en px).
-   - Ancho máximo del reproductor:
-     - Botones de presets rápidos (`480px`, `640px`, `750px`, `100%`).
-     - Input numérico libre en px/% para control milimétrico.
-   - Mantenimiento de alineación (`izquierda`, `centro`, `derecha`) y relación de aspecto (`16:9`, `4:3`, `9:16`, `1:1`).
-3. **Nuevo Grupo "OPCIONES DEL VIDEO"**:
-   - `Autoreproducir` (`autoplay`).
-   - `Silenciar` (`muted`).
-   - `Bucle / Repetir` (`loop`).
-4. **Nuevo Grupo "COVER PORTADA" (siguiendo *Imagen 2*)**:
-   - Selector de tipo de portada:
-     - **Opción 1: Imagen personalizada** (subida o URL de imagen de portada).
-     - **Opción 2: Portada diseñada con 4 elementos interactivos**:
-       1. **Icono de Play**: Centrado vertical y horizontalmente; selector de variantes de icono (Play clásico, Play con círculo, Play suave); control de tamaño y color del icono y de su botón circular.
-       2. **Texto Superior**: Píldora/banner superior (ej. "DALE CLICK AQUÍ" / "Haz clic para ver el video"); personalizable en tipografía, tamaño de fuente, color de texto, color de fondo de la cápsula y estilos (negrita, mayúsculas).
-       3. **Flecha Indicadora**: Flecha curvada orientada hacia el botón de play; personalizable en tipo de flecha, tamaño, color y ángulo de rotación sobre su eje (0° a 360°).
-       4. **Fondo de Portada**: Fondo personalizable (color sólido, gradiente suave o patrón oscuro) con control de opacidad y selector de color.
-   - **Comportamiento interactivo**: Al hacer clic sobre la portada (en vista previa o modo público), la cubierta se desvanece suavemente y el video se reproduce automáticamente.
-5. **Disposición**:
-   - Mantenimiento intacto del control de márgenes (Box Model).
+## 2. Experiencia de Usuario y Diseño Visual
+
+### Flujos Clave de Interacción
+1. **Control de Ancho de la Sección Externa**:
+   - Al seleccionar una Sección Externa en el lienzo o desde Estructura, el primer grupo desplegado arriba en el inspector es **Ancho de la Sección Externa**.
+   - Incluye dos botones de modo: **`En Caja`** y **`100% Ancho`** (las secciones existentes sin medida fija inician en `100% Ancho` para respetar el ancho actual del Canvas; al activar `En Caja` adoptan una medida inicial acotada al Canvas, como `1200px` o el máximo permitido por el lienzo).
+   - En modo `En Caja`, se muestran el deslizador continuo con entrada numérica en `px` y los botones de presets rápidos (`720px`, `960px`, `1140px`, `1200px`, `1440px`), deshabilitando u ocultando límites que superen el ancho gobernante del Canvas.
+   - En el lienzo (tanto en Edición como en Vista Previa), la caja completa de la Sección Externa se ajusta a ese ancho y se centra horizontalmente con su fondo y bordes.
+2. **Concordancia en Cascada (`Canvas` → `Sección Externa` → `Bloque Div`)**:
+   - Si el **Canvas** se reduce (ej. a `960px`), cualquier Sección Externa que tuviera `1200px` se ajusta automáticamente a `960px`.
+   - Si una **Sección Externa** se reduce (ej. a `800px`), cualquier **Bloque Div / Sección Interna** (incluidos bloques anidados) dentro de esa sección cuyo ancho supere `800px` se recorta automáticamente a `800px`, y su propio inspector pasa a mostrar `800px` como tope máximo gobernado por la Sección Externa.
+3. **Degradado Visual de 2 Colores en Fondo de la Sección**:
+   - Dentro de **Fondo de la Sección → Degradado**, el usuario dispone de la tarjeta **Degradado de 2 colores** con los selectores visuales **`Color inicial (1)`** y **`Color final (2)`** (selector cromático + código hexadecimal), idénticos a los de Columnas.
+   - Debajo se mantienen los **Estilos rápidos** por defecto; al pulsar cualquiera de ellos, se aplica el degradado a la sección y se sincronizan automáticamente ambos selectores de color para que el usuario pueda partir de un preset y ajustar cualquiera de sus dos tonos.
+   - El campo inferior `CSS Personalizado` desaparece por completo.
+
+### Identidad Visual y Precisión Espacial
+- **Dirección estética**: Paneles de inspección oscuros de alto contraste (`#1e293b` / `#0f172a` con acentos azul/índigo en estados activos), todos los acordeones abiertos por defecto sin controles colapsados ocultos.
+- **Tipografía y cifras tabulares**: Valores numéricos de ancho (`px`) renderizados con `tabular-nums` / `font-mono` para mantener alineación estable al deslizar controles de dimensión, y etiquetas de botones en una sola línea (`whitespace-nowrap`).
+- **Retroalimentación inmediata**: Ajuste en tiempo real (`< 150ms`) de la caja de la Sección Externa y de sus Bloques Div hijos tanto al arrastrar el deslizador como al pulsar un preset.
 
 ---
 
-### C. Elemento Audio (`audio`)
-1. **Origen de Audio**:
-   - Selector desplegable **"Fuente"**: `SoundCloud`, `Spotify`, `Audio Externo`, `Subir Audio`, `Alojado en Servidor`.
-   - Campo para URL de audio/canción/playlist.
-   - Eliminación de textos redundantes inferiores y del check verde.
-   - Mantenimiento de botón de carga de audio de prueba.
-2. **Soporte de Playlist**:
-   - Cuando se introduce un enlace de playlist (Spotify o SoundCloud), renderizar el reproductor embebido completo que expone la lista de pistas navegable (hasta 20+ temas).
-3. **Disposición**:
-   - Acordeón de espaciado y márgenes al final.
+## 3. Decisiones de Producto y Razonamiento
+
+- **Achicar y centrar la caja completa de la Sección Externa**:
+  - *Enfoque elegido*: Aplicar el `maxWidth` y centrado horizontal (`margin: auto` cuando no hay margen lateral explícito) directamente sobre el contenedor raíz de la Sección Externa en vistas de escritorio.
+  - *Por qué*: Permite que al asignar un color sólido, degradado o imagen de fondo a una Sección Externa en modo `En Caja`, dicho fondo se vea contenido dentro del ancho elegido dejando visible el lienzo exterior alrededor, exactamente igual que ocurre con un Bloque Div respecto a su sección.
+  - *Alternativa descartada*: Restringir únicamente un contenedor interno invisible manteniendo el fondo al 100%, lo cual impediría ver el recorte real del fondo de la sección cuando el usuario busca encajonarla.
+- **Propagación descendente automática de límites de ancho**:
+  - *Enfoque elegido*: Evaluar en cascada `Límite Canvas` → `Límite Efectivo de cada Sección Externa` → `Límite Efectivo de sus Bloques Div`, recortando de inmediato en el estado cualquier valor hijo que quede por encima cuando cambia un contenedor superior.
+  - *Por qué*: Evita estados inconsistentes donde un bloque interno afirme medir `1140px` dentro de una sección de `800px` o un lienzo de `640px`.
+- **Unificación del selector de Degradado con el estándar de Columnas**:
+  - *Enfoque elegido*: Combinar los dos selectores `Color inicial (1)` y `Color final (2)` (en ángulo diagonal suave de `135deg`) con la galería de presets existentes y eliminar la caja de texto CSS.
+  - *Por qué*: Mantiene un lenguaje visual idéntico entre Columnas y Sección Externa y elimina código técnico innecesario de la interfaz.
 
 ---
 
-### D. Elemento Icono (`icon`)
-1. **Previsualización Visual de Icono**:
-   - En lugar de mostrar solo el nombre textual (ej. "Star"), renderizar la forma real del icono seleccionado en un recuadro gráfico destacado.
-2. **Organización de Controles**:
-   - **Tamaño y Color en una sola línea**: Slider de tamaño del icono colocado de forma compacta y selector de color en la misma fila para optimizar espacio vertical.
-   - Inmediatamente debajo: **"Forma del icono"** (desplegable: Ninguna / Círculo / Cuadrado / Esquinas redondeadas).
-   - Inmediatamente debajo: **"Color de Fondo del contenedor"** con su respectivo selector de color (Hex y presets).
-3. **Disposición**:
-   - Acordeón de márgenes y padding al final.
+## 4. Arquitectura Técnica y Estrategia de Estado
 
----
-
-## 2. Arquitectura de Componentes y Datos
+### Diagrama de Jerarquía de Anchos y Sincronización
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│ VisualEditor / Inspector Panel (Sidebar)                               │
-├────────────────────────────────────────────────────────────────────────┤
-│  Image Inspector:                                                      │
-│  [1. Origen] → [2. Ajustes/Forma (W/H Sliders)] → [3. Link] →         │
-│  [4. Bordes] → [5. Disposición]                                        │
-│                                                                        │
-│  Video Inspector:                                                      │
-│  [1. Origen (Fuente + URL)] → [2. Ajustes (Bordes + Ancho)] →          │
-│  [3. Opciones (Autoplay/Mute/Loop)] → [4. Cover Portada (4 Elementos)] │
-│  → [5. Disposición]                                                    │
-│                                                                        │
-│  Audio Inspector:                                                      │
-│  [1. Origen (Fuente + Playlist)] → [2. Disposición]                    │
-│                                                                        │
-│  Icon Inspector:                                                       │
-│  [Visual Preview] → [Tamaño + Color fila única] →                      │
-│  [Forma Contenedor] → [Color Fondo] → [Disposición]                    │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │ Actualiza estado del elemento
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│ Canvas Renderer & PublicFunnelModal                                    │
-├────────────────────────────────────────────────────────────────────────┤
-│  - Renderizado de imagen con enlace <a> funcional si existe URL        │
-│  - Renderizado de Video con Cover interactivo y autoplay al clic       │
-│  - Embed de Audio con soporte para playlist de 20 temas                │
-│  - Renderizado de Icono con forma y fondo configurados                 │
-└────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 1. CANVAS PRINCIPAL (Lienzo de Página)                                     │
+│    Límite Canvas = Ancho en Caja (ej. 1200px / 640px) o Ancho Real (100%)  │
+└─────────────────────────────────────┬──────────────────────────────────────┘
+                                      │ Gobierna (Ancho Sección ≤ Límite Canvas)
+                                      ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 2. SECCIÓN EXTERNA                                                         │
+│    • Inspector (Grupo #1 arriba): Ancho de la Sección Externa              │
+│      [En Caja | 100% Ancho] + Slider + Presets ≤ Límite Canvas             │
+│    • Inspector (Grupo #2): Fondo de la Sección                             │
+│      Degradado = Color Inicial (1) + Color Final (2) + Presets (sin CSS)   │
+│    • Renderizado en Caja: Caja completa con fondo centrada en el Canvas    │
+│    • Límite Sección = En Caja ? min(Ancho Sección, Límite Canvas)          │
+│                               : Límite Canvas                              │
+└─────────────────────────────────────┬──────────────────────────────────────┘
+                                      │ Gobierna (Ancho Bloque Div ≤ Límite Sección)
+                                      ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 3. BLOQUE DIV / SECCIÓN INTERNA (y Contenedores Anidados)                  │
+│    • Inspector: Tope máximo dinámico = Límite Sección padre                │
+│    • Recorte automático si Límite Sección o Límite Canvas disminuye        │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Modelo de Datos y Estado
+- **Propiedades de Sección Externa**:
+  - `widthType`: `'boxed' | 'full'` (por defecto `'full'` en secciones existentes sin ancho numérico definido para preservar compatibilidad visual inmediata).
+  - `maxWidth`: medida numérica en píxeles cuando opera en modo `'boxed'`, siempre acotada a `Límite Canvas`.
+  - `bgGradientColor1` y `bgGradientColor2`: colores hexadecimales inicial y final del degradado de la sección, sincronizados bidireccionalmente con la propiedad de degradado renderizada (`linear-gradient(135deg, color1 0%, color2 100%)`) y con los presets rápidos.
 
-## 3. Plan de Verificación
-
-1. **Pruebas de Imagen**:
-   - Agregar nueva imagen y verificar que nace con `borderRadius: 0px`.
-   - Modificar ancho y alto con los sliders y comprobar sincronización proporcional con candado activo y desbloqueo al abrir el candado.
-   - Pulsar "Restaurar tamaño original" y verificar restablecimiento.
-   - Probar configuración de enlace y apertura en nueva pestaña en modo vista previa.
-2. **Pruebas de Video**:
-   - Seleccionar fuente (YouTube, Vimeo, etc.), verificar remoción de textos y checks verdes.
-   - Probar bordes y ancho máximo numérico.
-   - Configurar portada personalizada compuesta con icono, texto superior, flecha girada y fondo; verificar que al hacer clic se oculta e inicia el video.
-3. **Pruebas de Audio**:
-   - Probar fuentes, ingresar enlace de playlist y verificar visualización de lista de pistas.
-4. **Pruebas de Icono**:
-   - Verificar preview gráfico de la forma del icono, alineación horizontal de tamaño y color, y selector de forma/fondo.
-5. **Validación de Compilación y Tipos**:
-   - Ejecutar `compile_applet` y `lint_applet` para confirmar cero errores.
+### Mapeo Interactivo de Componentes y Manejadores
+- **Actualización de Sección Externa**:
+  - Al cambiar `widthType` a `'boxed'` o reducir `maxWidth` en la Sección Externa, el manejador de actualización valida primero que no exceda el `Límite Canvas` y recorre en el mismo paso todas las filas (`Bloque Div`) y contenedores internos anidados de esa sección para ajustar cualquier `maxWidth` hijo que supere el nuevo ancho de la sección.
+- **Actualización del Canvas Global**:
+  - Cuando disminuye el `Límite Canvas`, el efecto de normalización ajusta primero las Secciones Externas en caja que excedan el lienzo y, acto seguido, ajusta los Bloques Div internos respecto al límite efectivo resultante de su respectiva Sección Externa.
+- **Inspector del Bloque Div**:
+  - Recibe como límite máximo gobernante el ancho efectivo de la Sección Externa que lo contiene (e informa claramente en su nota inferior si el tope proviene de la Sección Externa o del Canvas).
+- **Fidelidad Edición / Publicación**:
+  - Tanto el lienzo del Editor Visual (en escritorio y vista previa de plantillas) como la vista pública publicada aplican la misma regla de ancho máximo y centrado exterior sobre la caja de la Sección Externa, manteniendo `100%` fluido en vista móvil (`390px`) para preservar la adaptabilidad responsiva.

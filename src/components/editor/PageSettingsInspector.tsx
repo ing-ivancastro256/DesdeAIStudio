@@ -36,8 +36,8 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
     borderRadius: true,
     typography: true,
     colors: true,
-    spacing: false,
-    seo: false,
+    spacing: true,
+    seo: true,
   });
 
   const toggleSection = (key: keyof typeof openSections) => {

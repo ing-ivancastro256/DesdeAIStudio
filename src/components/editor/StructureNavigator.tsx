@@ -6,6 +6,7 @@ import {
   PageBlockElement,
   ElementType,
 } from '../../types';
+import { formatRowDisplayName } from '../../utils/editorTreeUtils';
 import {
   Layers,
   ChevronDown,
@@ -53,9 +54,11 @@ interface StructureNavigatorProps {
   sections: PageBlockSection[];
   selectedSectionId: string | null;
   selectedRowId: string | null;
+  selectedColumnId?: string | null;
   selectedElementId: string | null;
   onSelectSection: (sectionId: string) => void;
   onSelectRow: (sectionId: string, rowId: string) => void;
+  onSelectColumn?: (sectionId: string, rowId: string, columnId: string) => void;
   onSelectElement: (sectionId: string, rowId: string, columnId: string, elementId: string) => void;
   onSelectPage: () => void;
   onMoveSection: (direction: 'up' | 'down', sectionId: string) => void;
@@ -178,6 +181,8 @@ const getElementName = (el: PageBlockElement) => {
       return 'Icono';
     case 'audio':
       return 'Audio / Música';
+    case 'inner_columns':
+      return formatRowDisplayName(el.nestedRow?.name, 'Sección Interna');
     default:
       return 'Elemento';
   }
@@ -187,9 +192,11 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
   sections,
   selectedSectionId,
   selectedRowId,
+  selectedColumnId,
   selectedElementId,
   onSelectSection,
   onSelectRow,
+  onSelectColumn,
   onSelectElement,
   onSelectPage,
   onMoveSection,
@@ -218,6 +225,14 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
         initial[row.id] = true;
         row.columns.forEach((col) => {
           initial[col.id] = true;
+          col.elements.forEach((el) => {
+            if (el.type === 'inner_columns' && el.nestedRow) {
+              initial[el.nestedRow.id] = true;
+              el.nestedRow.columns.forEach((nc) => {
+                initial[nc.id] = true;
+              });
+            }
+          });
         });
       });
     });
@@ -234,20 +249,27 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
 
   // Check if everything is currently expanded
   const areAllExpanded = useMemo(() => {
-    let all = true;
     for (const sec of sections) {
       if (expandedNodes[sec.id] === false) return false;
       for (const row of sec.rows) {
         if (expandedNodes[row.id] === false) return false;
         for (const col of row.columns) {
           if (expandedNodes[col.id] === false) return false;
+          for (const el of col.elements) {
+            if (el.type === 'inner_columns' && el.nestedRow) {
+              if (expandedNodes[el.nestedRow.id] === false) return false;
+              for (const nc of el.nestedRow.columns) {
+                if (expandedNodes[nc.id] === false) return false;
+              }
+            }
+          }
         }
       }
     }
-    return all;
+    return true;
   }, [sections, expandedNodes]);
 
-  // Master Expand All / Collapse All toggle (User requested: "un botón arribita que es como una flecha para arriba, para abajo... todo se expande y todo se contrae")
+  // Master Expand All / Collapse All toggle
   const toggleExpandAll = () => {
     const nextState = !areAllExpanded;
     const updated: Record<string, boolean> = {};
@@ -257,6 +279,14 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
         updated[row.id] = nextState;
         row.columns.forEach((col) => {
           updated[col.id] = nextState;
+          col.elements.forEach((el) => {
+            if (el.type === 'inner_columns' && el.nestedRow) {
+              updated[el.nestedRow.id] = nextState;
+              el.nestedRow.columns.forEach((nc) => {
+                updated[nc.id] = nextState;
+              });
+            }
+          });
         });
       });
     });
@@ -413,7 +443,7 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
         <div
           onClick={onSelectPage}
           className={`flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer transition-colors group ${
-            !selectedSectionId && !selectedRowId && !selectedElementId
+            !selectedSectionId && !selectedRowId && !selectedColumnId && !selectedElementId
               ? 'bg-blue-50/80 text-[#2848F0] font-semibold border border-blue-200'
               : 'hover:bg-zinc-100 text-zinc-800'
           }`}
@@ -431,7 +461,7 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
         {filteredSections.map((section, secIdx) => {
           const isSectionExpanded = expandedNodes[section.id] ?? true;
           const isSectionActive =
-            selectedSectionId === section.id && !selectedRowId && !selectedElementId;
+            selectedSectionId === section.id && !selectedRowId && !selectedColumnId && !selectedElementId;
 
           return (
             <div key={section.id} className="pt-0.5">
@@ -538,7 +568,157 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                   {section.rows.map((row, rowIdx) => {
                     const isRowExpanded = expandedNodes[row.id] ?? true;
                     const isRowActive =
-                      selectedRowId === row.id && !selectedElementId;
+                      selectedRowId === row.id && !selectedColumnId && !selectedElementId;
+
+                    const renderElementLeaf = (
+                      parentRowId: string,
+                      parentCol: PageBlockColumn,
+                      element: PageBlockElement,
+                      elIdx: number
+                    ) => {
+                      const isElementActive = selectedElementId === element.id;
+
+                      return (
+                        <div
+                          key={element.id}
+                          draggable
+                          onDragStart={() => {
+                            setDraggedItem({
+                              type: 'element',
+                              id: element.id,
+                              sectionId: section.id,
+                              rowId: parentRowId,
+                              columnId: parentCol.id,
+                              index: elIdx,
+                            });
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                          }}
+                          onDrop={() => {
+                            if (
+                              draggedItem &&
+                              draggedItem.type === 'element' &&
+                              draggedItem.columnId === parentCol.id &&
+                              onReorderElementsInCol
+                            ) {
+                              onReorderElementsInCol(parentCol.id, draggedItem.index, elIdx);
+                              setDraggedItem(null);
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectElement(
+                              section.id,
+                              parentRowId,
+                              parentCol.id,
+                              element.id
+                            );
+                            const domEl = document.getElementById(element.id);
+                            if (domEl) {
+                              domEl.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center',
+                              });
+                            }
+                          }}
+                          className={`flex items-center justify-between px-2 py-1 rounded-md cursor-pointer transition-all group ${
+                            isElementActive
+                              ? 'bg-[#2848F0] text-white font-medium shadow-2xs'
+                              : 'hover:bg-zinc-100 text-zinc-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 truncate">
+                            <div className="cursor-grab active:cursor-grabbing text-zinc-400 group-hover:text-zinc-600">
+                              <GripVertical className="w-3 h-3 opacity-0 group-hover:opacity-100" />
+                            </div>
+                            <div className={isElementActive ? 'text-white' : ''}>
+                              {getElementIcon(element.type)}
+                            </div>
+                            <span
+                              className={`truncate text-[11px] ${
+                                isElementActive ? 'text-white font-semibold' : ''
+                              }`}
+                            >
+                              {getElementName(element)}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+                              isElementActive ? 'opacity-100' : ''
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMoveElement('up', element.id);
+                              }}
+                              disabled={elIdx === 0}
+                              className={`p-0.5 rounded cursor-pointer disabled:opacity-30 ${
+                                isElementActive
+                                  ? 'hover:bg-blue-700 text-white'
+                                  : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+                              }`}
+                              title="Subir elemento"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMoveElement('down', element.id);
+                              }}
+                              disabled={elIdx === parentCol.elements.length - 1}
+                              className={`p-0.5 rounded cursor-pointer disabled:opacity-30 ${
+                                isElementActive
+                                  ? 'hover:bg-blue-700 text-white'
+                                  : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+                              }`}
+                              title="Bajar elemento"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                            {onDuplicateElement && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDuplicateElement(element.id);
+                                }}
+                                className={`p-0.5 rounded cursor-pointer ${
+                                  isElementActive
+                                    ? 'hover:bg-blue-700 text-white'
+                                    : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+                                }`}
+                                title="Duplicar elemento"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            )}
+                            {onDeleteElement && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteElement(element.id);
+                                }}
+                                className={`p-0.5 rounded cursor-pointer ${
+                                  isElementActive
+                                    ? 'hover:bg-red-500 text-white'
+                                    : 'hover:bg-red-50 text-zinc-400 hover:text-red-600'
+                                }`}
+                                title="Eliminar elemento"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    };
 
                     return (
                       <div key={row.id}>
@@ -588,7 +768,7 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                             </button>
                             <Box className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                             <span className="truncate text-[11px]">
-                              {row.name || 'Bloque div'}
+                              {formatRowDisplayName(row.name, 'Bloque div')}
                             </span>
                           </div>
 
@@ -653,20 +833,33 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                             {row.columns.map((column, colIdx) => {
                               const isColExpanded = expandedNodes[column.id] ?? true;
                               const hasElements = column.elements.length > 0;
+                              const isColActive =
+                                selectedColumnId === column.id && !selectedElementId;
 
                               return (
                                 <div key={column.id}>
-                                  {/* If row has more than 1 column, render Column node */}
-                                  {row.columns.length > 1 && (
+                                  {/* Render Column node when >1 column or column has custom styling */}
+                                  {(row.columns.length > 1 || column.bgColor || column.bgGradient) && (
                                     <div
-                                      onClick={(e) => toggleNode(column.id, e)}
-                                      className="flex items-center justify-between px-1.5 py-0.5 text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50 rounded cursor-pointer"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (onSelectColumn) {
+                                          onSelectColumn(section.id, row.id, column.id);
+                                        } else {
+                                          toggleNode(column.id, e);
+                                        }
+                                      }}
+                                      className={`flex items-center justify-between px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                        isColActive
+                                          ? 'bg-teal-50 text-teal-800 font-semibold ring-1 ring-teal-300'
+                                          : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+                                      }`}
                                     >
                                       <div className="flex items-center gap-1 min-w-0">
                                         <button
                                           type="button"
                                           onClick={(e) => toggleNode(column.id, e)}
-                                          className="p-0.5 text-zinc-400 hover:text-zinc-600"
+                                          className="p-0.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
                                         >
                                           {isColExpanded ? (
                                             <ChevronDown className="w-2.5 h-2.5" />
@@ -674,164 +867,207 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                             <ChevronRight className="w-2.5 h-2.5" />
                                           )}
                                         </button>
-                                        <Columns className="w-3 h-3 text-zinc-400" />
-                                        <span className="text-[10px] font-mono text-zinc-500">
-                                          Columna {colIdx + 1} ({column.widthPercentage}%)
+                                        <Columns className="w-3 h-3 text-teal-600 shrink-0" />
+                                        <span className="text-[10px] font-mono truncate">
+                                          Columna {colIdx + 1} ({Math.round(column.widthPercentage)}%)
                                         </span>
+                                        {(column.bgColor || column.bgGradient) && (
+                                          <span
+                                            style={
+                                              column.bgGradient
+                                                ? { backgroundImage: column.bgGradient }
+                                                : { backgroundColor: column.bgColor }
+                                            }
+                                            className="w-2.5 h-2.5 rounded-full border border-zinc-300 shrink-0"
+                                          />
+                                        )}
                                       </div>
                                     </div>
                                   )}
 
                                   {/* ELEMENTS INSIDE COLUMN */}
-                                  {(row.columns.length === 1 || isColExpanded) && (
-                                    <div className={row.columns.length > 1 ? 'ml-3 pl-2 border-l border-zinc-200 space-y-0.5' : 'space-y-0.5'}>
+                                  {(row.columns.length === 1 && !column.bgColor && !column.bgGradient
+                                    ? true
+                                    : isColExpanded) && (
+                                    <div
+                                      className={
+                                        row.columns.length > 1 || column.bgColor || column.bgGradient
+                                          ? 'ml-3 pl-2 border-l border-zinc-200 space-y-0.5'
+                                          : 'space-y-0.5'
+                                      }
+                                    >
                                       {!hasElements ? (
                                         <div className="px-2 py-1 text-[11px] text-zinc-400 italic">
                                           Vacío
                                         </div>
                                       ) : (
                                         column.elements.map((element, elIdx) => {
-                                          const isElementActive =
-                                            selectedElementId === element.id;
+                                          if (element.type === 'inner_columns' && element.nestedRow) {
+                                            const nRow = element.nestedRow;
+                                            const isNestedRowExpanded = expandedNodes[nRow.id] ?? true;
+                                            const isNestedRowActive =
+                                              selectedRowId === nRow.id &&
+                                              !selectedColumnId &&
+                                              !selectedElementId;
 
-                                          return (
-                                            <div
-                                              key={element.id}
-                                              draggable
-                                              onDragStart={() => {
-                                                setDraggedItem({
-                                                  type: 'element',
-                                                  id: element.id,
-                                                  sectionId: section.id,
-                                                  rowId: row.id,
-                                                  columnId: column.id,
-                                                  index: elIdx,
-                                                });
-                                              }}
-                                              onDragOver={(e) => {
-                                                e.preventDefault();
-                                              }}
-                                              onDrop={() => {
-                                                if (
-                                                  draggedItem &&
-                                                  draggedItem.type === 'element' &&
-                                                  draggedItem.columnId === column.id &&
-                                                  onReorderElementsInCol
-                                                ) {
-                                                  onReorderElementsInCol(column.id, draggedItem.index, elIdx);
-                                                  setDraggedItem(null);
-                                                }
-                                              }}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                onSelectElement(
-                                                  section.id,
-                                                  row.id,
-                                                  column.id,
-                                                  element.id
-                                                );
-                                                // Scroll element smoothly on canvas
-                                                const domEl = document.getElementById(element.id);
-                                                if (domEl) {
-                                                  domEl.scrollIntoView({
-                                                    behavior: 'smooth',
-                                                    block: 'center',
-                                                  });
-                                                }
-                                              }}
-                                              className={`flex items-center justify-between px-2 py-1 rounded-md cursor-pointer transition-all group ${
-                                                isElementActive
-                                                  ? 'bg-[#2848F0] text-white font-medium shadow-2xs'
-                                                  : 'hover:bg-zinc-100 text-zinc-800'
-                                              }`}
-                                            >
-                                              <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                                <div className="cursor-grab active:cursor-grabbing text-zinc-400 group-hover:text-zinc-600">
-                                                  <GripVertical className="w-3 h-3 opacity-0 group-hover:opacity-100" />
-                                                </div>
-                                                <div className={isElementActive ? 'text-white' : ''}>
-                                                  {getElementIcon(element.type)}
-                                                </div>
-                                                <span className={`truncate text-[11px] ${isElementActive ? 'text-white font-semibold' : ''}`}>
-                                                  {getElementName(element)}
-                                                </span>
-                                              </div>
-
-                                              {/* Element Quick Actions: Move up/down, duplicate, delete */}
-                                              <div
-                                                className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                                                  isElementActive ? 'opacity-100' : ''
-                                                }`}
-                                              >
-                                                <button
-                                                  type="button"
+                                            return (
+                                              <div key={element.id} className="space-y-0.5">
+                                                <div
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    onMoveElement('up', element.id);
+                                                    onSelectRow(section.id, nRow.id);
                                                   }}
-                                                  disabled={elIdx === 0}
-                                                  className={`p-0.5 rounded cursor-pointer disabled:opacity-30 ${
-                                                    isElementActive
-                                                      ? 'hover:bg-blue-700 text-white'
-                                                      : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
+                                                  className={`flex items-center justify-between px-1.5 py-1 rounded-md cursor-pointer transition-colors group ${
+                                                    isNestedRowActive
+                                                      ? 'bg-indigo-50 text-indigo-700 font-semibold ring-1 ring-indigo-300'
+                                                      : 'hover:bg-zinc-100 text-zinc-700'
                                                   }`}
-                                                  title="Subir elemento"
                                                 >
-                                                  <ArrowUp className="w-3 h-3" />
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onMoveElement('down', element.id);
-                                                  }}
-                                                  disabled={elIdx === column.elements.length - 1}
-                                                  className={`p-0.5 rounded cursor-pointer disabled:opacity-30 ${
-                                                    isElementActive
-                                                      ? 'hover:bg-blue-700 text-white'
-                                                      : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
-                                                  }`}
-                                                  title="Bajar elemento"
-                                                >
-                                                  <ArrowDown className="w-3 h-3" />
-                                                </button>
-                                                {onDuplicateElement && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      onDuplicateElement(element.id);
-                                                    }}
-                                                    className={`p-0.5 rounded cursor-pointer ${
-                                                      isElementActive
-                                                        ? 'hover:bg-blue-700 text-white'
-                                                        : 'hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900'
-                                                    }`}
-                                                    title="Duplicar elemento"
-                                                  >
-                                                    <Copy className="w-3 h-3" />
-                                                  </button>
-                                                )}
-                                                {onDeleteElement && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      onDeleteElement(element.id);
-                                                    }}
-                                                    className={`p-0.5 rounded cursor-pointer ${
-                                                      isElementActive
-                                                        ? 'hover:bg-red-500 text-white'
-                                                        : 'hover:bg-red-50 text-zinc-400 hover:text-red-600'
-                                                    }`}
-                                                    title="Eliminar elemento"
-                                                  >
-                                                    <Trash2 className="w-3 h-3" />
-                                                  </button>
+                                                  <div className="flex items-center gap-1 min-w-0 truncate">
+                                                    <button
+                                                      type="button"
+                                                      onClick={(e) => toggleNode(nRow.id, e)}
+                                                      className="p-0.5 hover:bg-zinc-200 rounded text-zinc-400 hover:text-zinc-700 cursor-pointer shrink-0"
+                                                    >
+                                                      {isNestedRowExpanded ? (
+                                                        <ChevronDown className="w-3 h-3" />
+                                                      ) : (
+                                                        <ChevronRight className="w-3 h-3" />
+                                                      )}
+                                                    </button>
+                                                    <Box className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                                                    <span className="truncate text-[11px]">
+                                                      {formatRowDisplayName(nRow.name, 'Sección Interna')}
+                                                    </span>
+                                                  </div>
+
+                                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                      type="button"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onMoveElement('up', element.id);
+                                                      }}
+                                                      disabled={elIdx === 0}
+                                                      className="p-0.5 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 rounded disabled:opacity-30 cursor-pointer"
+                                                      title="Subir sección interna"
+                                                    >
+                                                      <ArrowUp className="w-3 h-3" />
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onMoveElement('down', element.id);
+                                                      }}
+                                                      disabled={elIdx === column.elements.length - 1}
+                                                      className="p-0.5 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 rounded disabled:opacity-30 cursor-pointer"
+                                                      title="Bajar sección interna"
+                                                    >
+                                                      <ArrowDown className="w-3 h-3" />
+                                                    </button>
+                                                    {onDuplicateRow && (
+                                                      <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          onDuplicateRow(nRow.id);
+                                                        }}
+                                                        className="p-0.5 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 rounded cursor-pointer"
+                                                        title="Duplicar sección interna"
+                                                      >
+                                                        <Copy className="w-3 h-3" />
+                                                      </button>
+                                                    )}
+                                                    {onDeleteRow && (
+                                                      <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          onDeleteRow(nRow.id);
+                                                        }}
+                                                        className="p-0.5 hover:bg-red-50 text-zinc-400 hover:text-red-600 rounded cursor-pointer"
+                                                        title="Eliminar sección interna"
+                                                      >
+                                                        <Trash2 className="w-3 h-3" />
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                </div>
+
+                                                {isNestedRowExpanded && (
+                                                  <div className="ml-3 pl-2 border-l border-indigo-100 space-y-0.5">
+                                                    {nRow.columns.map((nCol, nColIdx) => {
+                                                      const isNColExpanded = expandedNodes[nCol.id] ?? true;
+                                                      const isNColActive =
+                                                        selectedColumnId === nCol.id && !selectedElementId;
+                                                      return (
+                                                        <div key={nCol.id}>
+                                                          <div
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              if (onSelectColumn) {
+                                                                onSelectColumn(section.id, nRow.id, nCol.id);
+                                                              }
+                                                            }}
+                                                            className={`flex items-center justify-between px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                                              isNColActive
+                                                                ? 'bg-teal-50 text-teal-800 font-semibold ring-1 ring-teal-300'
+                                                                : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
+                                                            }`}
+                                                          >
+                                                            <div className="flex items-center gap-1 min-w-0">
+                                                              <button
+                                                                type="button"
+                                                                onClick={(e) => toggleNode(nCol.id, e)}
+                                                                className="p-0.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                                                              >
+                                                                {isNColExpanded ? (
+                                                                  <ChevronDown className="w-2.5 h-2.5" />
+                                                                ) : (
+                                                                  <ChevronRight className="w-2.5 h-2.5" />
+                                                                )}
+                                                              </button>
+                                                              <Columns className="w-3 h-3 text-teal-600 shrink-0" />
+                                                              <span className="text-[10px] font-mono truncate">
+                                                                Columna {nColIdx + 1} ({Math.round(nCol.widthPercentage)}%)
+                                                              </span>
+                                                              {(nCol.bgColor || nCol.bgGradient) && (
+                                                                <span
+                                                                  style={
+                                                                    nCol.bgGradient
+                                                                      ? { backgroundImage: nCol.bgGradient }
+                                                                      : { backgroundColor: nCol.bgColor }
+                                                                  }
+                                                                  className="w-2.5 h-2.5 rounded-full border border-zinc-300 shrink-0"
+                                                                />
+                                                              )}
+                                                            </div>
+                                                          </div>
+
+                                                          {isNColExpanded && (
+                                                            <div className="ml-3 pl-2 border-l border-zinc-200 space-y-0.5">
+                                                              {nCol.elements.length === 0 ? (
+                                                                <div className="px-2 py-1 text-[11px] text-zinc-400 italic">
+                                                                  Vacío
+                                                                </div>
+                                                              ) : (
+                                                                nCol.elements.map((nEl, nElIdx) =>
+                                                                  renderElementLeaf(nRow.id, nCol, nEl, nElIdx)
+                                                                )
+                                                              )}
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
                                                 )}
                                               </div>
-                                            </div>
-                                          );
+                                            );
+                                          }
+
+                                          return renderElementLeaf(row.id, column, element, elIdx);
                                         })
                                       )}
                                     </div>

@@ -164,7 +164,8 @@ export type ElementType =
   | 'card_name'
   | 'card_bio'
   | 'card_links'
-  | 'card_funnel_button';
+  | 'card_funnel_button'
+  | 'inner_columns';
 
 export interface FaqItem {
   id: string;
@@ -200,6 +201,7 @@ export interface PopupModal {
 export interface PageBlockElement {
   id: string;
   type: ElementType;
+  nestedRow?: PageBlockRow;
   content: {
     text?: string;
     level?: 'h1' | 'h2' | 'h3' | 'h4' | 'h5';
@@ -323,7 +325,24 @@ export interface PageBlockElement {
 
 export interface PageBlockColumn {
   id: string;
+  name?: string;
   widthPercentage: number; // e.g. 100, 50, 33.33, 25
+  bgType?: 'solid' | 'gradient';
+  bgColor?: string;
+  bgColor2?: string;
+  bgGradient?: string;
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
+  marginTop?: number;
+  marginBottom?: number;
+  borderRadius?: number;
+  borderWidth?: number;
+  borderColor?: string;
+  borderStyle?: 'solid' | 'dashed' | 'dotted';
+  shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+  verticalAlign?: 'top' | 'center' | 'bottom';
   elements: PageBlockElement[];
 }
 
