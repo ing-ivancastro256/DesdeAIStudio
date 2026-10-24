@@ -97,6 +97,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
       {/* Header with back button */}
       <div className="p-3 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between">
         <button
+          type="button"
           onClick={onClose}
           className="flex items-center gap-1.5 text-xs font-semibold text-[#2848F0] hover:underline cursor-pointer"
         >

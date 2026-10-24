@@ -126,9 +126,15 @@ export interface ElementStyles {
   aspectRatio?: '16/9' | '4/3' | '9/16' | '1/1' | 'auto';
   buttonDestination?: 'next_page' | 'calendar' | 'url';
   buttonUrl?: string;
+  buttonOpenNewTab?: boolean;
   maxWidth?: string;
   fullWidth?: boolean;
   boxShadow?: string;
+  buttonPaddingY?: number;
+  buttonPaddingX?: number;
+  hoverBgColor?: string;
+  hoverTextColor?: string;
+  hoverBorderColor?: string;
 }
 
 export type ElementType =
@@ -204,6 +210,7 @@ export interface PageBlockElement {
     linkUrl?: string;
     linkOpenNewTab?: boolean;
     videoUrl?: string; // YouTube / Vimeo / etc.
+    videoFileName?: string;
     videoSource?: 'youtube' | 'vimeo' | 'wistia' | 'upload' | 'external' | 'server';
     videoAutoplay?: boolean;
     videoMuted?: boolean;
@@ -227,10 +234,14 @@ export interface PageBlockElement {
     videoCoverArrowRotation?: number;
     videoCoverBgType?: 'solid' | 'gradient' | 'pattern';
     videoCoverBgColor?: string;
+    videoCoverBgColor2?: string;
     videoCoverBgOpacity?: number;
     buttonText?: string;
     buttonSubtext?: string;
     buttonIcon?: string;
+    buttonIconPosition?: 'before' | 'after';
+    buttonIconSpacing?: number;
+    buttonIconSize?: number;
     formId?: string;
     // Spacer
     spacerHeight?: number;
@@ -238,11 +249,25 @@ export interface PageBlockElement {
     audioType?: 'direct' | 'spotify' | 'soundcloud';
     audioSource?: 'soundcloud' | 'spotify' | 'external' | 'upload' | 'server';
     audioUrl?: string;
+    audioFileName?: string;
     audioTitle?: string;
     audioArtist?: string;
     audioAutoplay?: boolean;
     audioLoop?: boolean;
     audioPlaylistTracks?: { title: string; artist?: string; duration?: string; url?: string }[];
+    audioBgType?: 'solid' | 'gradient';
+    audioBgColor?: string;
+    audioBgColorEnd?: string;
+    audioTitleColor?: string;
+    audioArtistColor?: string;
+    audioTitleSize?: number;
+    audioFontFamily?: string;
+    audioPlayButtonBg?: string;
+    audioPlayIconColor?: string;
+    audioPlayButtonShape?: 'circle' | 'rounded' | 'square';
+    audioProgressColor?: string;
+    audioProgressBgColor?: string;
+    audioPlayerSize?: 'compact' | 'normal' | 'large';
     // Icon
     iconName?: string;
     iconSize?: number;

@@ -82,9 +82,10 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
     } else if (type === 'image') {
       newEl.content = {
         src: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=600&auto=format&fit=crop&q=80',
-        alt: 'Oferta Especial',
+        alt: '',
       };
       newEl.styles.borderRadius = 12;
+      newEl.styles.opacity = 1;
     } else if (type === 'simple_form') {
       newEl.content = {
         showNameField: true,
@@ -119,6 +120,15 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
       ...currentPopup,
       elements: currentPopup.elements.map((el) =>
         el.id === elId ? { ...el, content: { ...el.content, ...updatedContent } } : el
+      ),
+    });
+  };
+
+  const updateElementStylesInPopup = (elId: string, updatedStyles: any) => {
+    setCurrentPopup({
+      ...currentPopup,
+      elements: currentPopup.elements.map((el) =>
+        el.id === elId ? { ...el, styles: { ...el.styles, ...updatedStyles } } : el
       ),
     });
   };
@@ -285,19 +295,94 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
                   )}
 
                   {el.type === 'image' && (
-                    <div className="text-center">
+                    <div className="text-center space-y-1.5">
                       <img
                         src={el.content.src}
-                        alt={el.content.alt || 'Pop-up Image'}
-                        className="max-h-48 mx-auto rounded-xl object-cover shadow-xs"
+                        alt={el.content.alt || ''}
+                        style={{ opacity: el.styles?.opacity ?? 1 }}
+                        className="max-h-48 mx-auto rounded-xl object-cover shadow-xs transition-opacity"
                       />
                       <input
                         type="text"
                         value={el.content.src || ''}
-                        onChange={(e) => updateElementInPopup(el.id, { src: e.target.value })}
-                        className="mt-1.5 w-full text-[10px] text-zinc-500 border border-zinc-200 rounded px-2 py-0.5"
+                        onChange={(e) => updateElementInPopup(el.id, { src: e.target.value, alt: '' })}
+                        className="w-full text-[10px] text-zinc-600 border border-zinc-200 rounded px-2 py-1 bg-white"
                         placeholder="URL de la imagen"
                       />
+                      <div className="grid grid-cols-3 gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateElementInPopup(el.id, {
+                              src: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=600&auto=format&fit=crop&q=80',
+                              alt: 'Reunión estratégica de equipo',
+                            })
+                          }
+                          className="py-0.5 px-1 text-[10px] bg-zinc-50 hover:bg-blue-50 border border-zinc-200 rounded text-zinc-700 cursor-pointer"
+                        >
+                          Reunión
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateElementInPopup(el.id, {
+                              src: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&auto=format&fit=crop&q=80',
+                              alt: 'Consultora ejecutiva de negocios',
+                            })
+                          }
+                          className="py-0.5 px-1 text-[10px] bg-zinc-50 hover:bg-blue-50 border border-zinc-200 rounded text-zinc-700 cursor-pointer"
+                        >
+                          Consultora
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateElementInPopup(el.id, {
+                              src: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80',
+                              alt: 'Panel de resultados y métricas de crecimiento',
+                            })
+                          }
+                          className="py-0.5 px-1 text-[10px] bg-zinc-50 hover:bg-blue-50 border border-zinc-200 rounded text-zinc-700 cursor-pointer"
+                        >
+                          Resultados
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 text-left">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-zinc-600 mb-0.5">
+                            Texto alternativo (Alt / SEO):
+                          </label>
+                          <input
+                            type="text"
+                            value={el.content.alt || ''}
+                            onChange={(e) => updateElementInPopup(el.id, { alt: e.target.value })}
+                            className="w-full text-[10px] text-zinc-700 border border-zinc-200 rounded px-2 py-1 bg-white"
+                            placeholder="Descripción de la imagen"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-zinc-600 mb-0.5">
+                            Opacidad:
+                          </label>
+                          <select
+                            value={String(
+                              [1, 0.9, 0.8, 0.7, 0.5, 0.4, 0.2].includes(Number(el.styles?.opacity ?? 1))
+                                ? Number(el.styles?.opacity ?? 1)
+                                : 1
+                            )}
+                            onChange={(e) => updateElementStylesInPopup(el.id, { opacity: parseFloat(e.target.value) })}
+                            className="w-full text-[10px] text-zinc-700 border border-zinc-200 rounded px-2 py-1 bg-white"
+                          >
+                            <option value="1">100% (Normal)</option>
+                            <option value="0.9">90%</option>
+                            <option value="0.8">80%</option>
+                            <option value="0.7">70%</option>
+                            <option value="0.5">50%</option>
+                            <option value="0.4">40%</option>
+                            <option value="0.2">20%</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   )}
 

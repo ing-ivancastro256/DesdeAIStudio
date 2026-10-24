@@ -4,6 +4,7 @@ import { NumberControl } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
 import { BoxModelSpacingControl } from '../common/BoxModelSpacingControl';
 import {
+  ArrowLeft,
   Maximize2,
   Minimize2,
   Palette,
@@ -62,8 +63,26 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-white font-['Inter']">
+      {/* Top Bar with Volver a Biblioteca */}
+      {onClose && (
+        <div className="p-3 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#2848F0] hover:underline cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Volver a Biblioteca</span>
+          </button>
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-semibold flex items-center gap-1">
+            <Box className="w-3 h-3" />
+            Contenedor
+          </span>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="p-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50">
+      <div className="px-3 py-2.5 border-b border-zinc-200 flex items-center justify-between bg-white">
         <div>
           <div className="flex items-center gap-1.5">
             <Box className="w-4 h-4 text-purple-600" />

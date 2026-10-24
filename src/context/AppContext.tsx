@@ -373,7 +373,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [virtualCard]);
 
   useEffect(() => {
-    localStorage.setItem('ssp_funnels', JSON.stringify(funnels));
+    try {
+      localStorage.setItem('ssp_funnels', JSON.stringify(funnels));
+    } catch {
+      // Ignore storage quota errors when large media data URLs are loaded in session
+    }
   }, [funnels]);
 
   useEffect(() => {

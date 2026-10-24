@@ -238,7 +238,7 @@ export const WordPressWysiwygEditor: React.FC<WordPressWysiwygEditorProps> = ({
     if (!mediaUrl.trim()) return;
     restoreSelection();
 
-    const imgTag = `<p style="text-align: ${mediaAlign === 'none' ? 'left' : mediaAlign}; margin: 16px 0;"><img src="${mediaUrl.trim()}" alt="${mediaAlt.trim() || 'Imagen'}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: inline-block;" /></p>`;
+    const imgTag = `<p style="text-align: ${mediaAlign === 'none' ? 'left' : mediaAlign}; margin: 16px 0;"><img src="${mediaUrl.trim()}" alt="${mediaAlt.trim()}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: inline-block;" /></p>`;
 
     executeCmd('insertHTML', imgTag);
 
@@ -947,7 +947,10 @@ export const WordPressWysiwygEditor: React.FC<WordPressWysiwygEditorProps> = ({
                 <input
                   type="url"
                   value={mediaUrl}
-                  onChange={(e) => setMediaUrl(e.target.value)}
+                  onChange={(e) => {
+                    setMediaUrl(e.target.value);
+                    setMediaAlt('');
+                  }}
                   placeholder="https://images.unsplash.com/photo-..."
                   className="w-full px-3 py-1.5 border border-zinc-300 rounded focus:outline-[#2271b1] text-xs"
                   autoFocus
@@ -977,7 +980,10 @@ export const WordPressWysiwygEditor: React.FC<WordPressWysiwygEditorProps> = ({
                     <button
                       key={preset.url}
                       type="button"
-                      onClick={() => setMediaUrl(preset.url)}
+                      onClick={() => {
+                        setMediaUrl(preset.url);
+                        setMediaAlt(preset.label);
+                      }}
                       className="text-left p-1.5 border border-zinc-200 hover:border-[#2271b1] rounded text-[11px] bg-zinc-50 hover:bg-blue-50/50 transition-colors cursor-pointer"
                     >
                       <img

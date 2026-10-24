@@ -68,6 +68,7 @@ export interface VideoEmbedOptions {
   autoplay?: boolean;
   muted?: boolean;
   loop?: boolean;
+  source?: string;
 }
 
 /**
@@ -93,7 +94,17 @@ export function getEmbedVideoInfo(rawUrl: string | undefined, options?: VideoEmb
     };
   }
 
-  const { autoplay = false, muted = false, loop = false } = options || {};
+  const { autoplay = false, muted = false, loop = false, source } = options || {};
+
+  // 0. Uploaded local Blob URLs or Data URLs
+  if (/^blob:/i.test(trimmed) || /^data:(video\/|application\/octet-stream)/i.test(trimmed)) {
+    return {
+      isValid: true,
+      type: 'direct',
+      embedUrl: trimmed,
+      originalUrl: trimmed,
+    };
+  }
 
   // 1. YouTube
   const ytId = extractYouTubeId(trimmed);
@@ -179,8 +190,8 @@ export function getEmbedVideoInfo(rawUrl: string | undefined, options?: VideoEmb
     };
   }
 
-  // 5. Direct video file (.mp4, .webm, .ogg)
-  if (/\.(mp4|webm|ogg)($|\?)/i.test(trimmed)) {
+  // 5. Direct video file (.mp4, .avi, .mov, .webm, .mkv, .ogg, .m4v)
+  if (/\.(mp4|avi|mov|webm|mkv|ogg|m4v)($|\?|#)/i.test(trimmed)) {
     return {
       isValid: true,
       type: 'direct',
@@ -189,8 +200,16 @@ export function getEmbedVideoInfo(rawUrl: string | undefined, options?: VideoEmb
     };
   }
 
-  // 6. Generic iframe or HTTP url
+  // 6. Explicit upload or external video URL -> play with HTML5 <video> when source is upload/external
   if (/^https?:\/\//i.test(trimmed)) {
+    if (source === 'upload' || source === 'external') {
+      return {
+        isValid: true,
+        type: 'direct',
+        embedUrl: trimmed,
+        originalUrl: trimmed,
+      };
+    }
     return {
       isValid: true,
       type: 'unknown',

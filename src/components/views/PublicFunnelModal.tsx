@@ -17,12 +17,13 @@ import {
   User,
   AlertCircle,
 } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 
 import { RichTextElement } from '../editor/elements/RichTextElement';
 import { AudioPlayerElement } from '../editor/elements/AudioPlayerElement';
 import { IconElement } from '../editor/elements/IconElement';
 import { SimpleFormElement } from '../editor/elements/SimpleFormElement';
-import { PopupButtonElement } from '../editor/elements/PopupButtonElement';
+import { PopupButtonElement, formatCtaDisplayText } from '../editor/elements/PopupButtonElement';
 import { EmbeddedVideoPlayer } from '../common/EmbeddedVideoPlayer';
 import { DelayedAppearance } from '../common/DelayedAppearance';
 import { renderBulletIcon } from '../../utils/bulletIcons';
@@ -570,6 +571,8 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
             <PopupButtonElement
               element={element}
               isEditable={false}
+              defaultPrimaryColor={activePage?.settings?.primaryColor || '#2848F0'}
+              defaultFontFamily={activePage?.settings?.bodyFontFamily || 'Poppins'}
               popups={activeFunnel?.pages[currentStepIndex]?.popups}
             />
           </div>
@@ -640,41 +643,122 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           </ul>
         );
 
-      case 'button':
+      case 'button': {
+        const isFullWidth = Boolean(element.styles?.fullWidth);
+        const align = element.styles?.textAlign || 'center';
+        const normalBg = element.styles?.bgColor || activePage?.settings?.primaryColor || '#2848F0';
+        const normalText = element.styles?.textColor || '#FFFFFF';
+        const bWidth = element.styles?.borderWidth ?? 0;
+        const hasBorder = bWidth > 0;
+        const normalBorder = element.styles?.borderColor || '#18181B';
+        const hoverBg = element.styles?.hoverBgColor || normalBg;
+        const hoverText = element.styles?.hoverTextColor || normalText;
+        const hoverBorder = hasBorder ? (element.styles?.hoverBorderColor || normalBorder) : 'transparent';
+
+        const padY = element.styles?.buttonPaddingY ?? 14;
+        const padX = element.styles?.buttonPaddingX ?? 28;
+        const fontSize = element.styles?.fontSize || 16;
+
+        const iconName = element.content.buttonIcon || '';
+        const IconComp = iconName
+          ? ((LucideIcons as unknown as Record<string, React.ComponentType<{ style?: React.CSSProperties; className?: string }>>)[iconName] || null)
+          : null;
+        const iconPos = element.content.buttonIconPosition || 'before';
+        const iconSpacing = element.content.buttonIconSpacing ?? 8;
+        const iconSize = element.content.buttonIconSize ?? Math.max(14, Math.round(fontSize * 1.05));
+        const displayBtnText = formatCtaDisplayText(
+          element.content.buttonText || 'Continuar',
+          element.styles?.textTransform
+        );
+
         return (
           <div
             key={element.id || eIdx}
             style={{
-              textAlign: element.styles?.textAlign || 'center',
-              marginTop: `${element.styles?.marginTop || 0}px`,
+              display: 'flex',
+              justifyContent: isFullWidth
+                ? 'center'
+                : align === 'left'
+                ? 'flex-start'
+                : align === 'right'
+                ? 'flex-end'
+                : 'center',
+              width: '100%',
+              marginTop: `${element.styles?.marginTop ?? 0}px`,
               marginBottom: `${element.styles?.marginBottom ?? 16}px`,
+              marginLeft: `${element.styles?.marginLeft ?? 0}px`,
+              marginRight: `${element.styles?.marginRight ?? 0}px`,
+              paddingTop: `${element.styles?.paddingTop ?? 0}px`,
+              paddingBottom: `${element.styles?.paddingBottom ?? 0}px`,
+              paddingLeft: `${element.styles?.paddingLeft ?? 0}px`,
+              paddingRight: `${element.styles?.paddingRight ?? 0}px`,
             }}
           >
             <button
+              type="button"
               onClick={() => {
-                advanceToNextStep();
+                if (element.styles?.buttonDestination === 'calendar') {
+                  const calendarEl = document.getElementById('ssp-calendar-section');
+                  if (calendarEl) calendarEl.scrollIntoView({ behavior: 'smooth' });
+                  else setCurrentStepIndex(3);
+                } else if (element.styles?.buttonDestination === 'url' && element.styles?.buttonUrl) {
+                  const targetLink = document.createElement('a');
+                  targetLink.href = element.styles.buttonUrl;
+                  if (element.styles.buttonOpenNewTab) {
+                    targetLink.target = '_blank';
+                    targetLink.rel = 'noopener noreferrer';
+                  } else {
+                    targetLink.target = '_self';
+                  }
+                  targetLink.click();
+                } else {
+                  advanceToNextStep();
+                }
               }}
-              style={{
-                backgroundColor: element.styles?.bgColor || activePage?.settings?.primaryColor || '#2848F0',
-                color: element.styles?.textColor || '#FFFFFF',
-                fontSize: `${element.styles?.fontSize || 16}px`,
-                fontFamily: element.styles?.fontFamily || activePage?.settings?.bodyFontFamily || 'Poppins',
-                fontWeight: element.styles?.isBold ? 700 : 500,
-                fontStyle: element.styles?.isItalic ? 'italic' : 'normal',
-                textDecoration: element.styles?.isUnderline ? 'underline' : 'none',
-                paddingTop: `${element.styles?.paddingTop || 14}px`,
-                paddingBottom: `${element.styles?.paddingBottom || 14}px`,
-                paddingLeft: `${element.styles?.paddingLeft || 28}px`,
-                paddingRight: `${element.styles?.paddingRight || 28}px`,
-                borderRadius: `${element.styles?.borderRadius || 8}px`,
-              }}
-              className="shadow-md hover:opacity-95 transition-all inline-flex items-center justify-center gap-2 cursor-pointer font-semibold"
+              style={
+                {
+                  '--cta-bg': normalBg,
+                  '--cta-hover-bg': hoverBg,
+                  '--cta-text': normalText,
+                  '--cta-hover-text': hoverText,
+                  '--cta-border': hasBorder ? normalBorder : 'transparent',
+                  '--cta-hover-border': hoverBorder,
+                  width: isFullWidth ? '100%' : 'auto',
+                  fontSize: `${fontSize}px`,
+                  fontFamily: element.styles?.fontFamily || activePage?.settings?.bodyFontFamily || 'Poppins',
+                  fontWeight: element.styles?.isBold ? 700 : 500,
+                  fontStyle: element.styles?.isItalic ? 'italic' : 'normal',
+                  textDecoration: element.styles?.isUnderline ? 'underline' : 'none',
+                  textTransform: element.styles?.textTransform || 'none',
+                  paddingTop: `${padY}px`,
+                  paddingBottom: `${padY}px`,
+                  paddingLeft: `${padX}px`,
+                  paddingRight: `${padX}px`,
+                  borderRadius: `${element.styles?.borderRadius ?? 0}px`,
+                  borderWidth: `${bWidth}px`,
+                  borderStyle: hasBorder ? (element.styles?.borderStyle || 'solid') : 'none',
+                  gap: IconComp ? `${iconSpacing}px` : '0px',
+                } as React.CSSProperties
+              }
+              className="[background-color:var(--cta-bg)] hover:[background-color:var(--cta-hover-bg)] [color:var(--cta-text)] hover:[color:var(--cta-hover-text)] [border-color:var(--cta-border)] hover:[border-color:var(--cta-hover-border)] shadow-sm transition-colors duration-200 inline-flex items-center justify-center cursor-pointer font-semibold"
             >
-              <span>{element.content.buttonText || 'Continuar'}</span>
-              <ArrowRight className="w-4 h-4" />
+              {IconComp && iconPos === 'before' && (
+                <IconComp
+                  style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                  className="shrink-0"
+                />
+              )}
+              <span>{displayBtnText}</span>
+              {IconComp && iconPos === 'after' && (
+                <IconComp
+                  style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                  className="shrink-0"
+                />
+              )}
             </button>
           </div>
         );
+      }
 
       case 'video':
         return (
@@ -694,6 +778,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           >
             <EmbeddedVideoPlayer
               videoUrl={element.content.videoUrl}
+              videoFileName={element.content.videoFileName}
               aspectRatio={element.styles?.aspectRatio || '16/9'}
               borderRadius={element.styles?.borderRadius ?? 0}
               maxWidth={element.styles?.maxWidth || '780px'}
@@ -724,6 +809,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
               videoCoverArrowRotation={element.content.videoCoverArrowRotation}
               videoCoverBgType={element.content.videoCoverBgType}
               videoCoverBgColor={element.content.videoCoverBgColor}
+              videoCoverBgColor2={element.content.videoCoverBgColor2}
               videoCoverBgOpacity={element.content.videoCoverBgOpacity}
             />
           </div>
@@ -735,7 +821,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
         const imgNode = (
           <img
             src={element.content.src || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80'}
-            alt={element.content.alt || 'Imagen'}
+            alt={element.content.alt || ''}
             style={{
               width: element.styles?.imageWidth ? `${element.styles.imageWidth}px` : (element.styles?.maxWidth || '100%'),
               height: element.styles?.imageHeight ? `${element.styles.imageHeight}px` : 'auto',
@@ -955,6 +1041,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                 fontWeight: element.styles?.isBold ? 700 : 600,
                 fontStyle: element.styles?.isItalic ? 'italic' : 'normal',
                 textDecoration: element.styles?.isUnderline ? 'underline' : 'none',
+                textTransform: element.styles?.textTransform || 'none',
                 paddingTop: `${element.styles?.paddingTop || 14}px`,
                 paddingBottom: `${element.styles?.paddingBottom || 14}px`,
                 paddingLeft: `${element.styles?.paddingLeft || 28}px`,

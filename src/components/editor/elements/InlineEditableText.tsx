@@ -104,7 +104,7 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
       onBlur={(e: React.FocusEvent<HTMLElement>) => {
         isFocusedRef.current = false;
         const newHtml = e.currentTarget.innerHTML;
-        const newText = e.currentTarget.innerText;
+        const newText = e.currentTarget.textContent || '';
         onSave?.(newHtml, newText);
         onBlur?.(e);
       }}

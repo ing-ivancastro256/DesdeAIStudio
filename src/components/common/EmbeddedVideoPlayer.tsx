@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Video,
   Play,
@@ -7,7 +7,6 @@ import {
   Sparkles,
   RefreshCw,
   AlertCircle,
-  CornerDownRight,
   ArrowDownRight,
   CornerRightDown,
   MousePointerClick,
@@ -18,12 +17,12 @@ import {
   Volume2,
   Heart,
   Disc,
-  Square,
 } from 'lucide-react';
 import { getEmbedVideoInfo } from '../../utils/videoUtils';
 
 export interface EmbeddedVideoPlayerProps {
   videoUrl?: string;
+  videoFileName?: string;
   aspectRatio?: '16/9' | '4/3' | '9/16' | '1/1' | string;
   borderRadius?: number;
   maxWidth?: string;
@@ -61,11 +60,13 @@ export interface EmbeddedVideoPlayerProps {
   videoCoverArrowRotation?: number; // 0 to 360
   videoCoverBgType?: 'solid' | 'gradient' | 'pattern';
   videoCoverBgColor?: string;
+  videoCoverBgColor2?: string;
   videoCoverBgOpacity?: number; // 0 to 100
 }
 
 export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
   videoUrl,
+  videoFileName,
   aspectRatio = '16/9',
   borderRadius = 0,
   maxWidth = '750px',
@@ -77,6 +78,7 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
   onSelect,
   onSetSampleVideo,
 
+  videoSource = 'youtube',
   videoAutoplay = false,
   videoMuted = false,
   videoLoop = false,
@@ -100,21 +102,95 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
   videoCoverArrowRotation = 0,
   videoCoverBgType = 'solid',
   videoCoverBgColor = '#F4F4F5',
+  videoCoverBgColor2,
   videoCoverBgOpacity = 100,
 }) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [fallbackBlobUrl, setFallbackBlobUrl] = useState<string | null>(null);
+  const [didAttemptBlobFallback, setDidAttemptBlobFallback] = useState(false);
   const [isCoverDismissed, setIsCoverDismissed] = useState(false);
+  const [playerResetKey, setPlayerResetKey] = useState(0);
+  const [suppressAutoplay, setSuppressAutoplay] = useState(false);
+  const [prevCoverType, setPrevCoverType] = useState(videoCoverType);
+  const [prevCoverImage, setPrevCoverImage] = useState(videoCoverImage);
+  const [prevAutoplay, setPrevAutoplay] = useState(videoAutoplay);
 
-  // If cover was dismissed, force autoplay so video plays immediately on user click
-  const effectiveAutoplay = isCoverDismissed || videoAutoplay;
-  const effectiveMuted = isCoverDismissed ? false : videoMuted;
+  // Whenever cover type changes, immediately restore cover and reset video to 0:00 paused
+  if (prevCoverType !== videoCoverType) {
+    setPrevCoverType(videoCoverType);
+    setIsCoverDismissed(false);
+    setSuppressAutoplay(true);
+    setPlayerResetKey((k) => k + 1);
+  }
+
+  // If cover image is replaced while in 'image' cover mode, restore cover and reset to 0:00 paused
+  if (prevCoverImage !== videoCoverImage) {
+    setPrevCoverImage(videoCoverImage);
+    if (videoCoverType === 'image') {
+      setIsCoverDismissed(false);
+      setSuppressAutoplay(true);
+      setPlayerResetKey((k) => k + 1);
+    }
+  }
+
+  // Re-honor videoAutoplay prop if the user explicitly toggles the Autoplay setting
+  if (prevAutoplay !== videoAutoplay) {
+    setPrevAutoplay(videoAutoplay);
+    setSuppressAutoplay(false);
+  }
+
+  // Ensure native HTML5 video element is paused and rewound to 0:00 on reset
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      try {
+        videoRef.current.currentTime = 0;
+      } catch {
+        // Ignore if metadata hasn't loaded yet
+      }
+    }
+  }, [playerResetKey]);
+
+  // Reset error, cover dismissal & fallback states whenever videoUrl or source changes
+  useEffect(() => {
+    setLoadError(false);
+    setDidAttemptBlobFallback(false);
+    setIsCoverDismissed(false);
+    setFallbackBlobUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, [videoUrl, videoSource]);
+
+  // Cleanup any created fallback blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (fallbackBlobUrl) {
+        URL.revokeObjectURL(fallbackBlobUrl);
+      }
+    };
+  }, [fallbackBlobUrl]);
+
+  const hasActiveCover = Boolean(videoCoverType && videoCoverType !== 'none' && !isCoverDismissed);
+  const isDismissedCoverPlayback = Boolean(videoCoverType && videoCoverType !== 'none' && isCoverDismissed);
+
+  // Never autoplay behind an active cover; play immediately when cover is clicked; stay paused at 0:00 after cover-type switch
+  const effectiveAutoplay = hasActiveCover
+    ? false
+    : isDismissedCoverPlayback
+    ? true
+    : !suppressAutoplay && Boolean(videoAutoplay);
+  const effectiveMuted = isDismissedCoverPlayback ? false : Boolean(videoMuted);
 
   const videoInfo = getEmbedVideoInfo(videoUrl, {
     autoplay: effectiveAutoplay,
     muted: effectiveMuted,
     loop: videoLoop,
+    source: videoSource,
   });
 
+  const activeDirectSrc = fallbackBlobUrl || videoInfo.embedUrl;
   const sampleYouTube = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 
   const ratioStyle =
@@ -126,11 +202,34 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
       ? '1/1'
       : '16/9';
 
-  const hasActiveCover = videoCoverType && videoCoverType !== 'none' && !isCoverDismissed;
-
   const handleCoverClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsCoverDismissed(true);
+  };
+
+  const handleDirectVideoError = () => {
+    // Some browsers reject 'video/quicktime' (.mov) or 'video/x-matroska' (.mkv) MIME strings
+    // even when their internal demuxer can decode the underlying H.264/VP8/VP9/AAC/Opus stream
+    // if served as a sniffable typeless Blob. Retry once automatically for blob: URLs.
+    if (
+      videoInfo.embedUrl.startsWith('blob:') &&
+      !didAttemptBlobFallback
+    ) {
+      setDidAttemptBlobFallback(true);
+      fetch(videoInfo.embedUrl)
+        .then((res) => res.blob())
+        .then((rawBlob) => {
+          const sniffableBlob = new Blob([rawBlob]);
+          const nextUrl = URL.createObjectURL(sniffableBlob);
+          setFallbackBlobUrl(nextUrl);
+          setLoadError(false);
+        })
+        .catch(() => {
+          setLoadError(true);
+        });
+      return;
+    }
+    setLoadError(true);
   };
 
   const renderPlayIcon = () => {
@@ -146,7 +245,7 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
       case 'play_square':
         return (
           <div className="relative flex items-center justify-center" style={{ width: `${iconSize}px`, height: `${iconSize}px` }}>
-            <div className="w-full h-full border-2 rounded-xs flex items-center justify-center" style={{ borderColor: color }}>
+            <div className="w-full h-full border-2 rounded-none flex items-center justify-center" style={{ borderColor: color }}>
               <Play style={{ width: `${Math.round(iconSize * 0.52)}px`, height: `${Math.round(iconSize * 0.52)}px`, color, fill: color, marginLeft: '1px' }} />
             </div>
           </div>
@@ -207,7 +306,6 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
         return <MousePointerClick style={style} />;
       case 'curved':
       default:
-        // Hand-drawn curved arrow SVG matching Image 2
         return (
           <svg
             viewBox="0 0 28 28"
@@ -224,6 +322,9 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
         );
     }
   };
+
+  const effectiveGradientColor2 = videoCoverBgColor2 || '#18181B';
+  const effectivePatternColor2 = videoCoverBgColor2 || '#94A3B8';
 
   return (
     <div
@@ -244,18 +345,21 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
       {videoInfo.isValid && !loadError ? (
         videoInfo.type === 'direct' ? (
           <video
-            src={videoInfo.embedUrl}
+            ref={videoRef}
+            key={`${activeDirectSrc}-${playerResetKey}`}
+            src={activeDirectSrc}
             controls
             playsInline
             autoPlay={effectiveAutoplay}
             muted={effectiveMuted}
             loop={videoLoop}
             preload="metadata"
-            className="w-full h-full object-cover rounded-[inherit]"
-            onError={() => setLoadError(true)}
+            className="w-full h-full object-contain bg-black rounded-[inherit]"
+            onError={handleDirectVideoError}
           />
         ) : (
           <iframe
+            key={`${videoInfo.embedUrl}-${playerResetKey}`}
             src={videoInfo.embedUrl}
             title="Reproductor de Video"
             className="w-full h-full border-0 rounded-[inherit]"
@@ -266,28 +370,39 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
           />
         )
       ) : (
-        /* Empty or invalid state placeholder */
+        /* Empty or invalid/unsupported state placeholder */
         <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-white bg-gradient-to-b from-zinc-900 to-zinc-950 select-none">
           <div className="w-14 h-14 rounded-full bg-red-600/90 flex items-center justify-center mb-3 shadow-lg ring-4 ring-red-500/20">
             <Play className="w-7 h-7 text-white fill-white ml-1" />
           </div>
 
           <h4 className="text-sm font-bold text-zinc-100 font-['Poppins']">
-            Reproductor de Video
+            {videoFileName ? videoFileName : 'Reproductor de Video'}
           </h4>
 
           {videoInfo.type === 'empty' ? (
             <p className="text-xs text-zinc-400 mt-1 max-w-sm">
-              Introduce la URL de tu video en el panel lateral para reproducir en tiempo real.
+              {videoSource === 'upload'
+                ? 'Arrastra o sube un video (MP4, AVI, MOV, WebM o MKV) desde el panel lateral.'
+                : 'Introduce la URL de tu video en el panel lateral para reproducir en tiempo real.'}
             </p>
+          ) : loadError && videoInfo.type === 'direct' ? (
+            <div className="flex flex-col items-center gap-1.5 text-xs text-amber-400 mt-1.5 max-w-sm">
+              <div className="flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>
+                  El navegador no pudo decodificar el códec interno de este archivo. Prueba con códec H.264 / VP9 (MP4, WebM, MOV o MKV).
+                </span>
+              </div>
+            </div>
           ) : (
             <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-1 max-w-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>URL no reconocida. Ingresa un enlace válido de YouTube, Vimeo, Wistia o MP4.</span>
+              <span>URL no reconocida. Ingresa un enlace válido de YouTube, Vimeo, Wistia o archivo de video.</span>
             </div>
           )}
 
-          {onSetSampleVideo && (
+          {onSetSampleVideo && videoSource !== 'upload' && (
             <button
               type="button"
               onClick={(e) => {
@@ -309,20 +424,34 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
         <div
           onClick={handleCoverClick}
           className="absolute inset-0 z-20 flex flex-col items-center justify-center cursor-pointer select-none transition-all group/cover"
-          style={{
-            backgroundColor:
-              videoCoverType === 'custom' && videoCoverBgType === 'solid'
-                ? videoCoverBgColor
-                : undefined,
-            backgroundImage:
-              videoCoverType === 'custom' && videoCoverBgType === 'gradient'
-                ? `linear-gradient(135deg, ${videoCoverBgColor} 0%, #18181B 100%)`
-                : videoCoverType === 'custom' && videoCoverBgType === 'pattern'
-                ? `radial-gradient(circle at 50% 50%, ${videoCoverBgColor} 0%, #09090B 100%)`
-                : undefined,
-            opacity: (videoCoverBgOpacity ?? 100) / 100,
-          }}
+          style={
+            videoCoverType === 'image'
+              ? { opacity: (videoCoverBgOpacity ?? 100) / 100 }
+              : undefined
+          }
         >
+          {/* BACKGROUND LAYER FOR CUSTOM CTA COVER (SÓLIDO, GRADIENTE DE 2 COLORES, PATRÓN DE 2 COLORES) */}
+          {videoCoverType === 'custom' && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundColor:
+                  videoCoverBgType === 'solid' || videoCoverBgType === 'pattern'
+                    ? videoCoverBgColor
+                    : undefined,
+                backgroundImage:
+                  videoCoverBgType === 'gradient'
+                    ? `linear-gradient(135deg, ${videoCoverBgColor} 0%, ${effectiveGradientColor2} 100%)`
+                    : videoCoverBgType === 'pattern'
+                    ? `radial-gradient(${effectivePatternColor2} 1.75px, transparent 1.75px), radial-gradient(${effectivePatternColor2} 1.75px, transparent 1.75px)`
+                    : undefined,
+                backgroundSize: videoCoverBgType === 'pattern' ? '22px 22px' : undefined,
+                backgroundPosition: videoCoverBgType === 'pattern' ? '0 0, 11px 11px' : undefined,
+                opacity: (videoCoverBgOpacity ?? 100) / 100,
+              }}
+            />
+          )}
+
           {/* OPTION 1: IMAGE COVER */}
           {videoCoverType === 'image' && videoCoverImage && (
             <img
@@ -332,7 +461,7 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
             />
           )}
 
-          {/* OPTION 2: COMPOSED CUSTOM COVER (TEXT ARRIBA, FLECHA A LA IZQUIERDA, PLAY EN EL CENTRO EXACTO) */}
+          {/* OPTION 2: COMPOSED CUSTOM COVER (TEXTO ARRIBA, FLECHA A LA IZQUIERDA, PLAY EN EL CENTRO EXACTO) */}
           {videoCoverType === 'custom' && (
             <div className="absolute inset-0 z-10 pointer-events-none">
               {/* BOTÓN DE PLAY: CENTRADO EN LA MITAD EXACTA HORIZONTAL Y VERTICAL */}
@@ -347,7 +476,7 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
                   height: `${videoCoverPlaySize || 56}px`,
                   borderRadius:
                     videoCoverButtonShape === 'square'
-                      ? '8px'
+                      ? '0px'
                       : videoCoverButtonShape === 'rounded'
                       ? '16px'
                       : '9999px',
@@ -404,7 +533,7 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
           )}
 
           {/* Click to play tooltip */}
-          <div className="absolute bottom-3 text-[11px] text-zinc-400 bg-black/60 px-2.5 py-0.5 rounded-full backdrop-blur-xs font-medium">
+          <div className="absolute bottom-3 z-20 text-[11px] text-zinc-300 bg-black/60 px-2.5 py-0.5 rounded-full backdrop-blur-xs font-medium">
             Haz clic para reproducir
           </div>
         </div>
@@ -418,7 +547,13 @@ export const EmbeddedVideoPlayer: React.FC<EmbeddedVideoPlayerProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsCoverDismissed(!isCoverDismissed);
+                if (isCoverDismissed) {
+                  setIsCoverDismissed(false);
+                  setSuppressAutoplay(true);
+                  setPlayerResetKey((k) => k + 1);
+                } else {
+                  setIsCoverDismissed(true);
+                }
               }}
               className="px-2 py-1 text-[10px] font-semibold bg-zinc-900/90 hover:bg-black text-white rounded-md backdrop-blur-sm border border-white/20 shadow-sm cursor-pointer flex items-center gap-1"
               title={isCoverDismissed ? 'Mostrar portada' : 'Probar sin portada'}
