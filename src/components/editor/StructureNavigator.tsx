@@ -116,6 +116,8 @@ const getElementIcon = (type: ElementType) => {
       return <CheckSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />;
     case 'input_field':
       return <TextCursorInput className="w-3.5 h-3.5 text-cyan-600 shrink-0" />;
+    case 'form_button':
+      return <MousePointerClick className="w-3.5 h-3.5 text-indigo-600 shrink-0" />;
     default:
       return <Box className="w-3.5 h-3.5 text-zinc-500 shrink-0" />;
   }
@@ -150,9 +152,10 @@ const getElementName = (el: PageBlockElement) => {
     case 'video':
       return 'Vídeo';
     case 'form':
-      return 'Formulario';
     case 'simple_form':
-      return 'Formulario';
+      return 'Formulario Completo';
+    case 'form_button':
+      return 'Botón de Formulario';
     case 'popup_button':
       return 'Botón Pop-up';
     case 'calendar':

@@ -127,6 +127,8 @@ export interface ElementStyles {
   buttonDestination?: 'next_page' | 'calendar' | 'url';
   buttonUrl?: string;
   maxWidth?: string;
+  fullWidth?: boolean;
+  boxShadow?: string;
 }
 
 export type ElementType =
@@ -151,6 +153,7 @@ export type ElementType =
   | 'social_links'
   | 'checkbox'
   | 'input_field'
+  | 'form_button'
   | 'card_avatar'
   | 'card_name'
   | 'card_bio'
@@ -226,6 +229,8 @@ export interface PageBlockElement {
     videoCoverBgColor?: string;
     videoCoverBgOpacity?: number;
     buttonText?: string;
+    buttonSubtext?: string;
+    buttonIcon?: string;
     formId?: string;
     // Spacer
     spacerHeight?: number;
