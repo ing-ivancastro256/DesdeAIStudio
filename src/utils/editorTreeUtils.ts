@@ -780,3 +780,102 @@ export const getColumnSurfaceStyle = (
 
   return style;
 };
+
+export const isSectionBoxed = (section: PageBlockSection): boolean => {
+  if (section.widthType) {
+    return section.widthType === 'boxed';
+  }
+  return typeof section.maxWidth === 'number';
+};
+
+export const getSectionEffectiveMaxWidth = (
+  section: PageBlockSection,
+  canvasMaxWidth: number
+): number => {
+  const safeCanvas = Math.max(320, Math.round(canvasMaxWidth || 1200));
+  if (!isSectionBoxed(section)) {
+    return safeCanvas;
+  }
+  const rawMax =
+    typeof section.maxWidth === 'number'
+      ? section.maxWidth
+      : Math.min(1200, safeCanvas);
+  return Math.min(Math.max(320, Math.round(rawMax)), safeCanvas);
+};
+
+export const clampRowTreeToLimit = (
+  row: PageBlockRow,
+  governingMaxWidth: number
+): { row: PageBlockRow; changed: boolean } => {
+  const safeLimit = Math.max(320, Math.round(governingMaxWidth || 1200));
+  let changed = false;
+  let nextRow = row;
+
+  if (nextRow.maxWidth !== undefined && nextRow.maxWidth > safeLimit) {
+    changed = true;
+    nextRow = { ...nextRow, maxWidth: safeLimit };
+  }
+
+  const effectiveRowLimit =
+    (nextRow.widthType || 'boxed') === 'boxed' && nextRow.maxWidth !== undefined
+      ? Math.min(nextRow.maxWidth, safeLimit)
+      : safeLimit;
+
+  const nextCols = nextRow.columns.map((col) => {
+    let colChanged = false;
+    const nextEls = col.elements.map((el) => {
+      if (el.type === 'inner_columns' && el.nestedRow) {
+        const nestedRes = clampRowTreeToLimit(el.nestedRow, effectiveRowLimit);
+        if (nestedRes.changed) {
+          colChanged = true;
+          changed = true;
+          return { ...el, nestedRow: nestedRes.row };
+        }
+      }
+      return el;
+    });
+    return colChanged ? { ...col, elements: nextEls } : col;
+  });
+
+  if (nextCols.some((c, idx) => c !== nextRow.columns[idx])) {
+    nextRow = { ...nextRow, columns: nextCols };
+  }
+
+  return { row: nextRow, changed };
+};
+
+export const clampSectionsHierarchy = (
+  sections: PageBlockSection[],
+  canvasMaxWidth: number
+): { sections: PageBlockSection[]; changed: boolean } => {
+  const safeCanvas = Math.max(320, Math.round(canvasMaxWidth || 1200));
+  let anyChanged = false;
+
+  const nextSections = sections.map((sec) => {
+    let nextSec = sec;
+    if (typeof nextSec.maxWidth === 'number' && nextSec.maxWidth > safeCanvas) {
+      anyChanged = true;
+      nextSec = { ...nextSec, maxWidth: safeCanvas };
+    }
+
+    const secLimit = getSectionEffectiveMaxWidth(nextSec, safeCanvas);
+    let rowsChanged = false;
+    const nextRows = nextSec.rows.map((r) => {
+      const res = clampRowTreeToLimit(r, secLimit);
+      if (res.changed) {
+        rowsChanged = true;
+        anyChanged = true;
+      }
+      return res.row;
+    });
+
+    if (rowsChanged) {
+      nextSec = { ...nextSec, rows: nextRows };
+    }
+
+    return nextSec;
+  });
+
+  return { sections: anyChanged ? nextSections : sections, changed: anyChanged };
+};
+

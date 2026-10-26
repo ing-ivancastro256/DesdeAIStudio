@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PageBlockSection, PageBlockRow, PageBlockElement } from '../../types';
-import { getColumnSurfaceStyle, getColumnShadowClass } from '../../utils/editorTreeUtils';
+import {
+  getColumnSurfaceStyle,
+  getColumnShadowClass,
+  isSectionBoxed,
+  getSectionEffectiveMaxWidth,
+} from '../../utils/editorTreeUtils';
 import {
   X,
   ArrowRight,
@@ -435,7 +440,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
   );
 
   // Render Single Element
-  const renderElement = (element: PageBlockElement, eIdx: number) => {
+  const renderElement = (element: PageBlockElement, eIdx: number, governingMaxW?: number) => {
     switch (element.type) {
       case 'heading': {
         const lvl = element.content.level || 'h1';
@@ -1081,7 +1086,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
               }}
               className="w-full"
             >
-              {renderRowBlock(element.nestedRow, eIdx)}
+              {renderRowBlock(element.nestedRow, eIdx, governingMaxW)}
             </div>
           );
         }
@@ -1096,16 +1101,24 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
     }
   };
 
-  const renderRowBlock = (row: PageBlockRow, rIdx: number) => {
+  const renderRowBlock = (row: PageBlockRow, rIdx: number, governingMaxW?: number) => {
     const pageMaxW =
-      activePage?.settings?.pageWidthType === 'full'
+      governingMaxW ??
+      (activePage?.settings?.pageWidthType === 'full'
         ? undefined
-        : activePage?.settings?.pageContentMaxWidth || 1200;
+        : activePage?.settings?.pageContentMaxWidth || 1200);
+
+    const effectiveRowMaxW =
+      (row.widthType || 'boxed') === 'boxed' && row.maxWidth
+        ? pageMaxW
+          ? Math.min(row.maxWidth, pageMaxW)
+          : row.maxWidth
+        : pageMaxW;
 
     const rowStyle: React.CSSProperties = {
       maxWidth:
-        (row.widthType || 'boxed') === 'boxed' && row.maxWidth
-          ? `${pageMaxW ? Math.min(row.maxWidth, pageMaxW) : row.maxWidth}px`
+        (row.widthType || 'boxed') === 'boxed' && row.maxWidth && effectiveRowMaxW
+          ? `${effectiveRowMaxW}px`
           : row.widthType === 'full'
           ? '100%'
           : undefined,
@@ -1146,7 +1159,9 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                     style={colSurfaceStyle}
                     className={`w-full flex-1 transition-all ${colShadowClass}`}
                   >
-                    {column.elements.map((element, eIdx) => renderElement(element, eIdx))}
+                    {column.elements.map((element, eIdx) =>
+                      renderElement(element, eIdx, effectiveRowMaxW)
+                    )}
                   </div>
                 </div>
               );
@@ -1163,15 +1178,32 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
       section.bgType ||
       (section.bgGradient ? 'gradient' : section.bgImageUrl ? 'image' : 'solid');
 
+    const pageCanvasMaxW =
+      activePage?.settings?.pageWidthType === 'full'
+        ? 1440
+        : activePage?.settings?.pageContentMaxWidth || 1200;
+    const sectionIsBoxed = isSectionBoxed(section);
+    const sectionEffectiveMaxW = getSectionEffectiveMaxWidth(section, pageCanvasMaxW);
+
     const sectionStyle: React.CSSProperties = {
+      width: '100%',
+      maxWidth: sectionIsBoxed ? `${sectionEffectiveMaxW}px` : undefined,
       paddingTop: `${section.paddingTop ?? section.paddingY ?? 40}px`,
       paddingBottom: `${section.paddingBottom ?? section.paddingY ?? 40}px`,
       paddingLeft: `${section.paddingLeft ?? 24}px`,
       paddingRight: `${section.paddingRight ?? 24}px`,
       marginTop: `${section.marginTop ?? 0}px`,
       marginBottom: `${section.marginBottom ?? 0}px`,
-      marginLeft: `${section.marginLeft ?? 0}px`,
-      marginRight: `${section.marginRight ?? 0}px`,
+      marginLeft: sectionIsBoxed
+        ? section.marginLeft
+          ? `${section.marginLeft}px`
+          : 'auto'
+        : `${section.marginLeft ?? 0}px`,
+      marginRight: sectionIsBoxed
+        ? section.marginRight
+          ? `${section.marginRight}px`
+          : 'auto'
+        : `${section.marginRight ?? 0}px`,
       borderTop: section.borderTopWidth
         ? `${section.borderTopWidth}px solid ${section.borderColor || '#E4E4E7'}`
         : undefined,
@@ -1216,14 +1248,15 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           <div
             className="relative z-1 mx-auto"
             style={{
-              maxWidth:
-                activePage?.settings?.pageWidthType === 'full'
-                  ? '100%'
-                  : `${activePage?.settings?.pageContentMaxWidth || 1200}px`,
+              maxWidth: sectionIsBoxed
+                ? '100%'
+                : activePage?.settings?.pageWidthType === 'full'
+                ? '100%'
+                : `${pageCanvasMaxW}px`,
               width: '100%',
             }}
           >
-            {section.rows.map((row, rIdx) => renderRowBlock(row, rIdx))}
+            {section.rows.map((row, rIdx) => renderRowBlock(row, rIdx, sectionEffectiveMaxW))}
           </div>
         </div>
       </DelayedAppearance>

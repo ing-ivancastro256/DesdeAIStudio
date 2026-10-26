@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   PageBlockSection,
   PageBlockRow,
@@ -24,10 +24,8 @@ import {
   Calendar,
   Minus,
   MoveVertical,
-  Award,
   Smile,
   Headphones,
-  FileCode,
   ExternalLink,
   Trash2,
   Copy,
@@ -40,9 +38,6 @@ import {
   Search,
   Sparkles,
   GripVertical,
-  Eye,
-  EyeOff,
-  Radio,
   Timer,
   HelpCircle,
   Share2,
@@ -73,8 +68,79 @@ interface StructureNavigatorProps {
   onReorderElementsInCol?: (colId: string, fromIndex: number, toIndex: number) => void;
   onReorderRowsInSection?: (sectionId: string, fromIndex: number, toIndex: number) => void;
   onReorderSections?: (fromIndex: number, toIndex: number) => void;
+  onMoveElementToColumn?: (elementId: string, targetColId: string, targetIndex: number) => void;
+  onMoveRowToSection?: (rowId: string, targetSectionId: string, targetRowIndex: number) => void;
+  onPromoteInnerColumnsToRow?: (
+    wrapperElementId: string,
+    targetSectionId: string,
+    targetRowIndex: number
+  ) => void;
+  onMoveSectionToIndex?: (sectionId: string, targetIndex: number) => void;
   onClose: () => void;
 }
+
+type TreeDragItem =
+  | {
+      kind: 'element';
+      elementId: string;
+      isInnerColumns: boolean;
+      nestedRowId?: string;
+      sourceColId: string;
+    }
+  | {
+      kind: 'row';
+      rowId: string;
+      sourceSectionId: string;
+    }
+  | {
+      kind: 'section';
+      sectionId: string;
+    };
+
+type TreeDropAction =
+  | { type: 'move-section'; sectionId: string; targetIdx: number }
+  | { type: 'move-row'; rowId: string; targetSectionId: string; targetRowIdx: number }
+  | {
+      type: 'promote-inner-to-row';
+      elementId: string;
+      targetSectionId: string;
+      targetRowIdx: number;
+    }
+  | { type: 'move-element'; elementId: string; targetColId: string; targetIdx: number };
+
+interface TreeDropTarget {
+  anchorType:
+    | 'section'
+    | 'section-header'
+    | 'row'
+    | 'row-header'
+    | 'nested-row'
+    | 'row-tail'
+    | 'column'
+    | 'element'
+    | 'empty-col';
+  anchorId: string;
+  position: 'before' | 'after';
+  action: TreeDropAction;
+}
+
+const isSameDropTarget = (a: TreeDropTarget | null, b: TreeDropTarget | null): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.anchorType !== b.anchorType || a.anchorId !== b.anchorId || a.position !== b.position) {
+    return false;
+  }
+  return JSON.stringify(a.action) === JSON.stringify(b.action);
+};
+
+// Pure blue horizontal drop indicator line (strictly line only, no text)
+const TreeDropLine: React.FC<{ position: 'before' | 'after' }> = ({ position }) => (
+  <div
+    className={`absolute left-0 right-0 h-[2px] bg-[#2848F0] rounded-full z-30 pointer-events-none shadow-[0_0_4px_rgba(40,72,240,0.45)] ${
+      position === 'before' ? '-top-[2px]' : '-bottom-[2px]'
+    }`}
+  />
+);
 
 // Helper to get corresponding icon for each element type
 const getElementIcon = (type: ElementType) => {
@@ -211,6 +277,10 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
   onReorderElementsInCol,
   onReorderRowsInSection,
   onReorderSections,
+  onMoveElementToColumn,
+  onMoveRowToSection,
+  onPromoteInnerColumnsToRow,
+  onMoveSectionToIndex,
   onClose,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -245,6 +315,162 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
       ...prev,
       [id]: prev[id] === undefined ? false : !prev[id],
     }));
+  };
+
+  // Drag and drop state + synchronous refs for flicker-free precision
+  const [draggedItem, setDraggedItem] = useState<TreeDragItem | null>(null);
+  const [dropTarget, setDropTarget] = useState<TreeDropTarget | null>(null);
+  const draggedItemRef = useRef<TreeDragItem | null>(null);
+  const dropTargetRef = useRef<TreeDropTarget | null>(null);
+
+  const updateDropTarget = (next: TreeDropTarget | null) => {
+    if (!isSameDropTarget(dropTargetRef.current, next)) {
+      dropTargetRef.current = next;
+      setDropTarget(next);
+    }
+  };
+
+  const clearTreeDragState = () => {
+    draggedItemRef.current = null;
+    dropTargetRef.current = null;
+    setDraggedItem(null);
+    setDropTarget(null);
+  };
+
+  useEffect(() => {
+    let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleGlobalDragEnd = () => {
+      clearTreeDragState();
+    };
+    const handleGlobalDrop = () => {
+      if (cleanupTimer) clearTimeout(cleanupTimer);
+      cleanupTimer = setTimeout(() => {
+        clearTreeDragState();
+      }, 0);
+    };
+    window.addEventListener('dragend', handleGlobalDragEnd, true);
+    window.addEventListener('drop', handleGlobalDrop, true);
+    return () => {
+      if (cleanupTimer) clearTimeout(cleanupTimer);
+      window.removeEventListener('dragend', handleGlobalDragEnd, true);
+      window.removeEventListener('drop', handleGlobalDrop, true);
+    };
+  }, []);
+
+  // Exact index/node lookups against the authoritative `sections` tree
+  const getRealSectionIndex = (sectionId: string): number => {
+    const idx = sections.findIndex((s) => s.id === sectionId);
+    return idx === -1 ? 0 : idx;
+  };
+
+  const getRealRowIndex = (sectionId: string, rowId: string): number => {
+    const sec = sections.find((s) => s.id === sectionId);
+    if (!sec) return 0;
+    const idx = sec.rows.findIndex((r) => r.id === rowId);
+    return idx === -1 ? 0 : idx;
+  };
+
+  const getRealColumnById = (
+    colId: string
+  ): { col: PageBlockColumn; depth: 0 | 1; sectionId: string; rowId: string; nestedRowId?: string } | null => {
+    for (const sec of sections) {
+      for (const row of sec.rows) {
+        for (const col of row.columns) {
+          if (col.id === colId) {
+            return { col, depth: 0, sectionId: sec.id, rowId: row.id };
+          }
+          for (const el of col.elements) {
+            if (el.type === 'inner_columns' && el.nestedRow) {
+              for (const nCol of el.nestedRow.columns) {
+                if (nCol.id === colId) {
+                  return {
+                    col: nCol,
+                    depth: 1,
+                    sectionId: sec.id,
+                    rowId: row.id,
+                    nestedRowId: el.nestedRow.id,
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return null;
+  };
+
+  const getRealElementIndexInCol = (colId: string, elementId: string): number => {
+    const found = getRealColumnById(colId);
+    if (!found) return 0;
+    const idx = found.col.elements.findIndex((el) => el.id === elementId);
+    return idx === -1 ? found.col.elements.length : idx;
+  };
+
+  // Auto-expand ancestor containers when dropping an item inside a collapsed node
+  const expandAncestorsForColumn = (colId: string) => {
+    const found = getRealColumnById(colId);
+    if (!found) return;
+    setExpandedNodes((prev) => ({
+      ...prev,
+      [found.sectionId]: true,
+      [found.rowId]: true,
+      ...(found.nestedRowId ? { [found.nestedRowId]: true } : {}),
+      [colId]: true,
+    }));
+  };
+
+  const commitDrop = (e: React.DragEvent) => {
+    if (!draggedItemRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const target = dropTargetRef.current;
+    const drag = draggedItemRef.current;
+    clearTreeDragState();
+
+    if (!target) return;
+
+    const { action } = target;
+    if (action.type === 'move-element') {
+      expandAncestorsForColumn(action.targetColId);
+      if (onMoveElementToColumn) {
+        onMoveElementToColumn(action.elementId, action.targetColId, action.targetIdx);
+      } else if (
+        drag.kind === 'element' &&
+        drag.sourceColId === action.targetColId &&
+        onReorderElementsInCol
+      ) {
+        const fromIdx = getRealElementIndexInCol(drag.sourceColId, action.elementId);
+        const toIdx = fromIdx < action.targetIdx ? action.targetIdx - 1 : action.targetIdx;
+        onReorderElementsInCol(action.targetColId, fromIdx, toIdx);
+      }
+    } else if (action.type === 'promote-inner-to-row') {
+      setExpandedNodes((prev) => ({ ...prev, [action.targetSectionId]: true }));
+      if (onPromoteInnerColumnsToRow) {
+        onPromoteInnerColumnsToRow(action.elementId, action.targetSectionId, action.targetRowIdx);
+      }
+    } else if (action.type === 'move-row') {
+      setExpandedNodes((prev) => ({ ...prev, [action.targetSectionId]: true }));
+      if (onMoveRowToSection) {
+        onMoveRowToSection(action.rowId, action.targetSectionId, action.targetRowIdx);
+      } else if (
+        drag.kind === 'row' &&
+        drag.sourceSectionId === action.targetSectionId &&
+        onReorderRowsInSection
+      ) {
+        const fromIdx = getRealRowIndex(drag.sourceSectionId, action.rowId);
+        const toIdx = fromIdx < action.targetRowIdx ? action.targetRowIdx - 1 : action.targetRowIdx;
+        onReorderRowsInSection(action.targetSectionId, fromIdx, toIdx);
+      }
+    } else if (action.type === 'move-section') {
+      if (onMoveSectionToIndex) {
+        onMoveSectionToIndex(action.sectionId, action.targetIdx);
+      } else if (onReorderSections) {
+        const fromIdx = getRealSectionIndex(action.sectionId);
+        const toIdx = fromIdx < action.targetIdx ? action.targetIdx - 1 : action.targetIdx;
+        onReorderSections(fromIdx, toIdx);
+      }
+    }
   };
 
   // Check if everything is currently expanded
@@ -292,16 +518,6 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
     });
     setExpandedNodes(updated);
   };
-
-  // Drag and drop state for reordering in tree
-  const [draggedItem, setDraggedItem] = useState<{
-    type: 'section' | 'row' | 'element';
-    id: string;
-    sectionId?: string;
-    rowId?: string;
-    columnId?: string;
-    index: number;
-  } | null>(null);
 
   // Counts summary
   const stats = useMemo(() => {
@@ -438,7 +654,22 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
       )}
 
       {/* Tree Content Area */}
-      <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+      <div
+        className="flex-1 overflow-y-auto p-1.5 space-y-0.5"
+        onDragOver={(e) => {
+          if (draggedItemRef.current) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+          }
+        }}
+        onDragLeave={(e) => {
+          const related = e.relatedTarget as Node | null;
+          if (!related || !e.currentTarget.contains(related)) {
+            updateDropTarget(null);
+          }
+        }}
+        onDrop={commitDrop}
+      >
         {/* Root Page Node */}
         <div
           onClick={onSelectPage}
@@ -462,32 +693,141 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
           const isSectionExpanded = expandedNodes[section.id] ?? true;
           const isSectionActive =
             selectedSectionId === section.id && !selectedRowId && !selectedColumnId && !selectedElementId;
+          const isDraggingSection =
+            draggedItem?.kind === 'section' && draggedItem.sectionId === section.id;
+
+          const showSectionBefore =
+            dropTarget?.anchorType === 'section' &&
+            dropTarget.anchorId === section.id &&
+            dropTarget.position === 'before';
+          const showSectionAfter =
+            dropTarget?.anchorType === 'section' &&
+            dropTarget.anchorId === section.id &&
+            dropTarget.position === 'after';
+          const showSectionHeaderAfter =
+            dropTarget?.anchorType === 'section-header' &&
+            dropTarget.anchorId === section.id &&
+            dropTarget.position === 'after';
 
           return (
-            <div key={section.id} className="pt-0.5">
-              {/* SECTION NODE */}
+            <div
+              key={section.id}
+              className={`pt-0.5 relative ${isDraggingSection ? 'opacity-45' : ''}`}
+              onDragOver={(e) => {
+                const drag = draggedItemRef.current;
+                if (!drag || drag.kind !== 'section') return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'move';
+                if (drag.sectionId === section.id) {
+                  updateDropTarget(null);
+                  return;
+                }
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pos: 'before' | 'after' =
+                  e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+                const realSecIdx = getRealSectionIndex(section.id);
+                updateDropTarget({
+                  anchorType: 'section',
+                  anchorId: section.id,
+                  position: pos,
+                  action: {
+                    type: 'move-section',
+                    sectionId: drag.sectionId,
+                    targetIdx: pos === 'before' ? realSecIdx : realSecIdx + 1,
+                  },
+                });
+              }}
+              onDrop={commitDrop}
+            >
+              {showSectionBefore && <TreeDropLine position="before" />}
+              {showSectionAfter && <TreeDropLine position="after" />}
+
+              {/* SECTION HEADER NODE */}
               <div
                 draggable
-                onDragStart={() => {
-                  setDraggedItem({ type: 'section', id: section.id, index: secIdx });
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', section.id);
+                  const item: TreeDragItem = { kind: 'section', sectionId: section.id };
+                  draggedItemRef.current = item;
+                  setDraggedItem(item);
+                }}
+                onDragEnd={() => {
+                  clearTreeDragState();
                 }}
                 onDragOver={(e) => {
+                  const drag = draggedItemRef.current;
+                  if (!drag) return;
+                  if (drag.kind === 'section') {
+                    return; // Handled by outer section container
+                  }
                   e.preventDefault();
-                }}
-                onDrop={() => {
-                  if (draggedItem && draggedItem.type === 'section' && onReorderSections) {
-                    onReorderSections(draggedItem.index, secIdx);
-                    setDraggedItem(null);
+                  e.stopPropagation();
+                  e.dataTransfer.dropEffect = 'move';
+
+                  if (drag.kind === 'row') {
+                    updateDropTarget({
+                      anchorType: 'section-header',
+                      anchorId: section.id,
+                      position: 'after',
+                      action: {
+                        type: 'move-row',
+                        rowId: drag.rowId,
+                        targetSectionId: section.id,
+                        targetRowIdx: 0,
+                      },
+                    });
+                    return;
+                  }
+
+                  if (drag.kind === 'element') {
+                    if (drag.isInnerColumns) {
+                      updateDropTarget({
+                        anchorType: 'section-header',
+                        anchorId: section.id,
+                        position: 'after',
+                        action: {
+                          type: 'promote-inner-to-row',
+                          elementId: drag.elementId,
+                          targetSectionId: section.id,
+                          targetRowIdx: 0,
+                        },
+                      });
+                    } else {
+                      const realSec = sections.find((s) => s.id === section.id) || section;
+                      const firstColId = realSec.rows[0]?.columns[0]?.id;
+                      if (firstColId) {
+                        updateDropTarget({
+                          anchorType: 'section-header',
+                          anchorId: section.id,
+                          position: 'after',
+                          action: {
+                            type: 'move-element',
+                            elementId: drag.elementId,
+                            targetColId: firstColId,
+                            targetIdx: 0,
+                          },
+                        });
+                      }
+                    }
                   }
                 }}
+                onDrop={commitDrop}
                 onClick={() => onSelectSection(section.id)}
-                className={`flex items-center justify-between px-1.5 py-1 rounded-md cursor-pointer transition-colors group ${
+                className={`relative flex items-center justify-between px-1.5 py-1 rounded-md cursor-pointer transition-colors group ${
                   isSectionActive
                     ? 'bg-blue-50 text-[#2848F0] font-semibold ring-1 ring-blue-300'
                     : 'hover:bg-zinc-100/90 text-zinc-800'
                 }`}
               >
+                {showSectionHeaderAfter && <TreeDropLine position="after" />}
+
                 <div className="flex items-center gap-1 min-w-0 truncate">
+                  <div className="cursor-grab active:cursor-grabbing text-zinc-400 group-hover:text-zinc-600 shrink-0">
+                    <GripVertical className="w-3 h-3 opacity-0 group-hover:opacity-100" />
+                  </div>
                   {/* Expand / Collapse toggle */}
                   <button
                     type="button"
@@ -562,50 +902,101 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                 </div>
               </div>
 
-              {/* SECTION CHILDREN (ROWS / SECCIONES INTERNAS) */}
+              {/* SECTION CHILDREN (ROWS / BLOQUES DIV) */}
               {isSectionExpanded && (
                 <div className="ml-3 pl-2 border-l border-zinc-200 space-y-0.5 my-0.5">
                   {section.rows.map((row, rowIdx) => {
                     const isRowExpanded = expandedNodes[row.id] ?? true;
                     const isRowActive =
                       selectedRowId === row.id && !selectedColumnId && !selectedElementId;
+                    const isDraggingRow =
+                      draggedItem?.kind === 'row' && draggedItem.rowId === row.id;
+
+                    const showRowBefore =
+                      dropTarget?.anchorType === 'row' &&
+                      dropTarget.anchorId === row.id &&
+                      dropTarget.position === 'before';
+                    const showRowAfter =
+                      dropTarget?.anchorType === 'row' &&
+                      dropTarget.anchorId === row.id &&
+                      dropTarget.position === 'after';
+                    const showRowHeaderAfter =
+                      dropTarget?.anchorType === 'row-header' &&
+                      dropTarget.anchorId === row.id &&
+                      dropTarget.position === 'after';
 
                     const renderElementLeaf = (
                       parentRowId: string,
                       parentCol: PageBlockColumn,
                       element: PageBlockElement,
-                      elIdx: number
+                      elIdx: number,
+                      colDepth: 0 | 1
                     ) => {
                       const isElementActive = selectedElementId === element.id;
+                      const isDraggingElement =
+                        draggedItem?.kind === 'element' && draggedItem.elementId === element.id;
+                      const showElBefore =
+                        dropTarget?.anchorType === 'element' &&
+                        dropTarget.anchorId === element.id &&
+                        dropTarget.position === 'before';
+                      const showElAfter =
+                        dropTarget?.anchorType === 'element' &&
+                        dropTarget.anchorId === element.id &&
+                        dropTarget.position === 'after';
 
                       return (
                         <div
                           key={element.id}
                           draggable
-                          onDragStart={() => {
-                            setDraggedItem({
-                              type: 'element',
-                              id: element.id,
-                              sectionId: section.id,
-                              rowId: parentRowId,
-                              columnId: parentCol.id,
-                              index: elIdx,
-                            });
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', element.id);
+                            const item: TreeDragItem = {
+                              kind: 'element',
+                              elementId: element.id,
+                              isInnerColumns: false,
+                              sourceColId: parentCol.id,
+                            };
+                            draggedItemRef.current = item;
+                            setDraggedItem(item);
+                          }}
+                          onDragEnd={() => {
+                            clearTreeDragState();
                           }}
                           onDragOver={(e) => {
+                            const drag = draggedItemRef.current;
+                            if (!drag || drag.kind !== 'element') return;
                             e.preventDefault();
-                          }}
-                          onDrop={() => {
-                            if (
-                              draggedItem &&
-                              draggedItem.type === 'element' &&
-                              draggedItem.columnId === parentCol.id &&
-                              onReorderElementsInCol
-                            ) {
-                              onReorderElementsInCol(parentCol.id, draggedItem.index, elIdx);
-                              setDraggedItem(null);
+                            e.stopPropagation();
+
+                            if (drag.isInnerColumns && colDepth === 1) {
+                              updateDropTarget(null);
+                              return;
                             }
+                            if (drag.elementId === element.id) {
+                              updateDropTarget(null);
+                              return;
+                            }
+
+                            e.dataTransfer.dropEffect = 'move';
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const pos: 'before' | 'after' =
+                              e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+                            const realElIdx = getRealElementIndexInCol(parentCol.id, element.id);
+                            updateDropTarget({
+                              anchorType: 'element',
+                              anchorId: element.id,
+                              position: pos,
+                              action: {
+                                type: 'move-element',
+                                elementId: drag.elementId,
+                                targetColId: parentCol.id,
+                                targetIdx: pos === 'before' ? realElIdx : realElIdx + 1,
+                              },
+                            });
                           }}
+                          onDrop={commitDrop}
                           onClick={(e) => {
                             e.stopPropagation();
                             onSelectElement(
@@ -622,14 +1013,25 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                               });
                             }
                           }}
-                          className={`flex items-center justify-between px-2 py-1 rounded-md cursor-pointer transition-all group ${
+                          className={`relative flex items-center justify-between px-2 py-1 rounded-md cursor-pointer transition-all group ${
+                            isDraggingElement ? 'opacity-45' : ''
+                          } ${
                             isElementActive
                               ? 'bg-[#2848F0] text-white font-medium shadow-2xs'
                               : 'hover:bg-zinc-100 text-zinc-800'
                           }`}
                         >
+                          {showElBefore && <TreeDropLine position="before" />}
+                          {showElAfter && <TreeDropLine position="after" />}
+
                           <div className="flex items-center gap-1.5 min-w-0 truncate">
-                            <div className="cursor-grab active:cursor-grabbing text-zinc-400 group-hover:text-zinc-600">
+                            <div
+                              className={`cursor-grab active:cursor-grabbing shrink-0 ${
+                                isElementActive
+                                  ? 'text-blue-200 group-hover:text-white'
+                                  : 'text-zinc-400 group-hover:text-zinc-600'
+                              }`}
+                            >
                               <GripVertical className="w-3 h-3 opacity-0 group-hover:opacity-100" />
                             </div>
                             <div className={isElementActive ? 'text-white' : ''}>
@@ -721,40 +1123,135 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                     };
 
                     return (
-                      <div key={row.id}>
-                        {/* ROW NODE (SECCIÓN INTERNA / BLOQUE DIV) */}
+                      <div
+                        key={row.id}
+                        className={`relative ${isDraggingRow ? 'opacity-45' : ''}`}
+                        onDragOver={(e) => {
+                          const drag = draggedItemRef.current;
+                          if (!drag || drag.kind !== 'row') return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          e.dataTransfer.dropEffect = 'move';
+                          if (drag.rowId === row.id) {
+                            updateDropTarget(null);
+                            return;
+                          }
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const pos: 'before' | 'after' =
+                            e.clientY - rect.top < rect.height / 2 ? 'before' : 'after';
+                          const realRowIdx = getRealRowIndex(section.id, row.id);
+                          updateDropTarget({
+                            anchorType: 'row',
+                            anchorId: row.id,
+                            position: pos,
+                            action: {
+                              type: 'move-row',
+                              rowId: drag.rowId,
+                              targetSectionId: section.id,
+                              targetRowIdx: pos === 'before' ? realRowIdx : realRowIdx + 1,
+                            },
+                          });
+                        }}
+                        onDrop={commitDrop}
+                      >
+                        {showRowBefore && <TreeDropLine position="before" />}
+                        {showRowAfter && <TreeDropLine position="after" />}
+
+                        {/* ROW HEADER NODE (BLOQUE DIV) */}
                         <div
                           draggable
-                          onDragStart={() => {
-                            setDraggedItem({
-                              type: 'row',
-                              id: row.id,
-                              sectionId: section.id,
-                              index: rowIdx,
-                            });
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', row.id);
+                            const item: TreeDragItem = {
+                              kind: 'row',
+                              rowId: row.id,
+                              sourceSectionId: section.id,
+                            };
+                            draggedItemRef.current = item;
+                            setDraggedItem(item);
+                          }}
+                          onDragEnd={() => {
+                            clearTreeDragState();
                           }}
                           onDragOver={(e) => {
-                            e.preventDefault();
-                          }}
-                          onDrop={() => {
-                            if (
-                              draggedItem &&
-                              draggedItem.type === 'row' &&
-                              draggedItem.sectionId === section.id &&
-                              onReorderRowsInSection
-                            ) {
-                              onReorderRowsInSection(section.id, draggedItem.index, rowIdx);
-                              setDraggedItem(null);
+                            const drag = draggedItemRef.current;
+                            if (!drag) return;
+                            if (drag.kind === 'section' || drag.kind === 'row') {
+                              return; // Handled by outer section or row wrapper
                             }
+
+                            e.preventDefault();
+                            e.stopPropagation();
+                            e.dataTransfer.dropEffect = 'move';
+
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const relY = e.clientY - rect.top;
+                            const realSec = sections.find((s) => s.id === section.id) || section;
+                            const realRow = realSec.rows.find((r) => r.id === row.id) || row;
+                            const targetOuterCol = realRow.columns[0];
+                            if (!targetOuterCol) return;
+
+                            if (drag.isInnerColumns) {
+                              if (relY < rect.height / 2) {
+                                const realRowIdx = getRealRowIndex(section.id, row.id);
+                                updateDropTarget({
+                                  anchorType: 'row',
+                                  anchorId: row.id,
+                                  position: 'before',
+                                  action: {
+                                    type: 'promote-inner-to-row',
+                                    elementId: drag.elementId,
+                                    targetSectionId: section.id,
+                                    targetRowIdx: realRowIdx,
+                                  },
+                                });
+                              } else {
+                                const insertAt = isRowExpanded ? 0 : targetOuterCol.elements.length;
+                                updateDropTarget({
+                                  anchorType: 'row-header',
+                                  anchorId: row.id,
+                                  position: 'after',
+                                  action: {
+                                    type: 'move-element',
+                                    elementId: drag.elementId,
+                                    targetColId: targetOuterCol.id,
+                                    targetIdx: insertAt,
+                                  },
+                                });
+                              }
+                              return;
+                            }
+
+                            // Regular element dropped onto Bloque div header -> moves up/into Bloque div
+                            const insertAt = isRowExpanded ? 0 : targetOuterCol.elements.length;
+                            updateDropTarget({
+                              anchorType: 'row-header',
+                              anchorId: row.id,
+                              position: 'after',
+                              action: {
+                                type: 'move-element',
+                                elementId: drag.elementId,
+                                targetColId: targetOuterCol.id,
+                                targetIdx: insertAt,
+                              },
+                            });
                           }}
+                          onDrop={commitDrop}
                           onClick={() => onSelectRow(section.id, row.id)}
-                          className={`flex items-center justify-between px-1.5 py-1 rounded-md cursor-pointer transition-colors group ${
+                          className={`relative flex items-center justify-between px-1.5 py-1 rounded-md cursor-pointer transition-colors group ${
                             isRowActive
                               ? 'bg-indigo-50 text-indigo-700 font-semibold ring-1 ring-indigo-300'
                               : 'hover:bg-zinc-100 text-zinc-700'
                           }`}
                         >
+                          {showRowHeaderAfter && <TreeDropLine position="after" />}
+
                           <div className="flex items-center gap-1 min-w-0 truncate">
+                            <div className="cursor-grab active:cursor-grabbing text-zinc-400 group-hover:text-zinc-600 shrink-0">
+                              <GripVertical className="w-3 h-3 opacity-0 group-hover:opacity-100" />
+                            </div>
                             <button
                               type="button"
                               onClick={(e) => toggleNode(row.id, e)}
@@ -835,12 +1332,40 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                               const hasElements = column.elements.length > 0;
                               const isColActive =
                                 selectedColumnId === column.id && !selectedElementId;
+                              const showOuterColHeaderAfter =
+                                dropTarget?.anchorType === 'column' &&
+                                dropTarget.anchorId === column.id &&
+                                dropTarget.position === 'after';
+                              const showOuterEmptyCol =
+                                dropTarget?.anchorType === 'empty-col' &&
+                                dropTarget.anchorId === column.id;
 
                               return (
                                 <div key={column.id}>
                                   {/* Render Column node when >1 column or column has custom styling */}
                                   {(row.columns.length > 1 || column.bgColor || column.bgGradient) && (
                                     <div
+                                      onDragOver={(e) => {
+                                        const drag = draggedItemRef.current;
+                                        if (!drag || drag.kind !== 'element') return;
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        e.dataTransfer.dropEffect = 'move';
+                                        const realCol = getRealColumnById(column.id)?.col || column;
+                                        const targetIdx = isColExpanded ? 0 : realCol.elements.length;
+                                        updateDropTarget({
+                                          anchorType: 'column',
+                                          anchorId: column.id,
+                                          position: 'after',
+                                          action: {
+                                            type: 'move-element',
+                                            elementId: drag.elementId,
+                                            targetColId: column.id,
+                                            targetIdx,
+                                          },
+                                        });
+                                      }}
+                                      onDrop={commitDrop}
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (onSelectColumn) {
@@ -849,12 +1374,13 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                           toggleNode(column.id, e);
                                         }
                                       }}
-                                      className={`flex items-center justify-between px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                      className={`relative flex items-center justify-between px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
                                         isColActive
                                           ? 'bg-teal-50 text-teal-800 font-semibold ring-1 ring-teal-300'
                                           : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
                                       }`}
                                     >
+                                      {showOuterColHeaderAfter && <TreeDropLine position="after" />}
                                       <div className="flex items-center gap-1 min-w-0">
                                         <button
                                           type="button"
@@ -897,7 +1423,29 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                       }
                                     >
                                       {!hasElements ? (
-                                        <div className="px-2 py-1 text-[11px] text-zinc-400 italic">
+                                        <div
+                                          onDragOver={(e) => {
+                                            const drag = draggedItemRef.current;
+                                            if (!drag || drag.kind !== 'element') return;
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            e.dataTransfer.dropEffect = 'move';
+                                            updateDropTarget({
+                                              anchorType: 'empty-col',
+                                              anchorId: column.id,
+                                              position: 'before',
+                                              action: {
+                                                type: 'move-element',
+                                                elementId: drag.elementId,
+                                                targetColId: column.id,
+                                                targetIdx: 0,
+                                              },
+                                            });
+                                          }}
+                                          onDrop={commitDrop}
+                                          className="relative px-2 py-1 text-[11px] text-zinc-400 italic rounded hover:bg-zinc-50"
+                                        >
+                                          {showOuterEmptyCol && <TreeDropLine position="before" />}
                                           Vacío
                                         </div>
                                       ) : (
@@ -909,21 +1457,162 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                               selectedRowId === nRow.id &&
                                               !selectedColumnId &&
                                               !selectedElementId;
+                                            const isDraggingNested =
+                                              draggedItem?.kind === 'element' &&
+                                              draggedItem.elementId === element.id;
+
+                                            const showNestedBefore =
+                                              dropTarget?.anchorType === 'nested-row' &&
+                                              dropTarget.anchorId === nRow.id &&
+                                              dropTarget.position === 'before';
+                                            const showNestedAfter =
+                                              dropTarget?.anchorType === 'nested-row' &&
+                                              dropTarget.anchorId === nRow.id &&
+                                              dropTarget.position === 'after';
+                                            const showNestedTailAfter =
+                                              dropTarget?.anchorType === 'row-tail' &&
+                                              dropTarget.anchorId === element.id &&
+                                              dropTarget.position === 'after';
 
                                             return (
-                                              <div key={element.id} className="space-y-0.5">
+                                              <div
+                                                key={element.id}
+                                                className={`relative space-y-0.5 ${
+                                                  isDraggingNested ? 'opacity-45' : ''
+                                                }`}
+                                              >
                                                 <div
+                                                  draggable
+                                                  onDragStart={(e) => {
+                                                    e.stopPropagation();
+                                                    e.dataTransfer.effectAllowed = 'move';
+                                                    e.dataTransfer.setData('text/plain', element.id);
+                                                    const item: TreeDragItem = {
+                                                      kind: 'element',
+                                                      elementId: element.id,
+                                                      isInnerColumns: true,
+                                                      nestedRowId: nRow.id,
+                                                      sourceColId: column.id,
+                                                    };
+                                                    draggedItemRef.current = item;
+                                                    setDraggedItem(item);
+                                                  }}
+                                                  onDragEnd={() => {
+                                                    clearTreeDragState();
+                                                  }}
+                                                  onDragOver={(e) => {
+                                                    const drag = draggedItemRef.current;
+                                                    if (!drag || drag.kind !== 'element') return;
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+
+                                                    if (drag.elementId === element.id) {
+                                                      updateDropTarget(null);
+                                                      return;
+                                                    }
+
+                                                    e.dataTransfer.dropEffect = 'move';
+                                                    const rect = e.currentTarget.getBoundingClientRect();
+                                                    const relY = e.clientY - rect.top;
+                                                    const realWrapperIdx = getRealElementIndexInCol(
+                                                      column.id,
+                                                      element.id
+                                                    );
+
+                                                    if (drag.isInnerColumns) {
+                                                      const pos: 'before' | 'after' =
+                                                        relY < rect.height / 2 ? 'before' : 'after';
+                                                      updateDropTarget({
+                                                        anchorType:
+                                                          pos === 'after' && isNestedRowExpanded
+                                                            ? 'row-tail'
+                                                            : 'nested-row',
+                                                        anchorId:
+                                                          pos === 'after' && isNestedRowExpanded
+                                                            ? element.id
+                                                            : nRow.id,
+                                                        position: pos,
+                                                        action: {
+                                                          type: 'move-element',
+                                                          elementId: drag.elementId,
+                                                          targetColId: column.id,
+                                                          targetIdx:
+                                                            pos === 'before'
+                                                              ? realWrapperIdx
+                                                              : realWrapperIdx + 1,
+                                                        },
+                                                      });
+                                                      return;
+                                                    }
+
+                                                    // Regular element over Sección Interna header:
+                                                    // If collapsed -> before/after in parent Bloque div column (subir de nivel)
+                                                    if (!isNestedRowExpanded) {
+                                                      const pos: 'before' | 'after' =
+                                                        relY < rect.height / 2 ? 'before' : 'after';
+                                                      updateDropTarget({
+                                                        anchorType: 'nested-row',
+                                                        anchorId: nRow.id,
+                                                        position: pos,
+                                                        action: {
+                                                          type: 'move-element',
+                                                          elementId: drag.elementId,
+                                                          targetColId: column.id,
+                                                          targetIdx:
+                                                            pos === 'before'
+                                                              ? realWrapperIdx
+                                                              : realWrapperIdx + 1,
+                                                        },
+                                                      });
+                                                      return;
+                                                    }
+
+                                                    // If expanded -> top 65% places BEFORE Sección Interna in parent Bloque div (subir de nivel),
+                                                    // bottom 35% places into first nested column
+                                                    if (relY < rect.height * 0.65 || !nRow.columns[0]) {
+                                                      updateDropTarget({
+                                                        anchorType: 'nested-row',
+                                                        anchorId: nRow.id,
+                                                        position: 'before',
+                                                        action: {
+                                                          type: 'move-element',
+                                                          elementId: drag.elementId,
+                                                          targetColId: column.id,
+                                                          targetIdx: realWrapperIdx,
+                                                        },
+                                                      });
+                                                    } else {
+                                                      updateDropTarget({
+                                                        anchorType: 'nested-row',
+                                                        anchorId: nRow.id,
+                                                        position: 'after',
+                                                        action: {
+                                                          type: 'move-element',
+                                                          elementId: drag.elementId,
+                                                          targetColId: nRow.columns[0].id,
+                                                          targetIdx: 0,
+                                                        },
+                                                      });
+                                                    }
+                                                  }}
+                                                  onDrop={commitDrop}
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     onSelectRow(section.id, nRow.id);
                                                   }}
-                                                  className={`flex items-center justify-between px-1.5 py-1 rounded-md cursor-pointer transition-colors group ${
+                                                  className={`relative flex items-center justify-between px-1.5 py-1 rounded-md cursor-pointer transition-colors group ${
                                                     isNestedRowActive
                                                       ? 'bg-indigo-50 text-indigo-700 font-semibold ring-1 ring-indigo-300'
                                                       : 'hover:bg-zinc-100 text-zinc-700'
                                                   }`}
                                                 >
+                                                  {showNestedBefore && <TreeDropLine position="before" />}
+                                                  {showNestedAfter && <TreeDropLine position="after" />}
+
                                                   <div className="flex items-center gap-1 min-w-0 truncate">
+                                                    <div className="cursor-grab active:cursor-grabbing text-zinc-400 group-hover:text-zinc-600 shrink-0">
+                                                      <GripVertical className="w-3 h-3 opacity-0 group-hover:opacity-100" />
+                                                    </div>
                                                     <button
                                                       type="button"
                                                       onClick={(e) => toggleNode(nRow.id, e)}
@@ -1001,21 +1690,60 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                                       const isNColExpanded = expandedNodes[nCol.id] ?? true;
                                                       const isNColActive =
                                                         selectedColumnId === nCol.id && !selectedElementId;
+                                                      const showNColHeaderAfter =
+                                                        dropTarget?.anchorType === 'column' &&
+                                                        dropTarget.anchorId === nCol.id &&
+                                                        dropTarget.position === 'after';
+                                                      const showNColEmpty =
+                                                        dropTarget?.anchorType === 'empty-col' &&
+                                                        dropTarget.anchorId === nCol.id;
+
                                                       return (
                                                         <div key={nCol.id}>
                                                           <div
+                                                            onDragOver={(e) => {
+                                                              const drag = draggedItemRef.current;
+                                                              if (!drag || drag.kind !== 'element') return;
+                                                              e.preventDefault();
+                                                              e.stopPropagation();
+                                                              if (drag.isInnerColumns) {
+                                                                updateDropTarget(null);
+                                                                return;
+                                                              }
+                                                              e.dataTransfer.dropEffect = 'move';
+                                                              const realNCol =
+                                                                getRealColumnById(nCol.id)?.col || nCol;
+                                                              const targetIdx = isNColExpanded
+                                                                ? 0
+                                                                : realNCol.elements.length;
+                                                              updateDropTarget({
+                                                                anchorType: 'column',
+                                                                anchorId: nCol.id,
+                                                                position: 'after',
+                                                                action: {
+                                                                  type: 'move-element',
+                                                                  elementId: drag.elementId,
+                                                                  targetColId: nCol.id,
+                                                                  targetIdx,
+                                                                },
+                                                              });
+                                                            }}
+                                                            onDrop={commitDrop}
                                                             onClick={(e) => {
                                                               e.stopPropagation();
                                                               if (onSelectColumn) {
                                                                 onSelectColumn(section.id, nRow.id, nCol.id);
                                                               }
                                                             }}
-                                                            className={`flex items-center justify-between px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                                            className={`relative flex items-center justify-between px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
                                                               isNColActive
                                                                 ? 'bg-teal-50 text-teal-800 font-semibold ring-1 ring-teal-300'
                                                                 : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
                                                             }`}
                                                           >
+                                                            {showNColHeaderAfter && (
+                                                              <TreeDropLine position="after" />
+                                                            )}
                                                             <div className="flex items-center gap-1 min-w-0">
                                                               <button
                                                                 type="button"
@@ -1030,7 +1758,8 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                                               </button>
                                                               <Columns className="w-3 h-3 text-teal-600 shrink-0" />
                                                               <span className="text-[10px] font-mono truncate">
-                                                                Columna {nColIdx + 1} ({Math.round(nCol.widthPercentage)}%)
+                                                                Columna {nColIdx + 1} (
+                                                                {Math.round(nCol.widthPercentage)}%)
                                                               </span>
                                                               {(nCol.bgColor || nCol.bgGradient) && (
                                                                 <span
@@ -1048,12 +1777,47 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                                           {isNColExpanded && (
                                                             <div className="ml-3 pl-2 border-l border-zinc-200 space-y-0.5">
                                                               {nCol.elements.length === 0 ? (
-                                                                <div className="px-2 py-1 text-[11px] text-zinc-400 italic">
+                                                                <div
+                                                                  onDragOver={(e) => {
+                                                                    const drag = draggedItemRef.current;
+                                                                    if (!drag || drag.kind !== 'element')
+                                                                      return;
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    if (drag.isInnerColumns) {
+                                                                      updateDropTarget(null);
+                                                                      return;
+                                                                    }
+                                                                    e.dataTransfer.dropEffect = 'move';
+                                                                    updateDropTarget({
+                                                                      anchorType: 'empty-col',
+                                                                      anchorId: nCol.id,
+                                                                      position: 'before',
+                                                                      action: {
+                                                                        type: 'move-element',
+                                                                        elementId: drag.elementId,
+                                                                        targetColId: nCol.id,
+                                                                        targetIdx: 0,
+                                                                      },
+                                                                    });
+                                                                  }}
+                                                                  onDrop={commitDrop}
+                                                                  className="relative px-2 py-1 text-[11px] text-zinc-400 italic rounded hover:bg-zinc-50"
+                                                                >
+                                                                  {showNColEmpty && (
+                                                                    <TreeDropLine position="before" />
+                                                                  )}
                                                                   Vacío
                                                                 </div>
                                                               ) : (
                                                                 nCol.elements.map((nEl, nElIdx) =>
-                                                                  renderElementLeaf(nRow.id, nCol, nEl, nElIdx)
+                                                                  renderElementLeaf(
+                                                                    nRow.id,
+                                                                    nCol,
+                                                                    nEl,
+                                                                    nElIdx,
+                                                                    1
+                                                                  )
                                                                 )
                                                               )}
                                                             </div>
@@ -1063,11 +1827,46 @@ export const StructureNavigator: React.FC<StructureNavigatorProps> = ({
                                                     })}
                                                   </div>
                                                 )}
+
+                                                {/* Tail drop strip right below expanded Sección Interna to easily move an element up a level AFTER Sección Interna */}
+                                                {isNestedRowExpanded && (
+                                                  <div
+                                                    onDragOver={(e) => {
+                                                      const drag = draggedItemRef.current;
+                                                      if (!drag || drag.kind !== 'element') return;
+                                                      if (drag.elementId === element.id) return;
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      e.dataTransfer.dropEffect = 'move';
+                                                      const realWrapperIdx = getRealElementIndexInCol(
+                                                        column.id,
+                                                        element.id
+                                                      );
+                                                      updateDropTarget({
+                                                        anchorType: 'row-tail',
+                                                        anchorId: element.id,
+                                                        position: 'after',
+                                                        action: {
+                                                          type: 'move-element',
+                                                          elementId: drag.elementId,
+                                                          targetColId: column.id,
+                                                          targetIdx: realWrapperIdx + 1,
+                                                        },
+                                                      });
+                                                    }}
+                                                    onDrop={commitDrop}
+                                                    className="relative h-1.5 w-full"
+                                                  >
+                                                    {showNestedTailAfter && (
+                                                      <TreeDropLine position="after" />
+                                                    )}
+                                                  </div>
+                                                )}
                                               </div>
                                             );
                                           }
 
-                                          return renderElementLeaf(row.id, column, element, elIdx);
+                                          return renderElementLeaf(row.id, column, element, elIdx, 0);
                                         })
                                       )}
                                     </div>

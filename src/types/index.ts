@@ -376,6 +376,8 @@ export interface PageBlockSection {
   bgType?: 'solid' | 'gradient' | 'image';
   bgColor?: string;
   bgGradient?: string;
+  bgGradientColor1?: string;
+  bgGradientColor2?: string;
   bgImageUrl?: string;
   bgImagePosition?: 'center' | 'top' | 'bottom' | 'cover' | 'contain';
   bgImageRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
@@ -383,6 +385,9 @@ export interface PageBlockSection {
   bgOverlayType?: 'none' | 'dark' | 'light' | 'color';
   bgOverlayColor?: string;
   bgOverlayOpacity?: number; // 0 to 100
+  // Width configuration (governed by Canvas width)
+  widthType?: 'boxed' | 'full';
+  maxWidth?: number | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '5xl' | '7xl' | 'full';
   // Spacing
   paddingTop?: number;
   paddingBottom?: number;
@@ -398,7 +403,6 @@ export interface PageBlockSection {
   borderBottomWidth?: number;
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '5xl' | '7xl' | 'full';
   // Retardo de aparición (delay)
   delayMinutes?: number;
   delaySeconds?: number;

@@ -16,11 +16,14 @@ import {
   Layout,
   Layers,
   Clock,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 
 interface SectionInspectorProps {
   section: PageBlockSection;
+  canvasMaxWidth?: number;
   onUpdate: (updatedProps: Partial<PageBlockSection>) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -51,18 +54,19 @@ const SOLID_PALETTES = [
 ];
 
 const GRADIENT_PRESETS = [
-  { name: 'Azul Eléctrico', value: 'linear-gradient(135deg, #1E3A8A 0%, #2848F0 100%)' },
-  { name: 'Noche Oscura', value: 'linear-gradient(180deg, #18181B 0%, #09090B 100%)' },
-  { name: 'Púrpura Neón', value: 'linear-gradient(135deg, #4C1D95 0%, #7C3AED 50%, #2848F0 100%)' },
-  { name: 'Esmeralda Pro', value: 'linear-gradient(135deg, #064E3B 0%, #059669 100%)' },
-  { name: 'Fuego Caliente', value: 'linear-gradient(135deg, #991B1B 0%, #EA580C 100%)' },
-  { name: 'Gris Ejecutivo', value: 'linear-gradient(180deg, #27272A 0%, #18181B 100%)' },
-  { name: 'Amanecer Dorado', value: 'linear-gradient(135deg, #78350F 0%, #D97706 100%)' },
-  { name: 'Azul Hielo Suave', value: 'linear-gradient(180deg, #EFF6FF 0%, #DBEAFE 100%)' },
+  { name: 'Azul Eléctrico', c1: '#1E3A8A', c2: '#2848F0', value: 'linear-gradient(135deg, #1E3A8A 0%, #2848F0 100%)' },
+  { name: 'Noche Oscura', c1: '#18181B', c2: '#09090B', value: 'linear-gradient(180deg, #18181B 0%, #09090B 100%)' },
+  { name: 'Púrpura Neón', c1: '#4C1D95', c2: '#2848F0', value: 'linear-gradient(135deg, #4C1D95 0%, #7C3AED 50%, #2848F0 100%)' },
+  { name: 'Esmeralda Pro', c1: '#064E3B', c2: '#059669', value: 'linear-gradient(135deg, #064E3B 0%, #059669 100%)' },
+  { name: 'Fuego Caliente', c1: '#991B1B', c2: '#EA580C', value: 'linear-gradient(135deg, #991B1B 0%, #EA580C 100%)' },
+  { name: 'Gris Ejecutivo', c1: '#27272A', c2: '#18181B', value: 'linear-gradient(180deg, #27272A 0%, #18181B 100%)' },
+  { name: 'Amanecer Dorado', c1: '#78350F', c2: '#D97706', value: 'linear-gradient(135deg, #78350F 0%, #D97706 100%)' },
+  { name: 'Azul Hielo Suave', c1: '#EFF6FF', c2: '#DBEAFE', value: 'linear-gradient(180deg, #EFF6FF 0%, #DBEAFE 100%)' },
 ];
 
 export const SectionInspector: React.FC<SectionInspectorProps> = ({
   section,
+  canvasMaxWidth,
   onUpdate,
   onMoveUp,
   onMoveDown,
@@ -75,6 +79,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    width: true,
     background: true,
     spacing: true,
     borders: true,
@@ -85,7 +90,30 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const maxAllowedWidth = Math.max(320, Math.round(canvasMaxWidth || 1200));
+  const minAllowedWidth = Math.min(320, maxAllowedWidth);
+  const numericMaxWidth = typeof section.maxWidth === 'number' ? section.maxWidth : undefined;
+  const currentWidthType: 'boxed' | 'full' = section.widthType
+    ? section.widthType
+    : numericMaxWidth !== undefined
+    ? 'boxed'
+    : 'full';
+  const currentMaxWidth = Math.min(
+    numericMaxWidth ?? Math.min(1200, maxAllowedWidth),
+    maxAllowedWidth
+  );
+
+  const basePresetValues = [600, 720, 960, 1140, 1200].filter((val) => val < maxAllowedWidth);
+  const widthPresets = [
+    ...basePresetValues.map((val) => ({ label: `${val}px`, val })),
+    { label: '100%', val: maxAllowedWidth },
+  ];
+
   const bgType = section.bgType || (section.bgGradient ? 'gradient' : section.bgImageUrl ? 'image' : 'solid');
+  const extractedHexes = section.bgGradient?.match(/#[0-9A-Fa-f]{6}/g) || [];
+  const gradColor1 = section.bgGradientColor1 || extractedHexes[0] || '#18181B';
+  const gradColor2 =
+    section.bgGradientColor2 || extractedHexes[extractedHexes.length - 1] || '#09090B';
 
   return (
     <div className="flex-1 flex flex-col h-full bg-white select-none">
@@ -182,10 +210,117 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* ACCORDION 1: FONDO Y BACKGROUND DE LA SECCIÓN (SÓLIDO, DEGRADADO, IMAGEN) */}
+        {/* ACCORDION 1: ANCHO DE LA SECCIÓN EXTERNA                       */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-lg overflow-hidden">
           <button
+            type="button"
+            onClick={() => toggleAccordion('width')}
+            className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <Maximize2 className="w-3.5 h-3.5 text-[#2848F0]" />
+              Ancho de la Sección Externa
+            </span>
+            {openSections.width ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          </button>
+
+          {openSections.width && (
+            <div className="p-3 space-y-3 bg-white">
+              <div>
+                <label className="font-semibold text-zinc-700 block mb-1.5">
+                  Comportamiento de Ancho:
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdate({
+                        widthType: 'boxed',
+                        maxWidth: currentMaxWidth,
+                      })
+                    }
+                    className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                      currentWidthType === 'boxed'
+                        ? 'bg-blue-50 border-[#2848F0] text-[#2848F0] font-bold shadow-2xs'
+                        : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700 font-medium'
+                    }`}
+                  >
+                    <Minimize2 className="w-4 h-4 mx-auto mb-1 text-[#2848F0]" />
+                    <span className="whitespace-nowrap">En Caja (Boxed)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onUpdate({ widthType: 'full' })}
+                    className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                      currentWidthType === 'full'
+                        ? 'bg-blue-50 border-[#2848F0] text-[#2848F0] font-bold shadow-2xs'
+                        : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700 font-medium'
+                    }`}
+                  >
+                    <Maximize2 className="w-4 h-4 mx-auto mb-1 text-[#2848F0]" />
+                    <span className="whitespace-nowrap">Ancho Completo (100%)</span>
+                  </button>
+                </div>
+              </div>
+
+              {currentWidthType === 'boxed' && (
+                <div className="space-y-2 pt-1 border-t border-zinc-100">
+                  <div className="flex items-center justify-between">
+                    <label className="font-semibold text-zinc-700">Presets de Ancho:</label>
+                    <span className="text-[10px] font-mono tabular-nums text-zinc-400">
+                      Máx. Canvas: {maxAllowedWidth}px
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {widthPresets.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() =>
+                          onUpdate({
+                            widthType: 'boxed',
+                            maxWidth: Math.min(preset.val, maxAllowedWidth),
+                          })
+                        }
+                        className={`flex-1 min-w-[52px] py-1 px-1.5 border rounded text-[10px] font-mono tabular-nums text-center transition-all cursor-pointer whitespace-nowrap ${
+                          currentMaxWidth === preset.val
+                            ? 'bg-[#2848F0] text-white border-[#2848F0] font-bold shadow-2xs'
+                            : 'border-zinc-200 bg-white hover:border-[#2848F0] text-zinc-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <NumberControl
+                    label="Ancho máximo exacto"
+                    value={currentMaxWidth}
+                    min={minAllowedWidth}
+                    max={maxAllowedWidth}
+                    step={10}
+                    unit="px"
+                    onChange={(val) =>
+                      onUpdate({
+                        widthType: 'boxed',
+                        maxWidth: Math.min(Math.max(minAllowedWidth, val), maxAllowedWidth),
+                      })
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* ACCORDION 2: FONDO Y BACKGROUND DE LA SECCIÓN (SÓLIDO, DEGRADADO, IMAGEN) */}
+        {/* ============================================================== */}
+        <div className="border border-zinc-200 rounded-lg overflow-hidden">
+          <button
+            type="button"
             onClick={() => toggleAccordion('background')}
             className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
           >
@@ -203,7 +338,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                 <button
                   type="button"
                   onClick={() => onUpdate({ bgType: 'solid' })}
-                  className={`flex-1 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                     bgType === 'solid' ? 'bg-white text-[#2848F0] shadow-xs' : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
@@ -214,10 +349,14 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                   onClick={() =>
                     onUpdate({
                       bgType: 'gradient',
-                      bgGradient: section.bgGradient || 'linear-gradient(135deg, #18181B 0%, #09090B 100%)',
+                      bgGradientColor1: gradColor1,
+                      bgGradientColor2: gradColor2,
+                      bgGradient:
+                        section.bgGradient ||
+                        `linear-gradient(135deg, ${gradColor1} 0%, ${gradColor2} 100%)`,
                     })
                   }
-                  className={`flex-1 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                     bgType === 'gradient' ? 'bg-white text-[#2848F0] shadow-xs' : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
@@ -226,7 +365,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                 <button
                   type="button"
                   onClick={() => onUpdate({ bgType: 'image' })}
-                  className={`flex-1 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
                     bgType === 'image' ? 'bg-white text-[#2848F0] shadow-xs' : 'text-zinc-600 hover:text-zinc-900'
                   }`}
                 >
@@ -268,9 +407,35 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                 </div>
               )}
 
-              {/* OPTION B: DEGRADADO */}
+              {/* OPTION B: DEGRADADO (2 COLORES + ESTILOS RÁPIDOS, SIN CSS PERSONALIZADO) */}
               {bgType === 'gradient' && (
                 <div className="space-y-3">
+                  <HexColorPicker
+                    label="Color 1 del gradiente:"
+                    value={gradColor1}
+                    onChange={(val) =>
+                      onUpdate({
+                        bgType: 'gradient',
+                        bgGradientColor1: val,
+                        bgGradientColor2: gradColor2,
+                        bgGradient: `linear-gradient(135deg, ${val} 0%, ${gradColor2} 100%)`,
+                      })
+                    }
+                  />
+
+                  <HexColorPicker
+                    label="Color 2 del gradiente:"
+                    value={gradColor2}
+                    onChange={(val) =>
+                      onUpdate({
+                        bgType: 'gradient',
+                        bgGradientColor1: gradColor1,
+                        bgGradientColor2: val,
+                        bgGradient: `linear-gradient(135deg, ${gradColor1} 0%, ${val} 100%)`,
+                      })
+                    }
+                  />
+
                   <div>
                     <span className="text-[10px] uppercase font-bold text-zinc-400 block mb-1.5">
                       Estilos de Degradado:
@@ -280,7 +445,14 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                         <button
                           key={grad.name}
                           type="button"
-                          onClick={() => onUpdate({ bgGradient: grad.value })}
+                          onClick={() =>
+                            onUpdate({
+                              bgType: 'gradient',
+                              bgGradientColor1: grad.c1,
+                              bgGradientColor2: grad.c2,
+                              bgGradient: grad.value,
+                            })
+                          }
                           className={`p-2 rounded-lg text-left text-[11px] font-medium border transition-all cursor-pointer flex flex-col gap-1.5 ${
                             section.bgGradient === grad.value
                               ? 'border-[#2848F0] ring-2 ring-blue-500/30'
@@ -295,17 +467,6 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-zinc-600 font-medium">CSS Gradiente Personalizado:</span>
-                    <textarea
-                      rows={2}
-                      value={section.bgGradient || ''}
-                      onChange={(e) => onUpdate({ bgGradient: e.target.value })}
-                      placeholder="linear-gradient(135deg, #18181B 0%, #09090B 100%)"
-                      className="w-full p-1.5 text-[11px] font-mono border border-zinc-200 rounded bg-zinc-50 focus:bg-white"
-                    />
                   </div>
                 </div>
               )}

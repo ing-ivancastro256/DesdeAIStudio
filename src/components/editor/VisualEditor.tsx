@@ -151,6 +151,10 @@ import {
   getColumnSurfaceStyle,
   getColumnShadowClass,
   formatRowDisplayName,
+  isSectionBoxed,
+  getSectionEffectiveMaxWidth,
+  clampRowTreeToLimit,
+  clampSectionsHierarchy,
 } from '../../utils/editorTreeUtils';
 
 interface VisualEditorProps {
@@ -427,6 +431,37 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     position: 'before' | 'after';
   } | null>(null);
 
+  const clearAllDragStates = () => {
+    setDraggingElementId(null);
+    setDropIndicator(null);
+    setDraggingSectionId(null);
+    setDraggingBlockType(null);
+    setDraggingSectionLayout(null);
+    setDraggingInnerCols(null);
+    setSectionDropIndicator(null);
+    setRowDropIndicator(null);
+  };
+
+  useEffect(() => {
+    let dropCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleGlobalDragEnd = () => {
+      clearAllDragStates();
+    };
+    const handleGlobalDrop = () => {
+      if (dropCleanupTimer) clearTimeout(dropCleanupTimer);
+      dropCleanupTimer = setTimeout(() => {
+        clearAllDragStates();
+      }, 0);
+    };
+    window.addEventListener('dragend', handleGlobalDragEnd, true);
+    window.addEventListener('drop', handleGlobalDrop, true);
+    return () => {
+      if (dropCleanupTimer) clearTimeout(dropCleanupTimer);
+      window.removeEventListener('dragend', handleGlobalDragEnd, true);
+      window.removeEventListener('drop', handleGlobalDrop, true);
+    };
+  }, []);
+
   // Popups configuration and active popup editor modal
   const [funnelPopups, setFunnelPopups] = useState<PopupModal[]>(() => {
     if (initialPage?.popups && initialPage.popups.length > 0) {
@@ -537,44 +572,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       ? Math.max(320, measuredCanvasWidth || 1200)
       : Math.max(320, pageSettings.pageContentMaxWidth || 1200);
 
-  // Automatically clamp any row / inner container maxWidth exceeding effectiveCanvasMaxWidth
+  // Automatically clamp External Sections and child Rows/Inner Containers whenever Canvas max width changes
   useEffect(() => {
     setSections((prevSections) => {
-      let changed = false;
-      const clampRow = (r: PageBlockRow): PageBlockRow => {
-        let nextRow = r;
-        if (r.maxWidth !== undefined && r.maxWidth > effectiveCanvasMaxWidth) {
-          changed = true;
-          nextRow = { ...nextRow, maxWidth: effectiveCanvasMaxWidth };
-        }
-        const nextCols = nextRow.columns.map((col) => {
-          let colChanged = false;
-          const nextEls = col.elements.map((el) => {
-            if (el.type === 'inner_columns' && el.nestedRow) {
-              const clampedNested = clampRow(el.nestedRow);
-              if (clampedNested !== el.nestedRow) {
-                colChanged = true;
-                return { ...el, nestedRow: clampedNested };
-              }
-            }
-            return el;
-          });
-          return colChanged ? { ...col, elements: nextEls } : col;
-        });
-        if (nextCols.some((c, idx) => c !== nextRow.columns[idx])) {
-          nextRow = { ...nextRow, columns: nextCols };
-        }
-        return nextRow;
-      };
-
-      const nextSections = prevSections.map((sec) => {
-        const nextRows = sec.rows.map(clampRow);
-        if (nextRows.some((r, idx) => r !== sec.rows[idx])) {
-          return { ...sec, rows: nextRows };
-        }
-        return sec;
-      });
-
+      const { sections: nextSections, changed } = clampSectionsHierarchy(
+        prevSections,
+        effectiveCanvasMaxWidth
+      );
       return changed ? nextSections : prevSections;
     });
   }, [effectiveCanvasMaxWidth]);
@@ -1074,7 +1078,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const updateSection = (secId: string, updatedProps: Partial<PageBlockSection>) => {
     const nextSections = sections.map((sec) => {
       if (sec.id !== secId) return sec;
-      return { ...sec, ...updatedProps };
+      let merged: PageBlockSection = { ...sec, ...updatedProps };
+      if (typeof merged.maxWidth === 'number' && merged.maxWidth > effectiveCanvasMaxWidth) {
+        merged = { ...merged, maxWidth: effectiveCanvasMaxWidth };
+      }
+      const secLimit = getSectionEffectiveMaxWidth(merged, effectiveCanvasMaxWidth);
+      const clampedRows = merged.rows.map((r) => clampRowTreeToLimit(r, secLimit).row);
+      return { ...merged, rows: clampedRows };
     });
     pushHistory(nextSections);
   };
@@ -1099,6 +1109,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   };
 
   const reorderCanvasSection = (sourceSecId: string, targetIdx: number) => {
+    clearAllDragStates();
     const fromIdx = sections.findIndex((s) => s.id === sourceSecId);
     if (fromIdx === -1) return;
 
@@ -1157,11 +1168,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     showToast('Sección eliminada');
   };
 
-  // Update inner section / row styles (supports outer & nested rows)
+  // Update inner section / row styles (supports outer & nested rows, enforcing parent width hierarchy)
   const updateSelectedRow = (updatedProps: Partial<PageBlockRow>) => {
     const targetRowId = activeRowForInspector?.id || selectedRowId;
     if (!targetRowId) return;
-    const nextSections = updateRowInSections(sections, targetRowId, updatedProps);
+    const rawUpdated = updateRowInSections(sections, targetRowId, updatedProps);
+    const { sections: nextSections } = clampSectionsHierarchy(rawUpdated, effectiveCanvasMaxWidth);
     pushHistory(nextSections);
     setHasUnsavedChanges(true);
   };
@@ -1284,6 +1296,119 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     });
     pushHistory(nextSections);
     showToast('Orden de bloques actualizado');
+  };
+
+  const moveCanvasRowToSection = (
+    rowId: string,
+    targetSectionId: string,
+    targetRowIndex: number
+  ) => {
+    clearAllDragStates();
+    let sourceSecIdx = -1;
+    let sourceRowIdx = -1;
+    for (let s = 0; s < sections.length; s++) {
+      const rIdx = sections[s].rows.findIndex((r) => r.id === rowId);
+      if (rIdx !== -1) {
+        sourceSecIdx = s;
+        sourceRowIdx = rIdx;
+        break;
+      }
+    }
+    if (sourceSecIdx === -1 || sourceRowIdx === -1) return;
+
+    const sourceSec = sections[sourceSecIdx];
+    const movingRow = sourceSec.rows[sourceRowIdx];
+
+    if (sourceSec.id === targetSectionId) {
+      const adjustedIdx =
+        sourceRowIdx < targetRowIndex ? targetRowIndex - 1 : targetRowIndex;
+      const clampedIdx = Math.max(0, Math.min(sourceSec.rows.length - 1, adjustedIdx));
+      if (clampedIdx === sourceRowIdx) return;
+
+      const nextSections = sections.map((sec) => {
+        if (sec.id !== targetSectionId) return sec;
+        const newRows = [...sec.rows];
+        newRows.splice(sourceRowIdx, 1);
+        newRows.splice(clampedIdx, 0, movingRow);
+        return { ...sec, rows: newRows };
+      });
+      pushHistory(nextSections);
+      setSelectedSectionId(targetSectionId);
+      setSelectedRowId(rowId);
+      setSelectedColumnId(null);
+      setSelectedElementId(null);
+      showToast('Orden de bloques actualizado');
+      return;
+    }
+
+    const rawSections = sections.map((sec) => {
+      if (sec.id === sourceSec.id) {
+        const remaining = sec.rows.filter((r) => r.id !== rowId);
+        if (remaining.length === 0) {
+          const fallbackRow = createInnerColumnsRow(1);
+          fallbackRow.name = 'Bloque div';
+          return { ...sec, rows: [fallbackRow] };
+        }
+        return { ...sec, rows: remaining };
+      }
+      if (sec.id === targetSectionId) {
+        const newRows = [...sec.rows];
+        const clampedIdx = Math.max(0, Math.min(newRows.length, targetRowIndex));
+        newRows.splice(clampedIdx, 0, movingRow);
+        return { ...sec, rows: newRows };
+      }
+      return sec;
+    });
+
+    const { sections: finalSections } = clampSectionsHierarchy(
+      rawSections,
+      effectiveCanvasMaxWidth
+    );
+    pushHistory(finalSections);
+    setSelectedSectionId(targetSectionId);
+    setSelectedRowId(rowId);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    showToast('Bloque movido a la sección seleccionada');
+  };
+
+  const promoteInnerColumnsToRow = (
+    wrapperElementId: string,
+    targetSectionId: string,
+    targetRowIndex: number
+  ) => {
+    clearAllDragStates();
+    const { nextSections, removedElement } = removeElementFromSections(
+      sections,
+      wrapperElementId
+    );
+    if (!removedElement || removedElement.type !== 'inner_columns' || !removedElement.nestedRow) {
+      return;
+    }
+
+    const promotedRow: PageBlockRow = {
+      ...removedElement.nestedRow,
+      name: formatRowDisplayName(removedElement.nestedRow.name, 'Bloque div'),
+    };
+
+    const withInsertedRow = nextSections.map((sec) => {
+      if (sec.id !== targetSectionId) return sec;
+      const newRows = [...sec.rows];
+      const clampedIdx = Math.max(0, Math.min(newRows.length, targetRowIndex));
+      newRows.splice(clampedIdx, 0, promotedRow);
+      return { ...sec, rows: newRows };
+    });
+
+    const { sections: finalSections } = clampSectionsHierarchy(
+      withInsertedRow,
+      effectiveCanvasMaxWidth
+    );
+    pushHistory(finalSections);
+    setSelectedSectionId(targetSectionId);
+    setSelectedRowId(promotedRow.id);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    showToast('Sección interna subida de nivel');
   };
 
   const reorderElementsInCol = (colId: string, fromIndex: number, toIndex: number) => {
@@ -2065,6 +2190,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     atIndex: number,
     options?: { level?: 'h1' | 'h2' | 'h3' | 'h4' }
   ) => {
+    clearAllDragStates();
     const newElement = createNewElement(type, options);
     const nextSections = insertElementIntoColumn(sections, colId, atIndex, newElement);
     pushHistory(nextSections);
@@ -2074,6 +2200,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
   // Insert nested inner columns (1-4 cols) at exact drop index inside a depth-0 block column (max 1 nested level)
   const insertNestedColumnsAt = (numCols: number, colId: string, atIndex: number) => {
+    clearAllDragStates();
     const depth = findColumnDepth(sections, colId);
     if (depth === null) return;
     if (depth >= 1) {
@@ -2095,6 +2222,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
   // Reorder existing element within canvas when dragged (supports depth 0 & depth 1, blocks >1 nested level)
   const reorderCanvasElement = (sourceId: string, targetColId: string, targetIdx: number) => {
+    clearAllDragStates();
     const sourceEl = findElementById(sections, sourceId);
     if (!sourceEl) return;
 
@@ -2115,19 +2243,43 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         ? targetIdx - 1
         : targetIdx;
 
-    const finalSections = insertElementIntoColumn(
+    if (sourceColId === targetColId && adjustedIdx === sourceIndex) {
+      return;
+    }
+
+    const insertedSections = insertElementIntoColumn(
       nextSections,
       targetColId,
       adjustedIdx,
       removedElement
     );
 
+    const { sections: finalSections } = clampSectionsHierarchy(
+      insertedSections,
+      effectiveCanvasMaxWidth
+    );
+
     pushHistory(finalSections);
     setSelectedColumnId(null);
     if (removedElement.type === 'inner_columns' && removedElement.nestedRow) {
+      const nextCtx = findEditorSelectionContext(finalSections, {
+        selectedSectionId: null,
+        selectedRowId: removedElement.nestedRow.id,
+        selectedColumnId: null,
+        selectedElementId: null,
+      });
+      if (nextCtx.selectedSec) setSelectedSectionId(nextCtx.selectedSec.id);
       setSelectedRowId(removedElement.nestedRow.id);
       setSelectedElementId(null);
     } else {
+      const nextCtx = findEditorSelectionContext(finalSections, {
+        selectedSectionId: null,
+        selectedRowId: null,
+        selectedColumnId: null,
+        selectedElementId: sourceId,
+      });
+      if (nextCtx.selectedSec) setSelectedSectionId(nextCtx.selectedSec.id);
+      if (nextCtx.selectedRow) setSelectedRowId(nextCtx.selectedRow.id);
       setSelectedElementId(sourceId);
     }
     showToast('Orden del elemento actualizado');
@@ -8596,25 +8748,50 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               />
             ) : activeRowForInspector ? (
               /* DEDICATED ROW INSPECTOR (SECCIÓN INTERNA) */
-              <RowInspector
-                row={activeRowForInspector}
-                sectionName={selectedSec?.name}
-                canvasMaxWidth={effectiveCanvasMaxWidth}
-                onUpdate={(props) => updateSelectedRow(props)}
-                onChangeColumnsCount={(count) => changeRowColumnsCount(activeRowForInspector.id, count)}
-                onMoveUp={() => moveRow('up', selectedSec?.id, activeRowForInspector.id)}
-                onMoveDown={() => moveRow('down', selectedSec?.id, activeRowForInspector.id)}
-                canMoveUp={selectionCtx.canMoveRowUp}
-                canMoveDown={selectionCtx.canMoveRowDown}
-                canDelete={selectionCtx.canDeleteRow}
-                onDuplicate={() => duplicateRow(activeRowForInspector.id)}
-                onDelete={() => deleteRow(activeRowForInspector.id)}
-                onClose={handleReturnToLibrary}
-              />
+              (() => {
+                const secEffectiveMaxW = selectedSec
+                  ? getSectionEffectiveMaxWidth(selectedSec, effectiveCanvasMaxWidth)
+                  : effectiveCanvasMaxWidth;
+                const rowGoverningMaxW =
+                  selectionCtx.isNestedRow && selectionCtx.outerRow
+                    ? (selectionCtx.outerRow.widthType || 'boxed') === 'boxed' &&
+                      selectionCtx.outerRow.maxWidth !== undefined
+                      ? Math.min(selectionCtx.outerRow.maxWidth, secEffectiveMaxW)
+                      : secEffectiveMaxW
+                    : secEffectiveMaxW;
+                const rowGoverningLabel =
+                  selectionCtx.isNestedRow &&
+                  selectionCtx.outerRow &&
+                  (selectionCtx.outerRow.widthType || 'boxed') === 'boxed' &&
+                  selectionCtx.outerRow.maxWidth !== undefined
+                    ? 'Contenedor Padre'
+                    : selectedSec && isSectionBoxed(selectedSec)
+                    ? 'Sección Externa'
+                    : 'Canvas';
+                return (
+                  <RowInspector
+                    row={activeRowForInspector}
+                    sectionName={selectedSec?.name}
+                    canvasMaxWidth={rowGoverningMaxW}
+                    governingLabel={rowGoverningLabel}
+                    onUpdate={(props) => updateSelectedRow(props)}
+                    onChangeColumnsCount={(count) => changeRowColumnsCount(activeRowForInspector.id, count)}
+                    onMoveUp={() => moveRow('up', selectedSec?.id, activeRowForInspector.id)}
+                    onMoveDown={() => moveRow('down', selectedSec?.id, activeRowForInspector.id)}
+                    canMoveUp={selectionCtx.canMoveRowUp}
+                    canMoveDown={selectionCtx.canMoveRowDown}
+                    canDelete={selectionCtx.canDeleteRow}
+                    onDuplicate={() => duplicateRow(activeRowForInspector.id)}
+                    onDelete={() => deleteRow(activeRowForInspector.id)}
+                    onClose={handleReturnToLibrary}
+                  />
+                );
+              })()
             ) : activeSectionForInspector ? (
               /* DEDICATED SECTION INSPECTOR (WHEN SECTION IS SELECTED) */
               <SectionInspector
                 section={activeSectionForInspector}
+                canvasMaxWidth={effectiveCanvasMaxWidth}
                 onUpdate={(props) => updateSection(activeSectionForInspector.id, props)}
                 onMoveUp={() => moveSection('up', activeSectionForInspector.id)}
                 onMoveDown={() => moveSection('down', activeSectionForInspector.id)}
@@ -9526,10 +9703,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  const prebuiltType = e.dataTransfer.getData('application/ssp-prebuilt-block');
+                  const prebuiltType = e.dataTransfer.getData('application/ssp-prebuilt-block') || draggingBlockType;
                   const elType = e.dataTransfer.getData('application/ssp-element-type') as ElementType;
-                  const layout = e.dataTransfer.getData('application/ssp-section-layout') as '1col' | '2col' | '3col' | '4col' | undefined;
-                  const innerCols = e.dataTransfer.getData('application/ssp-inner-columns');
+                  const layout = (e.dataTransfer.getData('application/ssp-section-layout') || draggingSectionLayout) as '1col' | '2col' | '3col' | '4col' | undefined;
+                  const innerCols = e.dataTransfer.getData('application/ssp-inner-columns') || (draggingInnerCols !== null ? String(draggingInnerCols) : '');
+                  clearAllDragStates();
                   if (prebuiltType) {
                     insertPrebuiltBlock(prebuiltType);
                   } else if (layout) {
@@ -9588,16 +9766,34 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               const isFirstSection = secIdx === 0;
               const isLastSection = secIdx === sections.length - 1;
 
-              // Compute background styles
+              const sectionIsBoxed = isSectionBoxed(section);
+              const sectionEffectiveMaxW = getSectionEffectiveMaxWidth(section, effectiveCanvasMaxWidth);
+
+              // Compute background & outer box styles (when boxed, shrink & center entire section box)
               const sectionStyle: React.CSSProperties = {
+                width: '100%',
+                maxWidth:
+                  viewportMode !== 'mobile' && sectionIsBoxed
+                    ? `${sectionEffectiveMaxW}px`
+                    : undefined,
                 paddingTop: `${section.paddingTop ?? section.paddingY ?? 48}px`,
                 paddingBottom: `${section.paddingBottom ?? section.paddingY ?? 48}px`,
                 paddingLeft: `${section.paddingLeft ?? 24}px`,
                 paddingRight: `${section.paddingRight ?? 24}px`,
                 marginTop: `${section.marginTop ?? 0}px`,
                 marginBottom: `${section.marginBottom ?? 0}px`,
-                marginLeft: `${section.marginLeft ?? 0}px`,
-                marginRight: `${section.marginRight ?? 0}px`,
+                marginLeft:
+                  viewportMode !== 'mobile' && sectionIsBoxed
+                    ? section.marginLeft
+                      ? `${section.marginLeft}px`
+                      : 'auto'
+                    : `${section.marginLeft ?? 0}px`,
+                marginRight:
+                  viewportMode !== 'mobile' && sectionIsBoxed
+                    ? section.marginRight
+                      ? `${section.marginRight}px`
+                      : 'auto'
+                    : `${section.marginRight ?? 0}px`,
                 borderTop: section.borderTopWidth ? `${section.borderTopWidth}px solid ${section.borderColor || '#E4E4E7'}` : undefined,
                 borderBottom: section.borderBottomWidth ? `${section.borderBottomWidth}px solid ${section.borderColor || '#E4E4E7'}` : undefined,
                 borderTopLeftRadius: isFirstSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
@@ -9973,7 +10169,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     rIdx: number,
                     depth: 0 | 1,
                     wrapperEl?: PageBlockElement,
-                    parentElementsCount?: number
+                    parentElementsCount?: number,
+                    governingMaxW: number = sectionEffectiveMaxW
                   ): React.ReactNode => {
                     const isRowSelected =
                       !isPreviewMode &&
@@ -9989,10 +10186,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         : rIdx < (parentElementsCount ?? 1) - 1;
                     const canRowDelete = depth === 1 ? true : section.rows.length > 1;
 
+                    const effectiveRowMaxW =
+                      (row.widthType || 'boxed') === 'boxed' && row.maxWidth
+                        ? Math.min(row.maxWidth, governingMaxW)
+                        : governingMaxW;
+
                     const rowStyle: React.CSSProperties = {
                       maxWidth:
                         (row.widthType || 'boxed') === 'boxed' && row.maxWidth
-                          ? `${Math.min(row.maxWidth, effectiveCanvasMaxWidth)}px`
+                          ? `${effectiveRowMaxW}px`
                           : row.widthType === 'full'
                           ? '100%'
                           : undefined,
@@ -10271,8 +10473,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       {row.columns.map((column, cIdx) => {
                         const isColumnSelected =
                           !isPreviewMode && selectedColumnId === column.id && !selectedElementId;
-                        const isColumnHovered =
-                          !isPreviewMode && hoveredColumnId === column.id && !selectedElementId;
                         const colSurfaceStyle = getColumnSurfaceStyle(column, { isPreview: isPreviewMode });
                         const colShadowClass = getColumnShadowClass(column.shadow);
                         const hasCustomColBorder = Boolean(column.borderWidth && column.borderWidth > 0);
@@ -10284,21 +10484,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               width: viewportMode === 'mobile' ? '100%' : `${column.widthPercentage}%`,
                             }}
                             className="px-3 flex flex-col relative"
-                            onMouseOver={(e) => {
-                              if (isPreviewMode) return;
-                              e.stopPropagation();
-                              if (hoveredColumnId !== column.id) {
-                                setHoveredColumnId(column.id);
-                              }
-                              if (hoveredRowId !== row.id) {
-                                setHoveredRowId(row.id);
-                              }
-                            }}
-                            onMouseLeave={() => {
-                              if (!isPreviewMode && hoveredColumnId === column.id) {
-                                setHoveredColumnId(null);
-                              }
-                            }}
                             onDragOver={(e) => {
                               const isBlockOrSectionDrag =
                                 draggingBlockType ||
@@ -10386,8 +10571,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               if (sourceId && depth === 1) {
                                 const srcEl = findElementById(sections, sourceId);
                                 if (srcEl?.type === 'inner_columns') {
-                                  setDraggingElementId(null);
-                                  setDropIndicator(null);
+                                  clearAllDragStates();
                                   showToast('Solo se permite una sección interna dentro de un bloque (máximo 1 nivel)');
                                   return;
                                 }
@@ -10400,7 +10584,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                     ? dropIndicator.index
                                     : dropIndicator.index + 1
                                   : computed.targetIdx;
-                              setDropIndicator(null);
 
                               // Handle sidebar drop
                               const droppedType = e.dataTransfer.getData('application/ssp-element-type') as ElementType;
@@ -10410,6 +10593,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 | 'h3'
                                 | 'h4'
                                 | undefined;
+                              clearAllDragStates();
                               if (droppedType) {
                                 insertElementAt(droppedType, column.id, targetIdx, droppedLevel ? { level: droppedLevel } : undefined);
                                 return;
@@ -10421,30 +10605,6 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               }
                             }}
                           >
-                            {/* FLOATING BADGE TO SELECT & COLOR INDIVIDUAL COLUMN */}
-                            {!isPreviewMode && (isColumnSelected || isColumnHovered) && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedSectionId(section.id);
-                                  setSelectedRowId(row.id);
-                                  setSelectedColumnId(column.id);
-                                  setSelectedElementId(null);
-                                }}
-                                className={`absolute -top-6 right-3 z-25 flex items-center gap-1 px-2 py-0.5 rounded-t-md text-[10px] font-bold uppercase tracking-wider shadow-sm cursor-pointer select-none transition-colors ${
-                                  isColumnSelected
-                                    ? 'bg-teal-600 text-white'
-                                    : 'bg-teal-600/90 hover:bg-teal-700 text-white'
-                                }`}
-                                title={`Editar color, fondo y estilo de ${column.name || `Columna ${cIdx + 1}`}`}
-                              >
-                                <ColumnsIcon className="w-3 h-3 text-white" />
-                                <span>{column.name || `Columna ${cIdx + 1}`}</span>
-                                <Palette className="w-2.5 h-2.5 text-teal-100 ml-0.5" />
-                              </button>
-                            )}
-
                             <div
                               style={colSurfaceStyle}
                               onClick={(e) => {
@@ -10452,7 +10612,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 e.stopPropagation();
                                 setSelectedSectionId(section.id);
                                 setSelectedRowId(row.id);
-                                setSelectedColumnId(column.id);
+                                setSelectedColumnId(null);
                                 setSelectedElementId(null);
                               }}
                               className={`w-full flex-1 relative transition-all ${colShadowClass} ${
@@ -10463,14 +10623,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                         ? dropIndicator?.colId === column.id
                                           ? 'border-2 border-dashed border-[#2848F0] bg-blue-50/20'
                                           : isColumnSelected
-                                          ? 'border-2 border-solid border-teal-500'
-                                          : 'border border-dashed border-zinc-300/80 hover:border-teal-400'
-                                        : ''
-                                    } ${
-                                      isColumnSelected
-                                        ? 'ring-2 ring-teal-500/50 ring-offset-1'
-                                        : isColumnHovered
-                                        ? 'ring-1 ring-teal-400/50'
+                                          ? 'border-2 border-solid border-indigo-500'
+                                          : 'border border-dashed border-zinc-300/80'
                                         : ''
                                     }`
                               }`}
@@ -10489,7 +10643,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                         {column.name || `Columna ${cIdx + 1}`}
                                       </span>
                                       <span className="text-[10px] text-zinc-400 italic mt-0.5">
-                                        Haz clic para editar columna o arrastra elementos aquí
+                                        Arrastra elementos aquí
                                       </span>
                                     </>
                                   )}
@@ -10526,7 +10680,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                             elIdx,
                                             1,
                                             element,
-                                            column.elements.length
+                                            column.elements.length,
+                                            effectiveRowMaxW
                                           )}
                                         </div>
                                       )}
@@ -11672,6 +11827,16 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               onReorderElementsInCol={(colId, fromIdx, toIdx) => reorderElementsInCol(colId, fromIdx, toIdx)}
               onReorderRowsInSection={(secId, fromIdx, toIdx) => reorderRowsInSection(secId, fromIdx, toIdx)}
               onReorderSections={(fromIdx, toIdx) => reorderSections(fromIdx, toIdx)}
+              onMoveElementToColumn={(elId, targetColId, targetIdx) =>
+                reorderCanvasElement(elId, targetColId, targetIdx)
+              }
+              onMoveRowToSection={(rId, targetSecId, targetRowIdx) =>
+                moveCanvasRowToSection(rId, targetSecId, targetRowIdx)
+              }
+              onPromoteInnerColumnsToRow={(wrapperElId, targetSecId, targetRowIdx) =>
+                promoteInnerColumnsToRow(wrapperElId, targetSecId, targetRowIdx)
+              }
+              onMoveSectionToIndex={(secId, targetIdx) => reorderCanvasSection(secId, targetIdx)}
               onClose={() => setShowStructurePanel(false)}
             />
           </aside>
@@ -11882,12 +12047,19 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     sec.bgColor === '#DC2626' ||
                     sec.bgColor === '#18181B' ||
                     (sec.bgColor && ['#0', '#1', '#2'].some((prefix) => sec.bgColor?.startsWith(prefix)));
+                  const secBoxed = isSectionBoxed(sec);
+                  const secBgType = sec.bgType || (sec.bgGradient ? 'gradient' : sec.bgImageUrl ? 'image' : 'solid');
                   return (
                     <div
                       key={idx}
                       className="p-6 sm:p-8"
                       style={{
-                        backgroundColor: sec.bgColor || '#FFFFFF',
+                        width: '100%',
+                        maxWidth: secBoxed ? `${getSectionEffectiveMaxWidth(sec, 900)}px` : undefined,
+                        marginLeft: secBoxed ? 'auto' : undefined,
+                        marginRight: secBoxed ? 'auto' : undefined,
+                        backgroundColor: secBgType === 'solid' ? sec.bgColor || '#FFFFFF' : undefined,
+                        backgroundImage: secBgType === 'gradient' ? sec.bgGradient : undefined,
                         color: isDark ? '#FFFFFF' : '#0F172A',
                       }}
                     >
