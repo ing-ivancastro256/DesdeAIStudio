@@ -1,8 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { PageBlockSection } from '../../types';
 import { NumberControl } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
-import { BoxModelSpacingControl } from '../common/BoxModelSpacingControl';
+import { BoxModelSpacingControl, SingleBoxModelRow } from '../common/BoxModelSpacingControl';
 import {
   ArrowLeft,
   ArrowUp,
@@ -18,7 +18,93 @@ import {
   Clock,
   Maximize2,
   Minimize2,
+  Square,
 } from 'lucide-react';
+
+interface SectionInlineSliderProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  unit?: string;
+  onChange: (val: number) => void;
+}
+
+const SectionInlineSlider: React.FC<SectionInlineSliderProps> = ({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  unit = 'px',
+  onChange,
+}) => {
+  const [inputStr, setInputStr] = useState<string>(String(value));
+
+  useEffect(() => {
+    setInputStr(String(value));
+  }, [value]);
+
+  const handleNumberChange = (raw: string) => {
+    setInputStr(raw);
+    if (raw.trim() === '' || raw === '-') return;
+    const parsed = Number(raw);
+    if (!Number.isNaN(parsed)) {
+      const clamped = Math.min(max, Math.max(min, parsed));
+      onChange(clamped);
+    }
+  };
+
+  const handleBlur = () => {
+    const parsed = Number(inputStr);
+    if (inputStr.trim() === '' || Number.isNaN(parsed)) {
+      setInputStr(String(value));
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, parsed));
+    setInputStr(String(clamped));
+    if (clamped !== value) {
+      onChange(clamped);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <label className="font-semibold text-zinc-700 block text-xs">{label}:</label>
+      <div className="flex items-center gap-2.5">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={Math.min(max, Math.max(min, value))}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            setInputStr(String(next));
+            onChange(next);
+          }}
+          className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
+        />
+        <div className="flex items-center gap-1 shrink-0">
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={inputStr}
+            onChange={(e) => handleNumberChange(e.target.value)}
+            onBlur={handleBlur}
+            className="w-[68px] px-1.5 py-1 text-right font-mono font-semibold text-xs border border-zinc-300 rounded-md bg-zinc-50 focus:bg-white text-zinc-900 focus:outline-[#2848F0] [&::-webkit-inner-spin-button]:opacity-100 [&::-webkit-inner-spin-button]:cursor-pointer"
+          />
+          {unit && (
+            <span className="text-[11px] text-zinc-500 font-mono select-none">{unit}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 interface SectionInspectorProps {
@@ -82,6 +168,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
     width: true,
     background: true,
     spacing: true,
+    borderRadius: true,
     borders: true,
     delay: true,
   });
@@ -378,9 +465,25 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                 <div className="space-y-2.5">
                   <HexColorPicker
                     label="Color de Fondo:"
-                    value={section.bgColor || '#FFFFFF'}
-                    onChange={(val) => onUpdate({ bgColor: val })}
+                    value={
+                      !section.bgColor || section.bgColor === 'transparent'
+                        ? '#FFFFFF'
+                        : section.bgColor
+                    }
+                    onChange={(val) => onUpdate({ bgColor: val, bgCustom: true })}
                   />
+
+                  <button
+                    type="button"
+                    onClick={() => onUpdate({ bgColor: 'transparent', bgCustom: true })}
+                    className={`w-full py-1.5 px-2.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      section.bgColor === 'transparent'
+                        ? 'bg-blue-50 border-[#2848F0] text-[#2848F0]'
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                    }`}
+                  >
+                    <span>Transparente (Mostrar fondo de página)</span>
+                  </button>
 
                   {/* Palette Presets */}
                   <div>
@@ -392,9 +495,10 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                         <button
                           key={color}
                           type="button"
-                          onClick={() => onUpdate({ bgColor: color })}
+                          onClick={() => onUpdate({ bgColor: color, bgCustom: true })}
                           style={{ backgroundColor: color }}
                           className={`h-6 rounded border transition-transform hover:scale-105 cursor-pointer ${
+                            section.bgCustom &&
                             section.bgColor?.toLowerCase() === color.toLowerCase()
                               ? 'ring-2 ring-[#2848F0] ring-offset-1 border-transparent'
                               : 'border-zinc-300'
@@ -624,15 +728,76 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* ACCORDION 3: BORDES Y SEPARADORES DE SECCIÓN                   */}
+        {/* ACCORDION 4: REDONDEO DE ESQUINAS / RADIO                      */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-lg overflow-hidden">
           <button
+            type="button"
+            onClick={() => toggleAccordion('borderRadius')}
+            className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <Square className="w-3.5 h-3.5 text-[#2848F0]" />
+              Redondeo de Esquinas (Radio)
+            </span>
+            {openSections.borderRadius ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          {openSections.borderRadius && (
+            <div className="p-3 space-y-3 bg-white">
+              <div>
+                <label className="font-semibold text-zinc-700 block mb-1.5">
+                  Presets Rápidos:
+                </label>
+                <div className="grid grid-cols-6 gap-1">
+                  {[0, 8, 16, 24, 32, 48].map((rad) => {
+                    const isActive = (section.borderRadius ?? 0) === rad;
+                    return (
+                      <button
+                        key={rad}
+                        type="button"
+                        onClick={() => onUpdate({ borderRadius: rad })}
+                        className={`py-1 px-1 rounded border text-[10px] font-mono tabular-nums text-center transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-[#2848F0] text-white border-[#2848F0] font-bold shadow-2xs'
+                            : 'border-zinc-200 bg-white hover:border-[#2848F0] text-zinc-700'
+                        }`}
+                      >
+                        {rad}px
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <SectionInlineSlider
+                label="Radio de Esquinas"
+                value={section.borderRadius ?? 0}
+                min={0}
+                max={64}
+                step={1}
+                unit="px"
+                onChange={(val) => onUpdate({ borderRadius: val })}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* ACCORDION 5: BORDES Y LÍNEAS DIVISORIAS                        */}
+        {/* ============================================================== */}
+        <div className="border border-zinc-200 rounded-lg overflow-hidden">
+          <button
+            type="button"
             onClick={() => toggleAccordion('borders')}
             className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
-              <Layout className="w-3.5 h-3.5 text-zinc-600" />
+              <Layout className="w-3.5 h-3.5 text-[#2848F0]" />
               Bordes y Líneas Divisorias
             </span>
             {openSections.borders ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -640,21 +805,55 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
 
           {openSections.borders && (
             <div className="p-3 space-y-3.5 bg-white">
-              <NumberControl
-                label="Borde Superior (px)"
-                value={section.borderTopWidth ?? 0}
-                min={0}
-                max={12}
-                onChange={(val) => onUpdate({ borderTopWidth: val })}
+              <SingleBoxModelRow
+                label="Grosor de borde"
+                defaultLinked={true}
+                values={{
+                  top: section.borderTopWidth ?? 0,
+                  right: section.borderRightWidth ?? 0,
+                  bottom: section.borderBottomWidth ?? 0,
+                  left: section.borderLeftWidth ?? 0,
+                }}
+                onChange={(v) =>
+                  onUpdate({
+                    borderTopWidth: v.top,
+                    borderRightWidth: v.right,
+                    borderBottomWidth: v.bottom,
+                    borderLeftWidth: v.left,
+                  })
+                }
               />
 
-              <NumberControl
-                label="Borde Inferior (px)"
-                value={section.borderBottomWidth ?? 0}
-                min={0}
-                max={12}
-                onChange={(val) => onUpdate({ borderBottomWidth: val })}
-              />
+              <div>
+                <label className="font-semibold text-zinc-700 block mb-1.5">
+                  Estilo de Borde:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      { value: 'solid', label: 'Sólido' },
+                      { value: 'dashed', label: 'Guiones' },
+                      { value: 'dotted', label: 'Puntos' },
+                    ] as const
+                  ).map((st) => {
+                    const isSelected = (section.borderStyle || 'solid') === st.value;
+                    return (
+                      <button
+                        key={st.value}
+                        type="button"
+                        onClick={() => onUpdate({ borderStyle: st.value })}
+                        className={`py-1.5 px-2 rounded-md border text-[11px] font-semibold transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-50 border-[#2848F0] text-[#2848F0] shadow-2xs'
+                            : 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {st.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <HexColorPicker
                 label="Color de Borde:"

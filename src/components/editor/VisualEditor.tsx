@@ -325,7 +325,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [showTemplateConfirmModal, setShowTemplateConfirmModal] = useState<boolean>(false);
   const [templatePreviewModal, setTemplatePreviewModal] = useState<PageTemplate | null>(null);
 
-  // Global Page settings (Canvas width, Google Fonts, default H1-H4 sizes, colors)
+  // Global Page settings (Canvas width, Google Fonts, default H1-H4 sizes, colors, background image, 4-side padding)
   const [pageSettings, setPageSettings] = useState<FunnelPageGlobalSettings>(() => ({
     pageWidthType: currentPage.settings?.pageWidthType || 'boxed',
     pageContentMaxWidth: currentPage.settings?.pageContentMaxWidth || 1200,
@@ -334,6 +334,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         ? currentPage.settings.pageBorderRadius
         : 0,
     pageBgColor: currentPage.settings?.pageBgColor || '#FFFFFF',
+    pageBgImageUrl: currentPage.settings?.pageBgImageUrl || '',
+    pageBgImageOpacity: currentPage.settings?.pageBgImageOpacity ?? 100,
+    pageBgImageSize: currentPage.settings?.pageBgImageSize || 'cover',
+    pageBgImagePosition: currentPage.settings?.pageBgImagePosition || 'center',
+    pageBgImageRepeat: currentPage.settings?.pageBgImageRepeat || 'no-repeat',
+    pageBgImageAttachment: currentPage.settings?.pageBgImageAttachment || 'scroll',
     primaryColor: currentPage.settings?.primaryColor || '#2848F0',
     textColor: currentPage.settings?.textColor || '#121111',
     headingFontFamily: currentPage.settings?.headingFontFamily || 'Poppins',
@@ -343,10 +349,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     defaultH3Size: currentPage.settings?.defaultH3Size || 22,
     defaultH4Size: currentPage.settings?.defaultH4Size || 18,
     pagePaddingTop: currentPage.settings?.pagePaddingTop ?? 0,
+    pagePaddingRight: currentPage.settings?.pagePaddingRight ?? 0,
     pagePaddingBottom:
       currentPage.settings?.pagePaddingBottom !== undefined && currentPage.settings?.pagePaddingBottom !== 40
         ? currentPage.settings.pagePaddingBottom
         : 0,
+    pagePaddingLeft: currentPage.settings?.pagePaddingLeft ?? 0,
     seo_title: currentPage.settings?.seo_title || '',
     seo_description: currentPage.settings?.seo_description || '',
   }));
@@ -359,7 +367,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           {
             id: 'sec_default',
             name: 'Sección Principal',
-            bgColor: '#FFFFFF',
+            bgColor: 'transparent',
             paddingY: 40,
             rows: [
               {
@@ -1604,7 +1612,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       id: `sec_${Date.now()}`,
       name: `Sección ${sections.length + 1}`,
       bgType: 'solid',
-      bgColor: '#FFFFFF',
+      bgColor: 'transparent',
       paddingTop: 48,
       paddingBottom: 48,
       paddingLeft: 24,
@@ -9665,9 +9673,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         >
           <div
             ref={canvasContainerRef}
-            className={`transition-all duration-300 shadow-xl border flex flex-col relative w-full h-auto min-h-0 ${
+            className={`transition-all duration-300 shadow-xl border flex flex-col relative w-full h-auto shrink-0 min-h-[480px] ${
               isPreviewMode
-                ? 'mb-16 shadow-2xl overflow-visible'
+                ? 'mb-16 shadow-2xl overflow-hidden'
                 : 'mb-24 overflow-visible'
             } ${viewportMode === 'mobile' ? 'max-w-[390px] my-4' : ''}`}
             style={{
@@ -9683,7 +9691,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               color: pageSettings.textColor || '#121111',
               borderColor: '#E4E4E7',
               paddingTop: `${pageSettings.pagePaddingTop ?? 0}px`,
+              paddingRight: `${pageSettings.pagePaddingRight ?? 0}px`,
               paddingBottom: `${pageSettings.pagePaddingBottom ?? 0}px`,
+              paddingLeft: `${pageSettings.pagePaddingLeft ?? 0}px`,
             }}
             onClick={(e) => {
               if (e.target === e.currentTarget && !isPreviewMode) {
@@ -9695,6 +9705,27 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               }
             }}
           >
+            {/* Optional Canvas Background Image Layer (supports opacity, fit, position, repeat, attachment) */}
+            {pageSettings.pageBgImageUrl && pageSettings.pageBgImageUrl.trim() !== '' && (
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  borderRadius: `${pageSettings.pageBorderRadius ?? 0}px`,
+                  backgroundImage: `url("${pageSettings.pageBgImageUrl}")`,
+                  backgroundSize:
+                    pageSettings.pageBgImageSize === 'stretch'
+                      ? '100% 100%'
+                      : pageSettings.pageBgImageSize || 'cover',
+                  backgroundPosition: pageSettings.pageBgImagePosition || 'center',
+                  backgroundRepeat: pageSettings.pageBgImageRepeat || 'no-repeat',
+                  backgroundAttachment:
+                    pageSettings.pageBgImageAttachment === 'fixed' ? 'fixed' : 'scroll',
+                  opacity: (pageSettings.pageBgImageOpacity ?? 100) / 100,
+                }}
+              />
+            )}
+
             {sections.length === 0 ? (
               <div
                 onDragOver={(e) => {
@@ -9718,7 +9749,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     addElement(elType);
                   }
                 }}
-                className="min-h-[460px] flex flex-col items-center justify-center p-8 text-center"
+                className="relative min-h-[460px] flex flex-col items-center justify-center p-8 text-center"
               >
                 <div className="w-full max-w-lg p-8 border-2 border-dashed border-zinc-300 rounded-2xl bg-zinc-50/50 hover:bg-zinc-50 hover:border-[#2848F0]/40 transition-all flex flex-col items-center justify-center shadow-xs">
                   <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2848F0] flex items-center justify-center mb-3.5 shadow-2xs">
@@ -9762,12 +9793,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               sections.map((section, secIdx) => {
               const isSectionSelected = !isPreviewMode && selectedSectionId === section.id && !selectedElementId;
               const effectiveBgType = section.bgType || (section.bgGradient ? 'gradient' : section.bgImageUrl ? 'image' : 'solid');
-              const canvasRadius = pageSettings.pageBorderRadius !== undefined ? pageSettings.pageBorderRadius : 0;
-              const isFirstSection = secIdx === 0;
-              const isLastSection = secIdx === sections.length - 1;
 
               const sectionIsBoxed = isSectionBoxed(section);
               const sectionEffectiveMaxW = getSectionEffectiveMaxWidth(section, effectiveCanvasMaxWidth);
+              const secBorderStyle = section.borderStyle || 'solid';
+              const secBorderColor = section.borderColor || '#E4E4E7';
 
               // Compute background & outer box styles (when boxed, shrink & center entire section box)
               const sectionStyle: React.CSSProperties = {
@@ -9794,17 +9824,37 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       ? `${section.marginRight}px`
                       : 'auto'
                     : `${section.marginRight ?? 0}px`,
-                borderTop: section.borderTopWidth ? `${section.borderTopWidth}px solid ${section.borderColor || '#E4E4E7'}` : undefined,
-                borderBottom: section.borderBottomWidth ? `${section.borderBottomWidth}px solid ${section.borderColor || '#E4E4E7'}` : undefined,
-                borderTopLeftRadius: isFirstSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
-                borderTopRightRadius: isFirstSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
-                borderBottomLeftRadius: isLastSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
-                borderBottomRightRadius: isLastSection && canvasRadius > 0 ? `${canvasRadius}px` : '0px',
+                borderRadius: `${section.borderRadius ?? 0}px`,
+                borderTop: section.borderTopWidth
+                  ? `${section.borderTopWidth}px ${secBorderStyle} ${secBorderColor}`
+                  : undefined,
+                borderRight: section.borderRightWidth
+                  ? `${section.borderRightWidth}px ${secBorderStyle} ${secBorderColor}`
+                  : undefined,
+                borderBottom: section.borderBottomWidth
+                  ? `${section.borderBottomWidth}px ${secBorderStyle} ${secBorderColor}`
+                  : undefined,
+                borderLeft: section.borderLeftWidth
+                  ? `${section.borderLeftWidth}px ${secBorderStyle} ${secBorderColor}`
+                  : undefined,
                 position: 'relative',
               };
 
               if (effectiveBgType === 'solid') {
-                sectionStyle.backgroundColor = section.bgColor || '#FFFFFF';
+                const hasCustomCanvasSurface = Boolean(
+                  (pageSettings.pageBgImageUrl && pageSettings.pageBgImageUrl.trim() !== '') ||
+                    (pageSettings.pageBgColor &&
+                      pageSettings.pageBgColor.toUpperCase() !== '#FFFFFF')
+                );
+                const isUntouchedLegacyWhite =
+                  !section.bgCustom &&
+                  (!section.bgColor || section.bgColor.toUpperCase() === '#FFFFFF') &&
+                  !sectionIsBoxed &&
+                  hasCustomCanvasSurface;
+                sectionStyle.backgroundColor =
+                  section.bgColor === 'transparent' || isUntouchedLegacyWhite
+                    ? 'transparent'
+                    : section.bgColor || '#FFFFFF';
               } else if (effectiveBgType === 'gradient') {
                 sectionStyle.backgroundImage = section.bgGradient || 'linear-gradient(135deg, #18181B 0%, #09090B 100%)';
               } else if (effectiveBgType === 'image' && section.bgImageUrl) {
@@ -9987,7 +10037,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       setSelectedColumnId(null);
                       setSelectedElementId(null);
                     }}
-                    className={`relative transition-all ${
+                    className={`relative shrink-0 transition-all ${
                       draggingSectionId === section.id
                         ? 'opacity-40 scale-[0.99] border-2 border-dashed border-amber-500'
                         : ''
@@ -10006,6 +10056,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       <div
                         className="absolute inset-0 pointer-events-none z-0"
                         style={{
+                          borderRadius: 'inherit',
                           backgroundColor: (section.bgOverlayType || 'dark') === 'dark' ? '#000000' : '#FFFFFF',
                           opacity: (section.bgOverlayOpacity ?? 60) / 100,
                         }}
@@ -12049,15 +12100,30 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     (sec.bgColor && ['#0', '#1', '#2'].some((prefix) => sec.bgColor?.startsWith(prefix)));
                   const secBoxed = isSectionBoxed(sec);
                   const secBgType = sec.bgType || (sec.bgGradient ? 'gradient' : sec.bgImageUrl ? 'image' : 'solid');
+                  const tplBorderStyle = sec.borderStyle || 'solid';
+                  const tplBorderColor = sec.borderColor || '#E4E4E7';
                   return (
                     <div
                       key={idx}
-                      className="p-6 sm:p-8"
+                      className="p-6 sm:p-8 shrink-0"
                       style={{
                         width: '100%',
                         maxWidth: secBoxed ? `${getSectionEffectiveMaxWidth(sec, 900)}px` : undefined,
                         marginLeft: secBoxed ? 'auto' : undefined,
                         marginRight: secBoxed ? 'auto' : undefined,
+                        borderRadius: `${sec.borderRadius ?? 0}px`,
+                        borderTop: sec.borderTopWidth
+                          ? `${sec.borderTopWidth}px ${tplBorderStyle} ${tplBorderColor}`
+                          : undefined,
+                        borderRight: sec.borderRightWidth
+                          ? `${sec.borderRightWidth}px ${tplBorderStyle} ${tplBorderColor}`
+                          : undefined,
+                        borderBottom: sec.borderBottomWidth
+                          ? `${sec.borderBottomWidth}px ${tplBorderStyle} ${tplBorderColor}`
+                          : undefined,
+                        borderLeft: sec.borderLeftWidth
+                          ? `${sec.borderLeftWidth}px ${tplBorderStyle} ${tplBorderColor}`
+                          : undefined,
                         backgroundColor: secBgType === 'solid' ? sec.bgColor || '#FFFFFF' : undefined,
                         backgroundImage: secBgType === 'gradient' ? sec.bgGradient : undefined,
                         color: isDark ? '#FFFFFF' : '#0F172A',

@@ -1,21 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { Monitor, Link2, Unlink } from 'lucide-react';
 
-interface SpacingValues {
+export interface SpacingValues {
   top: number;
   right: number;
   bottom: number;
   left: number;
 }
 
-interface SingleBoxProps {
-  label: string; // 'Margen' | 'Relleno'
+export interface SingleBoxProps {
+  label: string; // 'Margen' | 'Relleno' | 'Grosor de borde'
   values: SpacingValues;
   onChange: (values: SpacingValues) => void;
+  defaultLinked?: boolean;
 }
 
-const SingleBoxModelRow: React.FC<SingleBoxProps> = ({ label, values, onChange }) => {
-  const [isLinked, setIsLinked] = useState<boolean>(false);
+export const SingleBoxModelRow: React.FC<SingleBoxProps> = ({
+  label,
+  values,
+  onChange,
+  defaultLinked = false,
+}) => {
+  const [isLinked, setIsLinked] = useState<boolean>(() => {
+    if (!defaultLinked) return false;
+    const t = values.top ?? 0;
+    return t === (values.right ?? 0) && t === (values.bottom ?? 0) && t === (values.left ?? 0);
+  });
   const [localTop, setLocalTop] = useState<string>(String(values.top ?? 0));
   const [localRight, setLocalRight] = useState<string>(String(values.right ?? 0));
   const [localBottom, setLocalBottom] = useState<string>(String(values.bottom ?? 0));
@@ -162,7 +172,7 @@ export interface BoxModelSpacingControlProps {
   paddingRight?: number;
   paddingBottom?: number;
   paddingLeft?: number;
-  onChangeMargin: (margins: {
+  onChangeMargin?: (margins: {
     marginTop: number;
     marginRight: number;
     marginBottom: number;
@@ -174,6 +184,7 @@ export interface BoxModelSpacingControlProps {
     paddingBottom: number;
     paddingLeft: number;
   }) => void;
+  showMargin?: boolean;
   showPadding?: boolean;
 }
 
@@ -188,28 +199,31 @@ export const BoxModelSpacingControl: React.FC<BoxModelSpacingControlProps> = ({
   paddingLeft = 0,
   onChangeMargin,
   onChangePadding,
+  showMargin = true,
   showPadding = true,
 }) => {
   return (
     <div className="space-y-4">
       {/* Margen */}
-      <SingleBoxModelRow
-        label="Margen"
-        values={{
-          top: marginTop,
-          right: marginRight,
-          bottom: marginBottom,
-          left: marginLeft,
-        }}
-        onChange={(v) =>
-          onChangeMargin({
-            marginTop: v.top,
-            marginRight: v.right,
-            marginBottom: v.bottom,
-            marginLeft: v.left,
-          })
-        }
-      />
+      {showMargin && onChangeMargin && (
+        <SingleBoxModelRow
+          label="Margen"
+          values={{
+            top: marginTop,
+            right: marginRight,
+            bottom: marginBottom,
+            left: marginLeft,
+          }}
+          onChange={(v) =>
+            onChangeMargin({
+              marginTop: v.top,
+              marginRight: v.right,
+              marginBottom: v.bottom,
+              marginLeft: v.left,
+            })
+          }
+        />
+      )}
 
       {/* Relleno */}
       {showPadding && onChangePadding && (

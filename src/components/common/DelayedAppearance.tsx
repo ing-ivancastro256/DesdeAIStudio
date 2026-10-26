@@ -57,7 +57,7 @@ export const DelayedAppearance: React.FC<DelayedAppearanceProps> = ({
   // Once elapsed, render with smooth fade-in
   return (
     <div
-      className={`animate-in fade-in duration-700 w-full ${className}`}
+      className={`animate-in fade-in duration-700 w-full shrink-0 ${className}`}
       style={style}
     >
       {children}

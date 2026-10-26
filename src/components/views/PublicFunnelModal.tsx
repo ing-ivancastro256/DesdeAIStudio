@@ -1184,6 +1184,8 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
         : activePage?.settings?.pageContentMaxWidth || 1200;
     const sectionIsBoxed = isSectionBoxed(section);
     const sectionEffectiveMaxW = getSectionEffectiveMaxWidth(section, pageCanvasMaxW);
+    const secBorderStyle = section.borderStyle || 'solid';
+    const secBorderColor = section.borderColor || '#E4E4E7';
 
     const sectionStyle: React.CSSProperties = {
       width: '100%',
@@ -1204,17 +1206,38 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           ? `${section.marginRight}px`
           : 'auto'
         : `${section.marginRight ?? 0}px`,
+      borderRadius: `${section.borderRadius ?? 0}px`,
       borderTop: section.borderTopWidth
-        ? `${section.borderTopWidth}px solid ${section.borderColor || '#E4E4E7'}`
+        ? `${section.borderTopWidth}px ${secBorderStyle} ${secBorderColor}`
+        : undefined,
+      borderRight: section.borderRightWidth
+        ? `${section.borderRightWidth}px ${secBorderStyle} ${secBorderColor}`
         : undefined,
       borderBottom: section.borderBottomWidth
-        ? `${section.borderBottomWidth}px solid ${section.borderColor || '#E4E4E7'}`
+        ? `${section.borderBottomWidth}px ${secBorderStyle} ${secBorderColor}`
+        : undefined,
+      borderLeft: section.borderLeftWidth
+        ? `${section.borderLeftWidth}px ${secBorderStyle} ${secBorderColor}`
         : undefined,
       position: 'relative',
     };
 
     if (effectiveBgType === 'solid') {
-      sectionStyle.backgroundColor = section.bgColor || '#FFFFFF';
+      const hasCustomCanvasSurface = Boolean(
+        (activePage?.settings?.pageBgImageUrl &&
+          activePage.settings.pageBgImageUrl.trim() !== '') ||
+          (activePage?.settings?.pageBgColor &&
+            activePage.settings.pageBgColor.toUpperCase() !== '#FFFFFF')
+      );
+      const isUntouchedLegacyWhite =
+        !section.bgCustom &&
+        (!section.bgColor || section.bgColor.toUpperCase() === '#FFFFFF') &&
+        !sectionIsBoxed &&
+        hasCustomCanvasSurface;
+      sectionStyle.backgroundColor =
+        section.bgColor === 'transparent' || isUntouchedLegacyWhite
+          ? 'transparent'
+          : section.bgColor || '#FFFFFF';
     } else if (effectiveBgType === 'gradient') {
       sectionStyle.backgroundImage =
         section.bgGradient || 'linear-gradient(135deg, #18181B 0%, #09090B 100%)';
@@ -1232,12 +1255,13 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
         delaySeconds={section.delaySeconds}
         active={true}
       >
-        <div style={sectionStyle} className="relative overflow-hidden w-full">
+        <div style={sectionStyle} className="relative overflow-hidden shrink-0 w-full">
           {/* Overlay for image background */}
           {effectiveBgType === 'image' && (section.bgOverlayType || 'dark') !== 'none' && (
             <div
               className="absolute inset-0 pointer-events-none z-0"
               style={{
+                borderRadius: 'inherit',
                 backgroundColor:
                   (section.bgOverlayType || 'dark') === 'dark' ? '#000000' : '#FFFFFF',
                 opacity: (section.bgOverlayOpacity ?? 60) / 100,
@@ -1302,18 +1326,46 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
         </div>
 
         {/* Modal Body Container rendering edited page sections */}
-        <div
-          className="flex-1 overflow-y-auto"
-          style={{
-            backgroundColor: activePage?.settings?.pageBgColor || '#FFFFFF',
-            fontFamily: activePage?.settings?.bodyFontFamily || 'Inter',
-            color: activePage?.settings?.textColor || '#121111',
-            paddingTop: `${activePage?.settings?.pagePaddingTop ?? 0}px`,
-            paddingBottom: `${activePage?.settings?.pagePaddingBottom ?? 0}px`,
-          }}
-        >
-          {hasCustomSections ? (
-            <div className="w-full">
+        <div className="flex-1 overflow-y-auto relative bg-[#F4F4F5]">
+          <div
+            className="min-h-full h-auto w-full shrink-0 relative flex flex-col mx-auto overflow-hidden"
+            style={{
+              maxWidth:
+                activePage?.settings?.pageWidthType === 'full'
+                  ? '100%'
+                  : `${activePage?.settings?.pageContentMaxWidth || 1200}px`,
+              borderRadius: `${activePage?.settings?.pageBorderRadius ?? 0}px`,
+              backgroundColor: activePage?.settings?.pageBgColor || '#FFFFFF',
+              fontFamily: activePage?.settings?.bodyFontFamily || 'Inter',
+              color: activePage?.settings?.textColor || '#121111',
+              paddingTop: `${activePage?.settings?.pagePaddingTop ?? 0}px`,
+              paddingRight: `${activePage?.settings?.pagePaddingRight ?? 0}px`,
+              paddingBottom: `${activePage?.settings?.pagePaddingBottom ?? 0}px`,
+              paddingLeft: `${activePage?.settings?.pagePaddingLeft ?? 0}px`,
+            }}
+          >
+            {activePage?.settings?.pageBgImageUrl &&
+              activePage.settings.pageBgImageUrl.trim() !== '' && (
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    borderRadius: `${activePage?.settings?.pageBorderRadius ?? 0}px`,
+                    backgroundImage: `url("${activePage.settings.pageBgImageUrl}")`,
+                    backgroundSize:
+                      activePage.settings.pageBgImageSize === 'stretch'
+                        ? '100% 100%'
+                        : activePage.settings.pageBgImageSize || 'cover',
+                    backgroundPosition: activePage.settings.pageBgImagePosition || 'center',
+                    backgroundRepeat: activePage.settings.pageBgImageRepeat || 'no-repeat',
+                    backgroundAttachment:
+                      activePage.settings.pageBgImageAttachment === 'fixed' ? 'fixed' : 'scroll',
+                    opacity: (activePage.settings.pageBgImageOpacity ?? 100) / 100,
+                  }}
+                />
+              )}
+            {hasCustomSections ? (
+              <div className="w-full relative flex flex-col shrink-0">
               {activePage?.sections.map((section, secIdx) => renderSection(section, secIdx))}
 
               {/* If on step 2 (Qualification) and no explicit form element was in sections, append interactive form */}
@@ -1393,6 +1445,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
               {currentStepIndex === 4 && renderThankYouConfirmation()}
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

@@ -244,10 +244,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     ? 0
                     : p.settings.pageBorderRadius,
                 pagePaddingTop: p.settings?.pagePaddingTop ?? 0,
+                pagePaddingRight: p.settings?.pagePaddingRight ?? 0,
                 pagePaddingBottom:
                   p.settings?.pagePaddingBottom === undefined || p.settings?.pagePaddingBottom === 40
                     ? 0
                     : p.settings.pagePaddingBottom,
+                pagePaddingLeft: p.settings?.pagePaddingLeft ?? 0,
               },
             })),
           }));

@@ -375,6 +375,7 @@ export interface PageBlockSection {
   // Background configuration
   bgType?: 'solid' | 'gradient' | 'image';
   bgColor?: string;
+  bgCustom?: boolean;
   bgGradient?: string;
   bgGradientColor1?: string;
   bgGradientColor2?: string;
@@ -399,8 +400,11 @@ export interface PageBlockSection {
   marginRight?: number;
   paddingY?: number; // fallback legacy
   // Border & Effects
+  borderRadius?: number;
   borderTopWidth?: number;
+  borderRightWidth?: number;
   borderBottomWidth?: number;
+  borderLeftWidth?: number;
   borderColor?: string;
   borderStyle?: 'solid' | 'dashed' | 'dotted';
   // Retardo de aparición (delay)
@@ -438,6 +442,12 @@ export interface FunnelPageGlobalSettings {
   pageContentMaxWidth?: number;     // e.g. 1200 (default), 800, 960, 1140, 1400
   pageBorderRadius?: number;        // corner rounding / redondeo de esquinas en px (0, 8, 16, 24, etc.)
   pageBgColor?: string;             // General canvas background color
+  pageBgImageUrl?: string;          // Optional canvas background image URL / Data URL
+  pageBgImageOpacity?: number;      // 0 to 100 (default 100)
+  pageBgImageSize?: 'cover' | 'contain' | 'stretch' | 'auto';
+  pageBgImagePosition?: 'center' | 'top' | 'bottom' | 'left' | 'right';
+  pageBgImageRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
+  pageBgImageAttachment?: 'scroll' | 'fixed';
   primaryColor?: string;            // Global primary brand color for buttons
   textColor?: string;               // Global body text color
   headingFontFamily?: string;       // Global font for H1-H4
@@ -447,7 +457,9 @@ export interface FunnelPageGlobalSettings {
   defaultH3Size?: number;           // Default H3 font size in px
   defaultH4Size?: number;           // Default H4 font size in px
   pagePaddingTop?: number;
+  pagePaddingRight?: number;
   pagePaddingBottom?: number;
+  pagePaddingLeft?: number;
   seo_title?: string;
   seo_description?: string;
 }
