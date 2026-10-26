@@ -569,6 +569,9 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
             <SimpleFormElement
               element={element}
               isEditable={false}
+              defaultPrimaryColor={activePage?.settings?.primaryColor || '#2848F0'}
+              defaultFontFamily={activePage?.settings?.bodyFontFamily || 'Inter'}
+              onNextFunnelStep={advanceToNextStep}
               onSubmitSuccess={() => {
                 showToast && showToast('¡Formulario enviado con éxito!');
               }}
@@ -1224,7 +1227,8 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
 
     if (effectiveBgType === 'solid') {
       const hasCustomCanvasSurface = Boolean(
-        (activePage?.settings?.pageBgImageUrl &&
+        (activePage?.settings?.pageBgImageEnabled !== false &&
+          activePage?.settings?.pageBgImageUrl &&
           activePage.settings.pageBgImageUrl.trim() !== '') ||
           (activePage?.settings?.pageBgColor &&
             activePage.settings.pageBgColor.toUpperCase() !== '#FFFFFF')
@@ -1344,7 +1348,8 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
               paddingLeft: `${activePage?.settings?.pagePaddingLeft ?? 0}px`,
             }}
           >
-            {activePage?.settings?.pageBgImageUrl &&
+            {activePage?.settings?.pageBgImageEnabled !== false &&
+              activePage?.settings?.pageBgImageUrl &&
               activePage.settings.pageBgImageUrl.trim() !== '' && (
                 <div
                   aria-hidden="true"

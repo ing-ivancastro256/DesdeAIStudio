@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageBlockColumn, PageBlockRow } from '../../types';
-import { NumberControl } from '../common/NumberControl';
+import { NumberControl, InlineSliderInput } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
 import { BoxModelSpacingControl } from '../common/BoxModelSpacingControl';
 import { formatRowDisplayName } from '../../utils/editorTreeUtils';
@@ -16,6 +16,7 @@ import {
   AlignCenterVertical,
   AlignEndVertical,
   RotateCcw,
+  Maximize2,
 } from 'lucide-react';
 
 interface ColumnInspectorProps {
@@ -24,6 +25,8 @@ interface ColumnInspectorProps {
   parentRow: PageBlockRow;
   sectionName?: string;
   onUpdate: (props: Partial<PageBlockColumn>) => void;
+  onResizeColumnWidth?: (pct: number) => void;
+  onEqualizeColumns?: () => void;
   onSelectSiblingColumn: (columnId: string) => void;
   onSelectParentRow: () => void;
   onClose: () => void;
@@ -59,11 +62,14 @@ export const ColumnInspector: React.FC<ColumnInspectorProps> = ({
   parentRow,
   sectionName,
   onUpdate,
+  onResizeColumnWidth,
+  onEqualizeColumns,
   onSelectSiblingColumn,
   onSelectParentRow,
   onClose,
 }) => {
   const [openSections, setOpenSections] = useState({
+    width: true,
     background: true,
     spacing: true,
     borders: true,
@@ -180,6 +186,84 @@ export const ColumnInspector: React.FC<ColumnInspectorProps> = ({
 
       {/* Scrollable Inspector Controls */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        {/* 0. ANCHO DE LA COLUMNA (CUANDO HAY MÚLTIPLES COLUMNAS) */}
+        {parentRow.columns.length > 1 && onResizeColumnWidth && (() => {
+          const minColPct = 10;
+          const maxColPct = 100 - (parentRow.columns.length - 1) * 10;
+          const curPct = Math.round(column.widthPercentage);
+          const colPresets = [20, 25, 33, 50, 67, 75, 80].filter(
+            (v) => v >= minColPct && v <= maxColPct
+          );
+
+          return (
+            <div className="border border-zinc-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleSection('width')}
+                className="w-full px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-xs text-zinc-800 cursor-pointer"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Maximize2 className="w-3.5 h-3.5 text-teal-600" />
+                  Ancho de Columna
+                </span>
+                {openSections.width ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+                )}
+              </button>
+
+              {openSections.width && (
+                <div className="p-3.5 space-y-2.5 bg-white">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-zinc-700 text-[11px]">
+                      Proporción rápida:
+                    </span>
+                    {onEqualizeColumns && (
+                      <button
+                        type="button"
+                        onClick={onEqualizeColumns}
+                        className="text-[10px] font-semibold text-teal-700 hover:underline cursor-pointer"
+                      >
+                        Igualar todas ({Math.round(100 / parentRow.columns.length)}%)
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1">
+                    {colPresets.map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => onResizeColumnWidth(pct)}
+                        className={`flex-1 min-w-[42px] py-1 px-1.5 border rounded text-[10px] font-mono font-semibold text-center transition-all cursor-pointer ${
+                          curPct === pct
+                            ? 'bg-teal-600 text-white border-teal-600 shadow-2xs'
+                            : 'border-zinc-200 bg-white hover:border-teal-600 text-zinc-700'
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
+
+                  <InlineSliderInput
+                    label="Ancho exacto de columna"
+                    value={curPct}
+                    min={minColPct}
+                    max={maxColPct}
+                    strictMax={true}
+                    step={1}
+                    unit="%"
+                    accentClassName="accent-teal-600"
+                    onChange={(val) => onResizeColumnWidth(val)}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* 1. COLOR Y FONDO DE LA COLUMNA */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button

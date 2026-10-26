@@ -57,6 +57,7 @@ export const WordPressWysiwygEditor: React.FC<WordPressWysiwygEditorProps> = ({
   const [activeTab, setActiveTab] = useState<'visual' | 'texto'>('visual');
   const [showToolbarRow2, setShowToolbarRow2] = useState(true);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [toolbarTextColor, setToolbarTextColor] = useState('#18181B');
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
@@ -123,7 +124,21 @@ export const WordPressWysiwygEditor: React.FC<WordPressWysiwygEditorProps> = ({
       visualEditorRef.current.focus();
     }
     restoreSelection();
+    if (command === 'foreColor') {
+      try {
+        document.execCommand('styleWithCSS', false, 'true');
+      } catch {
+        // Ignore if unsupported
+      }
+    }
     document.execCommand(command, false, cmdValue);
+    if (command === 'foreColor') {
+      try {
+        document.execCommand('styleWithCSS', false, 'false');
+      } catch {
+        // Ignore if unsupported
+      }
+    }
     if (visualEditorRef.current) {
       const newHtml = visualEditorRef.current.innerHTML;
       lastHtmlRef.current = newHtml;
@@ -680,8 +695,9 @@ export const WordPressWysiwygEditor: React.FC<WordPressWysiwygEditorProps> = ({
                 <div onMouseDown={() => saveSelection()}>
                   <HexColorPicker
                     compact
-                    value="#18181b"
+                    value={toolbarTextColor}
                     onChange={(color) => {
+                      setToolbarTextColor(color);
                       restoreSelection();
                       executeCmd('foreColor', color);
                     }}

@@ -241,6 +241,107 @@ export const resizeRowColumnsCount = (
   };
 };
 
+export const resizeColumnWidthInRow = (
+  row: PageBlockRow,
+  columnId: string,
+  targetPct: number
+): PageBlockRow => {
+  const n = row.columns.length;
+  if (n <= 1) {
+    return {
+      ...row,
+      columns: row.columns.map((c) => ({ ...c, widthPercentage: 100 })),
+    };
+  }
+
+  const targetIdx = row.columns.findIndex((c) => c.id === columnId);
+  if (targetIdx === -1) return row;
+
+  const minCol = 10;
+  const maxCol = 100 - (n - 1) * minCol;
+  const clampedTarget = Number(
+    Math.min(maxCol, Math.max(minCol, targetPct)).toFixed(2)
+  );
+  const remaining = 100 - clampedTarget;
+  const siblingCount = n - 1;
+  const floorTotal = siblingCount * minCol;
+  const extraPool = Math.max(0, remaining - floorTotal);
+
+  const siblings = row.columns.filter((_, idx) => idx !== targetIdx);
+  const siblingExtras = siblings.map((c) =>
+    Math.max(0, (c.widthPercentage || 100 / n) - minCol)
+  );
+  const sumExtras = siblingExtras.reduce((acc, v) => acc + v, 0);
+
+  let allocatedSiblings = siblings.map((_, sIdx) => {
+    const share =
+      sumExtras > 0.001
+        ? (siblingExtras[sIdx] / sumExtras) * extraPool
+        : extraPool / siblingCount;
+    return Number((minCol + share).toFixed(2));
+  });
+
+  const currentSibSum = allocatedSiblings.reduce((acc, v) => acc + v, 0);
+  const diff = Number((remaining - currentSibSum).toFixed(2));
+  if (allocatedSiblings.length > 0 && Math.abs(diff) > 0) {
+    const lastIdx = allocatedSiblings.length - 1;
+    allocatedSiblings[lastIdx] = Number(
+      Math.max(minCol, allocatedSiblings[lastIdx] + diff).toFixed(2)
+    );
+  }
+
+  let sibCursor = 0;
+  const nextColumns = row.columns.map((col, idx) => {
+    if (idx === targetIdx) {
+      return { ...col, widthPercentage: clampedTarget };
+    }
+    const nextWidth = allocatedSiblings[sibCursor++];
+    return { ...col, widthPercentage: nextWidth };
+  });
+
+  return {
+    ...row,
+    columns: nextColumns,
+  };
+};
+
+export const resizeColumnWidthInSections = (
+  sections: PageBlockSection[],
+  columnId: string,
+  targetPct: number
+): PageBlockSection[] =>
+  sections.map((sec) => ({
+    ...sec,
+    rows: sec.rows.map((row) => {
+      if (row.columns.some((c) => c.id === columnId)) {
+        return resizeColumnWidthInRow(row, columnId, targetPct);
+      }
+      return {
+        ...row,
+        columns: row.columns.map((col) => ({
+          ...col,
+          elements: col.elements.map((el) => {
+            if (
+              el.type === 'inner_columns' &&
+              el.nestedRow &&
+              el.nestedRow.columns.some((nc) => nc.id === columnId)
+            ) {
+              return {
+                ...el,
+                nestedRow: resizeColumnWidthInRow(
+                  el.nestedRow,
+                  columnId,
+                  targetPct
+                ),
+              };
+            }
+            return el;
+          }),
+        })),
+      };
+    }),
+  }));
+
 export const insertElementIntoColumn = (
   sections: PageBlockSection[],
   colId: string,
@@ -800,7 +901,7 @@ export const getSectionEffectiveMaxWidth = (
     typeof section.maxWidth === 'number'
       ? section.maxWidth
       : Math.min(1200, safeCanvas);
-  return Math.min(Math.max(320, Math.round(rawMax)), safeCanvas);
+  return Math.min(Math.max(100, Math.round(rawMax)), safeCanvas);
 };
 
 export const clampRowTreeToLimit = (

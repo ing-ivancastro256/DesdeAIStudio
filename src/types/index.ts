@@ -188,6 +188,95 @@ export interface SimpleFormFieldConfig {
   options?: string[];
 }
 
+export type CompleteFormFieldType =
+  | 'text'
+  | 'email'
+  | 'textarea'
+  | 'tel'
+  | 'whatsapp'
+  | 'select'
+  | 'radio'
+  | 'checkbox';
+
+export type CompleteFormColumnWidth = '100' | '75' | '66' | '50' | '33' | '25';
+
+export type CompleteFormInputSize = 'xs' | 'sm' | 'md' | 'lg';
+
+export interface CompleteFormGlobalFieldStyle {
+  fontFamily?: string;
+  fontSize?: number;
+  isBold?: boolean;
+  isItalic?: boolean;
+  textColor?: string;
+  labelColor?: string;
+  bgColor?: string;
+  borderWidth?: number;
+  borderStyle?: 'solid' | 'dashed' | 'dotted';
+  borderColor?: string;
+  borderRadius?: number;
+}
+
+export interface CompleteFormFieldStyleOverride extends CompleteFormGlobalFieldStyle {
+  enabled?: boolean;
+}
+
+export interface CompleteFormFieldItem {
+  id: string;
+  type: CompleteFormFieldType;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  columnWidth?: CompleteFormColumnWidth;
+  optionsText?: string;
+  styleOverride?: CompleteFormFieldStyleOverride;
+}
+
+export interface CompleteFormButtonStyles {
+  text?: string;
+  subtext?: string;
+  icon?: string;
+  iconPosition?: 'before' | 'after';
+  iconSpacing?: number;
+  iconSize?: number;
+  paddingY?: number;
+  paddingX?: number;
+  fontSize?: number;
+  fontFamily?: string;
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+  isBold?: boolean;
+  isItalic?: boolean;
+  isUnderline?: boolean;
+  align?: 'left' | 'center' | 'right';
+  fullWidth?: boolean;
+  bgType?: 'solid' | 'gradient';
+  bgColor?: string;
+  bgColor2?: string;
+  textColor?: string;
+  borderColor?: string;
+  hoverBgColor?: string;
+  hoverTextColor?: string;
+  hoverBorderColor?: string;
+  borderWidth?: number;
+  borderStyle?: 'solid' | 'dashed' | 'dotted';
+  borderRadius?: number;
+}
+
+export interface CompleteFormEmailTarget {
+  provider: EmailProvider;
+  enabled: boolean;
+  listOrTag: string;
+}
+
+export interface CompleteFormPostSubmitActions {
+  goToNextStep?: boolean;
+  redirectToUrl?: boolean;
+  redirectUrl?: string;
+  redirectOpenNewTab?: boolean;
+  addToCrm?: boolean;
+  sendToEmailMarketing?: boolean;
+  emailTargets?: CompleteFormEmailTarget[];
+}
+
 export interface PopupModal {
   id: string;
   name: string;
@@ -276,7 +365,22 @@ export interface PageBlockElement {
     iconColor?: string;
     iconBgColor?: string;
     iconShape?: 'none' | 'circle' | 'square' | 'rounded';
-    // Simple Form
+    // Complete Form (simple_form)
+    formName?: string;
+    formFields?: CompleteFormFieldItem[];
+    formInputSize?: CompleteFormInputSize;
+    formRowsGap?: number;
+    formShowLabels?: boolean;
+    formShowRequiredMark?: boolean;
+    formFieldStyles?: CompleteFormGlobalFieldStyle;
+    formButtonStyles?: CompleteFormButtonStyles;
+    policyCheckboxEnabled?: boolean;
+    policyCheckboxHtml?: string;
+    policyCheckboxFontSize?: number;
+    policyCheckboxTextColor?: string;
+    policyCheckboxErrorText?: string;
+    formPostSubmitActions?: CompleteFormPostSubmitActions;
+    // Legacy Simple Form fallbacks
     formTitle?: string;
     formSubtitle?: string;
     showNameField?: boolean;
@@ -442,6 +546,7 @@ export interface FunnelPageGlobalSettings {
   pageContentMaxWidth?: number;     // e.g. 1200 (default), 800, 960, 1140, 1400
   pageBorderRadius?: number;        // corner rounding / redondeo de esquinas en px (0, 8, 16, 24, etc.)
   pageBgColor?: string;             // General canvas background color
+  pageBgImageEnabled?: boolean;     // Toggle switch to enable/disable canvas background image without losing uploaded URL
   pageBgImageUrl?: string;          // Optional canvas background image URL / Data URL
   pageBgImageOpacity?: number;      // 0 to 100 (default 100)
   pageBgImageSize?: 'cover' | 'contain' | 'stretch' | 'auto';

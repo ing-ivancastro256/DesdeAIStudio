@@ -113,13 +113,19 @@ import { WordPressWysiwygEditor } from './elements/WordPressWysiwygEditor';
 import { AudioPlayerElement } from './elements/AudioPlayerElement';
 import { IconElement, POPULAR_ICONS } from './elements/IconElement';
 import { SimpleFormElement } from './elements/SimpleFormElement';
+import { CompleteFormInspector } from './CompleteFormInspector';
+import {
+  createDefaultCompleteFormFields,
+  DEFAULT_POLICY_ERROR_TEXT,
+  DEFAULT_POLICY_HTML,
+} from '../../utils/completeFormUtils';
 import { PopupButtonElement, formatCtaDisplayText } from './elements/PopupButtonElement';
 import { PopupEditorModal } from './elements/PopupEditorModal';
 import { PAGE_TEMPLATES, PageTemplate } from '../../data/pageTemplates';
 import { EmbeddedVideoPlayer } from '../common/EmbeddedVideoPlayer';
 import { getEmbedVideoInfo, getEmbedVideoUrl } from '../../utils/videoUtils';
 import { InlineEditableText } from './elements/InlineEditableText';
-import { NumberControl } from '../common/NumberControl';
+import { NumberControl, InlineSliderInput, FreeNumberInput } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
 import { BoxModelSpacingControl } from '../common/BoxModelSpacingControl';
 import {
@@ -137,6 +143,7 @@ import {
   updateColumnInSections,
   updateRowInSections,
   resizeRowColumnsCount,
+  resizeColumnWidthInSections,
   insertElementIntoColumn,
   findColumnDepth,
   findElementById,
@@ -1900,36 +1907,74 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         break;
       case 'simple_form':
         newElement.content = {
-          formTitle: '¿Quieres recibir más información?',
-          formSubtitle: 'Déjanos tus datos y nos pondremos en contacto contigo de inmediato.',
-          showNameField: true,
-          nameRequired: false,
-          showPhoneField: false,
-          phoneRequired: false,
-          emailRequired: true,
-          submitButtonText: '👉 Enviar Información',
-          submitButtonBg: '#2848F0',
-          submitButtonTextColor: '#FFFFFF',
-          formSuccessMessage: '¡Gracias por registrarte! Hemos recibido tus datos.',
-          extraFields: [
-            {
-              id: `q_${Date.now()}`,
-              type: 'radio',
-              label: '¿Cuál es tu objetivo prioritario?',
-              required: true,
-              options: [
-                'Aumentar las ventas de mi negocio',
-                'Automatizar la captación de clientes',
-                'Aprender a escalar con embudos',
-              ],
-            },
-          ],
+          formName: 'Formulario Principal',
+          formFields: createDefaultCompleteFormFields(),
+          formInputSize: 'md',
+          formShowLabels: true,
+          formShowRequiredMark: true,
+          formFieldStyles: {
+            fontFamily: pageSettings.bodyFontFamily || 'Inter',
+            fontSize: 14,
+            isBold: false,
+            isItalic: false,
+            textColor: '#18181B',
+            labelColor: '#27272A',
+            bgColor: '#FFFFFF',
+            borderWidth: 1,
+            borderStyle: 'solid',
+            borderColor: '#D4D4D8',
+            borderRadius: 0,
+          },
+          formButtonStyles: {
+            text: 'Enviar Información',
+            subtext: '',
+            icon: '',
+            iconPosition: 'after',
+            iconSpacing: 8,
+            iconSize: 18,
+            paddingY: 14,
+            paddingX: 24,
+            fontSize: 15,
+            fontFamily: pageSettings.bodyFontFamily || 'Poppins',
+            textTransform: 'none',
+            isBold: true,
+            isItalic: false,
+            isUnderline: false,
+            align: 'center',
+            fullWidth: true,
+            bgType: 'solid',
+            bgColor: pageSettings.primaryColor || '#2848F0',
+            bgColor2: '#1E3A8A',
+            textColor: '#FFFFFF',
+            borderColor: '#18181B',
+            borderWidth: 0,
+            borderStyle: 'solid',
+            borderRadius: 0,
+          },
+          policyCheckboxEnabled: false,
+          policyCheckboxHtml: DEFAULT_POLICY_HTML,
+          policyCheckboxFontSize: 12,
+          policyCheckboxTextColor: '#3F3F46',
+          policyCheckboxErrorText: DEFAULT_POLICY_ERROR_TEXT,
+          formPostSubmitActions: {
+            goToNextStep: false,
+            redirectToUrl: false,
+            redirectUrl: '',
+            redirectOpenNewTab: false,
+            addToCrm: true,
+            sendToEmailMarketing: false,
+          },
+          formSuccessMessage: '¡Gracias! Hemos recibido tus datos correctamente.',
         };
         newElement.styles = {
           marginTop: 0,
-          marginBottom: 24,
+          marginBottom: 20,
           marginLeft: 0,
           marginRight: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
         };
         break;
       case 'popup_button':
@@ -4426,68 +4471,28 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           </div>
 
                           {/* TAMAÑO DEL ICONO */}
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Tamaño del icono:</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min={10}
-                                max={64}
-                                value={
-                                  selectedElement.content.buttonIconSize ??
-                                  Math.max(14, Math.round((selectedElement.styles.fontSize || 16) * 1.05))
-                                }
-                                onChange={(e) => updateSelectedElement({}, { buttonIconSize: Number(e.target.value) })}
-                                className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                              />
-                              <div className="flex items-center gap-1 shrink-0">
-                                <input
-                                  type="number"
-                                  min={8}
-                                  max={120}
-                                  step={1}
-                                  value={
-                                    selectedElement.content.buttonIconSize ??
-                                    Math.max(14, Math.round((selectedElement.styles.fontSize || 16) * 1.05))
-                                  }
-                                  onChange={(e) =>
-                                    updateSelectedElement({}, { buttonIconSize: Math.max(8, parseInt(e.target.value) || 8) })
-                                  }
-                                  className="w-16 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-white focus:outline-[#2848F0]"
-                                />
-                                <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                              </div>
-                            </div>
-                          </div>
+                          <InlineSliderInput
+                            label="Tamaño del icono:"
+                            value={
+                              selectedElement.content.buttonIconSize ??
+                              Math.max(14, Math.round((selectedElement.styles.fontSize || 16) * 1.05))
+                            }
+                            min={10}
+                            max={64}
+                            inputMin={8}
+                            unit="px"
+                            onChange={(val) => updateSelectedElement({}, { buttonIconSize: val })}
+                          />
 
                           {/* ESPACIADO ENTRE ICONO Y TEXTO */}
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Espaciado entre icono y texto:</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min={0}
-                                max={40}
-                                value={selectedElement.content.buttonIconSpacing ?? 8}
-                                onChange={(e) => updateSelectedElement({}, { buttonIconSpacing: Number(e.target.value) })}
-                                className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                              />
-                              <div className="flex items-center gap-1 shrink-0">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={80}
-                                  step={1}
-                                  value={selectedElement.content.buttonIconSpacing ?? 8}
-                                  onChange={(e) =>
-                                    updateSelectedElement({}, { buttonIconSpacing: Math.max(0, parseInt(e.target.value) || 0) })
-                                  }
-                                  className="w-16 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-white focus:outline-[#2848F0]"
-                                />
-                                <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                              </div>
-                            </div>
-                          </div>
+                          <InlineSliderInput
+                            label="Espaciado entre icono y texto:"
+                            value={selectedElement.content.buttonIconSpacing ?? 8}
+                            min={0}
+                            max={40}
+                            unit="px"
+                            onChange={(val) => updateSelectedElement({}, { buttonIconSpacing: val })}
+                          />
                         </div>
 
                         {/* RELLENO DEL BOTÓN (INTERNO DESDE EL TEXTO HACIA LOS BORDES) */}
@@ -4499,35 +4504,23 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-[10px] font-semibold text-zinc-600 block mb-1">Vertical (arriba/abajo)</label>
-                              <div className="flex items-center border border-zinc-200 rounded-lg bg-white overflow-hidden">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  value={selectedElement.styles.buttonPaddingY ?? 14}
-                                  onChange={(e) =>
-                                    updateSelectedElement({ buttonPaddingY: Math.max(0, parseInt(e.target.value) || 0) })
-                                  }
-                                  className="w-full p-1.5 text-xs font-mono font-semibold text-center focus:outline-none"
-                                />
-                                <span className="text-[10px] text-zinc-400 pr-2 font-mono select-none">px</span>
-                              </div>
+                              <FreeNumberInput
+                                value={selectedElement.styles.buttonPaddingY ?? 14}
+                                min={0}
+                                unit="px"
+                                inputClassName="text-center"
+                                onChange={(val) => updateSelectedElement({ buttonPaddingY: val })}
+                              />
                             </div>
                             <div>
                               <label className="text-[10px] font-semibold text-zinc-600 block mb-1">Horizontal (laterales)</label>
-                              <div className="flex items-center border border-zinc-200 rounded-lg bg-white overflow-hidden">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={160}
-                                  value={selectedElement.styles.buttonPaddingX ?? 28}
-                                  onChange={(e) =>
-                                    updateSelectedElement({ buttonPaddingX: Math.max(0, parseInt(e.target.value) || 0) })
-                                  }
-                                  className="w-full p-1.5 text-xs font-mono font-semibold text-center focus:outline-none"
-                                />
-                                <span className="text-[10px] text-zinc-400 pr-2 font-mono select-none">px</span>
-                              </div>
+                              <FreeNumberInput
+                                value={selectedElement.styles.buttonPaddingX ?? 28}
+                                min={0}
+                                unit="px"
+                                inputClassName="text-center"
+                                onChange={(val) => updateSelectedElement({ buttonPaddingX: val })}
+                              />
                             </div>
                           </div>
                         </div>
@@ -4675,7 +4668,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             : 1.5;
 
                           const handleWidthChange = (val: number) => {
-                            const clampedWidth = Math.max(20, Math.min(1200, val));
+                            const clampedWidth = Math.max(20, Math.min(2400, val));
                             if (isLocked) {
                               const calculatedHeight = Math.round(clampedWidth / ratio);
                               updateSelectedElement({
@@ -4688,7 +4681,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           };
 
                           const handleHeightChange = (val: number) => {
-                            const clampedHeight = Math.max(20, Math.min(1200, val));
+                            const clampedHeight = Math.max(20, Math.min(2400, val));
                             if (isLocked) {
                               const calculatedWidth = Math.round(clampedHeight * ratio);
                               updateSelectedElement({
@@ -4730,64 +4723,28 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 </div>
 
                                 {/* ANCHO */}
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-700">
-                                    <span>Ancho</span>
-                                    <span className="font-mono text-zinc-500 text-[10px]">{curWidth}px</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="range"
-                                      min={50}
-                                      max={1200}
-                                      step={5}
-                                      value={curWidth}
-                                      onChange={(e) => handleWidthChange(Number(e.target.value))}
-                                      className="flex-1 accent-[#2848F0] cursor-pointer"
-                                    />
-                                    <div className="flex items-center border border-zinc-200 rounded-md bg-white overflow-hidden w-20 shrink-0">
-                                      <input
-                                        type="number"
-                                        min={20}
-                                        max={1600}
-                                        value={curWidth}
-                                        onChange={(e) => handleWidthChange(Number(e.target.value))}
-                                        className="w-full p-1 text-xs font-mono text-center focus:outline-none"
-                                      />
-                                      <span className="text-[10px] text-zinc-400 pr-1 select-none font-mono">px</span>
-                                    </div>
-                                  </div>
-                                </div>
+                                <InlineSliderInput
+                                  label="Ancho"
+                                  value={curWidth}
+                                  min={50}
+                                  max={1200}
+                                  inputMin={20}
+                                  step={5}
+                                  unit="px"
+                                  onChange={handleWidthChange}
+                                />
 
                                 {/* ALTO */}
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-700">
-                                    <span>Alto</span>
-                                    <span className="font-mono text-zinc-500 text-[10px]">{curHeight}px</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="range"
-                                      min={30}
-                                      max={1200}
-                                      step={5}
-                                      value={curHeight}
-                                      onChange={(e) => handleHeightChange(Number(e.target.value))}
-                                      className="flex-1 accent-[#2848F0] cursor-pointer"
-                                    />
-                                    <div className="flex items-center border border-zinc-200 rounded-md bg-white overflow-hidden w-20 shrink-0">
-                                      <input
-                                        type="number"
-                                        min={20}
-                                        max={1600}
-                                        value={curHeight}
-                                        onChange={(e) => handleHeightChange(Number(e.target.value))}
-                                        className="w-full p-1 text-xs font-mono text-center focus:outline-none"
-                                      />
-                                      <span className="text-[10px] text-zinc-400 pr-1 select-none font-mono">px</span>
-                                    </div>
-                                  </div>
-                                </div>
+                                <InlineSliderInput
+                                  label="Alto"
+                                  value={curHeight}
+                                  min={30}
+                                  max={1200}
+                                  inputMin={20}
+                                  step={5}
+                                  unit="px"
+                                  onChange={handleHeightChange}
+                                />
 
                                 {/* BOTÓN RESTAURAR TAMAÑO ORIGINAL (IMAGEN 1) */}
                                 <button
@@ -5294,32 +5251,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               </div>
 
                               {/* Bordes redondeados en la misma fila para ahorrar espacio */}
-                              <div>
-                                <div className="flex items-center justify-between text-xs mb-1">
-                                  <span className="font-semibold text-zinc-700 text-[11px]">Bordes redondeados (Radio):</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="range"
-                                    min={0}
-                                    max={48}
-                                    value={selectedElement.styles.borderRadius ?? 0}
-                                    onChange={(e) => updateSelectedElement({ borderRadius: Number(e.target.value) })}
-                                    className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                                  />
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      max={100}
-                                      value={selectedElement.styles.borderRadius ?? 0}
-                                      onChange={(e) => updateSelectedElement({ borderRadius: Math.max(0, parseInt(e.target.value) || 0) })}
-                                      className="w-14 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
-                                    />
-                                    <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                                  </div>
-                                </div>
-                              </div>
+                              <InlineSliderInput
+                                label="Bordes redondeados (Radio):"
+                                value={selectedElement.styles.borderRadius ?? 0}
+                                min={0}
+                                max={48}
+                                unit="px"
+                                onChange={(val) => updateSelectedElement({ borderRadius: val })}
+                              />
 
                               {/* Ancho máximo del reproductor: seleccionable y con input para introducir número */}
                               <div className="space-y-1.5">
@@ -5685,21 +5624,16 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                       />
                                     </div>
 
-                                    <div>
-                                      <div className="flex justify-between items-center text-[11px] mb-1">
-                                        <span className="font-semibold text-zinc-700">Tamaño del botón:</span>
-                                        <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverPlaySize || 56}px</span>
-                                      </div>
-                                      <input
-                                        type="range"
-                                        min={36}
-                                        max={96}
-                                        step={2}
-                                        value={selectedElement.content.videoCoverPlaySize || 56}
-                                        onChange={(e) => updateSelectedElement({}, { videoCoverPlaySize: Number(e.target.value) })}
-                                        className="w-full accent-[#2848F0] cursor-pointer"
-                                      />
-                                    </div>
+                                    <InlineSliderInput
+                                      label="Tamaño del botón:"
+                                      value={selectedElement.content.videoCoverPlaySize || 56}
+                                      min={36}
+                                      max={96}
+                                      inputMin={20}
+                                      step={2}
+                                      unit="px"
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverPlaySize: val })}
+                                    />
                                   </div>
 
                                   {/* TEXTO ARRIBA DEL ICONO DE PLAY */}
@@ -5756,20 +5690,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                       </div>
                                     </div>
 
-                                    <div>
-                                      <div className="flex justify-between items-center text-[11px] mb-1">
-                                        <span className="font-semibold text-zinc-700">Tamaño del texto:</span>
-                                        <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverTextSize || 22}px</span>
-                                      </div>
-                                      <input
-                                        type="range"
-                                        min={12}
-                                        max={36}
-                                        value={selectedElement.content.videoCoverTextSize || 22}
-                                        onChange={(e) => updateSelectedElement({}, { videoCoverTextSize: Number(e.target.value) })}
-                                        className="w-full accent-[#2848F0] cursor-pointer"
-                                      />
-                                    </div>
+                                    <InlineSliderInput
+                                      label="Tamaño del texto:"
+                                      value={selectedElement.content.videoCoverTextSize || 22}
+                                      min={12}
+                                      max={36}
+                                      inputMin={8}
+                                      unit="px"
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverTextSize: val })}
+                                    />
 
                                     {/* Selectores de color uno arriba del otro */}
                                     <div className="space-y-2.5">
@@ -5826,38 +5755,28 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                         onChange={(val) => updateSelectedElement({}, { videoCoverArrowColor: val })}
                                       />
 
-                                      <div>
-                                        <div className="flex justify-between items-center text-[11px] mb-1">
-                                          <span className="font-semibold text-zinc-700">Tamaño:</span>
-                                          <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverArrowSize || 26}px</span>
-                                        </div>
-                                        <input
-                                          type="range"
-                                          min={16}
-                                          max={54}
-                                          value={selectedElement.content.videoCoverArrowSize || 26}
-                                          onChange={(e) => updateSelectedElement({}, { videoCoverArrowSize: Number(e.target.value) })}
-                                          className="w-full accent-[#2848F0] cursor-pointer"
-                                        />
-                                      </div>
+                                      <InlineSliderInput
+                                        label="Tamaño:"
+                                        value={selectedElement.content.videoCoverArrowSize || 26}
+                                        min={16}
+                                        max={54}
+                                        inputMin={8}
+                                        unit="px"
+                                        onChange={(val) => updateSelectedElement({}, { videoCoverArrowSize: val })}
+                                      />
                                     </div>
 
                                     {/* ROTACIÓN SOBRE SU EJE MEDIO */}
-                                    <div>
-                                      <div className="flex justify-between items-center text-[11px] mb-1">
-                                        <span className="font-semibold text-zinc-700">Girar sobre su eje medio:</span>
-                                        <span className="font-mono text-[#2848F0] font-bold">{selectedElement.content.videoCoverArrowRotation || 0}°</span>
-                                      </div>
-                                      <input
-                                        type="range"
-                                        min={0}
-                                        max={360}
-                                        step={5}
-                                        value={selectedElement.content.videoCoverArrowRotation || 0}
-                                        onChange={(e) => updateSelectedElement({}, { videoCoverArrowRotation: Number(e.target.value) })}
-                                        className="w-full accent-[#2848F0] cursor-pointer"
-                                      />
-                                    </div>
+                                    <InlineSliderInput
+                                      label="Girar sobre su eje medio:"
+                                      value={selectedElement.content.videoCoverArrowRotation || 0}
+                                      min={0}
+                                      max={360}
+                                      strictMax={true}
+                                      step={5}
+                                      unit="°"
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverArrowRotation: val })}
+                                    />
                                   </div>
 
                                   {/* FONDO (SÓLIDO, GRADIENTE DE 2 COLORES, PATRÓN DE 2 COLORES) */}
@@ -5932,20 +5851,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                       )}
                                     </div>
 
-                                    <div>
-                                      <div className="flex justify-between items-center text-[11px] mb-1">
-                                        <span className="font-semibold text-zinc-700">Opacidad del Fondo:</span>
-                                        <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.videoCoverBgOpacity ?? 100}%</span>
-                                      </div>
-                                      <input
-                                        type="range"
-                                        min={0}
-                                        max={100}
-                                        value={selectedElement.content.videoCoverBgOpacity ?? 100}
-                                        onChange={(e) => updateSelectedElement({}, { videoCoverBgOpacity: Number(e.target.value) })}
-                                        className="w-full accent-[#2848F0] cursor-pointer"
-                                      />
-                                    </div>
+                                    <InlineSliderInput
+                                      label="Opacidad del Fondo:"
+                                      value={selectedElement.content.videoCoverBgOpacity ?? 100}
+                                      min={0}
+                                      max={100}
+                                      strictMax={true}
+                                      unit="%"
+                                      onChange={(val) => updateSelectedElement({}, { videoCoverBgOpacity: val })}
+                                    />
                                   </div>
                                 </div>
                               )}
@@ -6054,6 +5968,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         value={selectedElement.styles.imageWidth || 100}
                         min={10}
                         max={100}
+                        strictMax={true}
                         unit="%"
                         onChange={(val) => updateSelectedElement({ imageWidth: val })}
                       />
@@ -6127,30 +6042,21 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
                   {/* 10. CONTENT FOR SPACER */}
                   {selectedElement.type === 'spacer' && (
-                    <div className="space-y-3.5 border border-zinc-200 rounded-xl p-3 bg-zinc-50/50">
-                      <div className="flex items-center justify-between">
-                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
-                          <SlidersHorizontal className="w-4 h-4 text-teal-600" />
-                          <span>Altura del Espaciador</span>
-                        </label>
-                        <span className="text-xs font-mono font-bold text-teal-700">
-                          {selectedElement.content.spacerHeight || 40}px
-                        </span>
-                      </div>
-                      <input
-                        type="range"
+                    <div className="space-y-3 border border-zinc-200 rounded-xl p-3 bg-zinc-50/50">
+                      <label className="font-bold text-zinc-800 flex items-center gap-1.5">
+                        <SlidersHorizontal className="w-4 h-4 text-teal-600" />
+                        <span>Altura del Espaciador</span>
+                      </label>
+                      <InlineSliderInput
+                        value={selectedElement.content.spacerHeight || 40}
                         min={10}
                         max={200}
+                        inputMin={1}
                         step={5}
-                        value={selectedElement.content.spacerHeight || 40}
-                        onChange={(e) => updateSelectedElement({}, { spacerHeight: Number(e.target.value) })}
-                        className="w-full accent-teal-600 cursor-pointer"
+                        unit="px"
+                        accentClassName="accent-teal-600"
+                        onChange={(val) => updateSelectedElement({}, { spacerHeight: val })}
                       />
-                      <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
-                        <span>10px (Mínimo)</span>
-                        <span>100px</span>
-                        <span>200px (Máximo)</span>
-                      </div>
                     </div>
                   )}
 
@@ -6599,47 +6505,17 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                     </select>
                                   </div>
 
-                                  <div>
-                                    <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
-                                      Tamaño de letra:
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="range"
-                                        min={11}
-                                        max={22}
-                                        value={selectedElement.content.audioTitleSize ?? 13}
-                                        onChange={(e) =>
-                                          updateSelectedElement(
-                                            {},
-                                            { audioTitleSize: Number(e.target.value) }
-                                          )
-                                        }
-                                        className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                                      />
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        <input
-                                          type="number"
-                                          min={10}
-                                          max={28}
-                                          value={selectedElement.content.audioTitleSize ?? 13}
-                                          onChange={(e) =>
-                                            updateSelectedElement(
-                                              {},
-                                              {
-                                                audioTitleSize: Math.max(
-                                                  10,
-                                                  parseInt(e.target.value) || 13
-                                                ),
-                                              }
-                                            )
-                                          }
-                                          className="w-14 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-white focus:outline-[#2848F0]"
-                                        />
-                                        <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                                      </div>
-                                    </div>
-                                  </div>
+                                  <InlineSliderInput
+                                    label="Tamaño de letra:"
+                                    value={selectedElement.content.audioTitleSize ?? 13}
+                                    min={11}
+                                    max={22}
+                                    inputMin={8}
+                                    unit="px"
+                                    onChange={(val) =>
+                                      updateSelectedElement({}, { audioTitleSize: val })
+                                    }
+                                  />
                                 </div>
                               </div>
                             )}
@@ -6913,35 +6789,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                     })}
                                   </div>
 
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="range"
-                                      min={0}
-                                      max={60}
-                                      value={Math.min(60, selectedElement.styles.borderRadius ?? 16)}
-                                      onChange={(e) =>
-                                        updateSelectedElement({
-                                          borderRadius: Number(e.target.value),
-                                        })
-                                      }
-                                      className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                                    />
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={120}
-                                        value={selectedElement.styles.borderRadius ?? 16}
-                                        onChange={(e) =>
-                                          updateSelectedElement({
-                                            borderRadius: Math.max(0, parseInt(e.target.value) || 0),
-                                          })
-                                        }
-                                        className="w-14 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-white focus:outline-[#2848F0]"
-                                      />
-                                      <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                                    </div>
-                                  </div>
+                                  <InlineSliderInput
+                                    value={selectedElement.styles.borderRadius ?? 16}
+                                    min={0}
+                                    max={60}
+                                    unit="px"
+                                    onChange={(val) => updateSelectedElement({ borderRadius: val })}
+                                  />
                                 </div>
 
                                 {/* Borde opcional */}
@@ -6980,20 +6834,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                           <label className="text-[10px] font-semibold text-zinc-600 block mb-1">
                                             Grosor (px):
                                           </label>
-                                          <input
-                                            type="number"
-                                            min={1}
-                                            max={12}
+                                          <FreeNumberInput
                                             value={selectedElement.styles.borderWidth ?? 2}
-                                            onChange={(e) =>
-                                              updateSelectedElement({
-                                                borderWidth: Math.max(
-                                                  1,
-                                                  parseInt(e.target.value) || 1
-                                                ),
-                                              })
-                                            }
-                                            className="w-full p-1.5 text-xs font-mono border border-zinc-200 rounded-lg bg-white"
+                                            min={1}
+                                            unit="px"
+                                            onChange={(val) => updateSelectedElement({ borderWidth: val })}
                                           />
                                         </div>
                                         <div>
@@ -7134,31 +6979,24 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               </div>
                             </div>
 
-                            {/* TAMAÑO Y COLOR EN UNA SOLA LÍNEA / FILA */}
-                            <div className="grid grid-cols-2 gap-2 p-2.5 bg-zinc-50 rounded-xl border border-zinc-200 items-center">
-                              <div>
-                                <div className="flex justify-between items-center text-[11px] mb-1">
-                                  <span className="font-semibold text-zinc-700">Tamaño:</span>
-                                  <span className="font-mono text-zinc-500 font-bold">{selectedElement.content.iconSize || 40}px</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={16}
-                                  max={96}
-                                  step={2}
-                                  value={selectedElement.content.iconSize || 40}
-                                  onChange={(e) => updateSelectedElement({}, { iconSize: Number(e.target.value) })}
-                                  className="w-full accent-[#2848F0] cursor-pointer"
-                                />
-                              </div>
+                            {/* TAMAÑO Y COLOR DEL ICONO */}
+                            <div className="space-y-2.5 p-2.5 bg-zinc-50 rounded-xl border border-zinc-200">
+                              <InlineSliderInput
+                                label="Tamaño del icono:"
+                                value={selectedElement.content.iconSize || 40}
+                                min={16}
+                                max={96}
+                                inputMin={8}
+                                step={2}
+                                unit="px"
+                                onChange={(val) => updateSelectedElement({}, { iconSize: val })}
+                              />
 
-                              <div>
-                                <HexColorPicker
-                                  label="Color del Icono"
-                                  value={selectedElement.content.iconColor || '#2848F0'}
-                                  onChange={(val) => updateSelectedElement({}, { iconColor: val })}
-                                />
-                              </div>
+                              <HexColorPicker
+                                label="Color del Icono"
+                                value={selectedElement.content.iconColor || '#2848F0'}
+                                onChange={(val) => updateSelectedElement({}, { iconColor: val })}
+                              />
                             </div>
 
                             {/* FORMA DEL ICONO: NINGUNA, CÍRCULO, CUADRADO, REDONDEADO */}
@@ -7213,191 +7051,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     );
                   })()}
 
-                  {/* 13. CONTENT FOR SIMPLE FORM */}
+                  {/* 13. CONTENT FOR COMPLETE FORM (FORMULARIO COMPLETO) */}
                   {selectedElement.type === 'simple_form' && (
-                    <div className="space-y-3.5 border border-emerald-200 rounded-xl p-3 bg-emerald-50/20">
-                      <div className="flex items-center justify-between">
-                        <label className="font-bold text-zinc-800 flex items-center gap-1.5">
-                          <FileText className="w-4 h-4 text-emerald-600" />
-                          <span>Formulario Simple de Captación</span>
-                        </label>
-                      </div>
-
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1">Título del formulario:</label>
-                        <input
-                          type="text"
-                          value={selectedElement.content.formTitle || ''}
-                          onChange={(e) => updateSelectedElement({}, { formTitle: e.target.value })}
-                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1">Subtítulo explicativo:</label>
-                        <input
-                          type="text"
-                          value={selectedElement.content.formSubtitle || ''}
-                          onChange={(e) => updateSelectedElement({}, { formSubtitle: e.target.value })}
-                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
-                        />
-                      </div>
-
-                      {/* Fields Toggles */}
-                      <div className="p-2.5 bg-white border border-zinc-200 rounded-xl space-y-2">
-                        <div className="text-xs font-bold text-zinc-700">Campos del Formulario:</div>
-
-                        <div className="flex items-center justify-between py-1 border-b border-zinc-100">
-                          <span className="text-xs text-zinc-700">Correo Electrónico (Email)</span>
-                          <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
-                            Obligatorio
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between py-1 border-b border-zinc-100">
-                          <span className="text-xs text-zinc-700">Campo Nombre</span>
-                          <div className="flex items-center gap-2">
-                            <label className="flex items-center gap-1 text-[11px] text-zinc-500 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedElement.content.showNameField ?? true}
-                                onChange={(e) => updateSelectedElement({}, { showNameField: e.target.checked })}
-                                className="w-3.5 h-3.5 text-[#2848F0] rounded"
-                              />
-                              <span>Activar</span>
-                            </label>
-                            {selectedElement.content.showNameField && (
-                              <label className="flex items-center gap-1 text-[11px] text-zinc-500 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedElement.content.nameRequired ?? false}
-                                  onChange={(e) => updateSelectedElement({}, { nameRequired: e.target.checked })}
-                                  className="w-3.5 h-3.5 text-[#2848F0] rounded"
-                                />
-                                <span>Requerido</span>
-                              </label>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between py-1">
-                          <span className="text-xs text-zinc-700">Campo Teléfono / WhatsApp</span>
-                          <div className="flex items-center gap-2">
-                            <label className="flex items-center gap-1 text-[11px] text-zinc-500 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedElement.content.showPhoneField ?? false}
-                                onChange={(e) => updateSelectedElement({}, { showPhoneField: e.target.checked })}
-                                className="w-3.5 h-3.5 text-[#2848F0] rounded"
-                              />
-                              <span>Activar</span>
-                            </label>
-                            {selectedElement.content.showPhoneField && (
-                              <label className="flex items-center gap-1 text-[11px] text-zinc-500 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedElement.content.phoneRequired ?? false}
-                                  onChange={(e) => updateSelectedElement({}, { phoneRequired: e.target.checked })}
-                                  className="w-3.5 h-3.5 text-[#2848F0] rounded"
-                                />
-                                <span>Requerido</span>
-                              </label>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Radio button question configurator */}
-                      <div className="p-2.5 bg-white border border-zinc-200 rounded-xl space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-zinc-700 flex items-center gap-1">
-                            <RadioIcon className="w-3.5 h-3.5 text-[#2848F0]" />
-                            Pregunta con Radio Buttons:
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const extras = [...(selectedElement.content.extraFields || [])];
-                              if (extras.length === 0) {
-                                extras.push({
-                                  id: `q_${Date.now()}`,
-                                  type: 'radio',
-                                  label: '¿Cuál es tu consulta principal?',
-                                  required: true,
-                                  options: ['Opción 1', 'Opción 2', 'Opción 3'],
-                                });
-                              } else {
-                                extras[0].options = [...(extras[0].options || []), `Nueva opción ${(extras[0].options?.length || 0) + 1}`];
-                              }
-                              updateSelectedElement({}, { extraFields: extras });
-                            }}
-                            className="text-[11px] font-bold text-[#2848F0] hover:underline cursor-pointer"
-                          >
-                            + Añadir Opción
-                          </button>
-                        </div>
-
-                        {selectedElement.content.extraFields && selectedElement.content.extraFields.length > 0 && (
-                          <div className="space-y-2 pt-1">
-                            <div>
-                              <label className="text-[11px] text-zinc-500 font-medium block mb-1">Título de la pregunta:</label>
-                              <input
-                                type="text"
-                                value={selectedElement.content.extraFields[0].label || ''}
-                                onChange={(e) => {
-                                  const extras = [...(selectedElement.content.extraFields || [])];
-                                  extras[0].label = e.target.value;
-                                  updateSelectedElement({}, { extraFields: extras });
-                                }}
-                                className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              {(selectedElement.content.extraFields[0].options || []).map((opt, oIdx) => (
-                                <div key={oIdx} className="flex items-center gap-1.5">
-                                  <span className="text-xs text-zinc-400 font-bold">🔘</span>
-                                  <input
-                                    type="text"
-                                    value={opt}
-                                    onChange={(e) => {
-                                      const extras = [...(selectedElement.content.extraFields || [])];
-                                      const opts = [...(extras[0].options || [])];
-                                      opts[oIdx] = e.target.value;
-                                      extras[0].options = opts;
-                                      updateSelectedElement({}, { extraFields: extras });
-                                    }}
-                                    className="flex-1 p-1 text-xs border border-zinc-200 rounded-lg"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const extras = [...(selectedElement.content.extraFields || [])];
-                                      extras[0].options = (extras[0].options || []).filter((_, i) => i !== oIdx);
-                                      updateSelectedElement({}, { extraFields: extras });
-                                    }}
-                                    className="p-1 text-red-500 hover:bg-red-50 rounded cursor-pointer"
-                                    title="Eliminar opción"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Submit Button Settings */}
-                      <div>
-                        <label className="font-semibold text-zinc-700 block mb-1">Texto del botón de envío:</label>
-                        <input
-                          type="text"
-                          value={selectedElement.content.submitButtonText || '👉 Enviar Información'}
-                          onChange={(e) => updateSelectedElement({}, { submitButtonText: e.target.value })}
-                          className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-medium"
-                        />
-                      </div>
-                    </div>
+                    <CompleteFormInspector
+                      element={selectedElement}
+                      pageSettings={pageSettings}
+                      onUpdate={updateSelectedElement}
+                    />
                   )}
 
                   {/* 14. CONTENT FOR POPUP BUTTON */}
@@ -7606,68 +7266,28 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           </div>
 
                           {/* TAMAÑO DEL ICONO */}
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Tamaño del icono:</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min={10}
-                                max={64}
-                                value={
-                                  selectedElement.content.buttonIconSize ??
-                                  Math.max(14, Math.round((selectedElement.styles.fontSize || 16) * 1.05))
-                                }
-                                onChange={(e) => updateSelectedElement({}, { buttonIconSize: Number(e.target.value) })}
-                                className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                              />
-                              <div className="flex items-center gap-1 shrink-0">
-                                <input
-                                  type="number"
-                                  min={8}
-                                  max={120}
-                                  step={1}
-                                  value={
-                                    selectedElement.content.buttonIconSize ??
-                                    Math.max(14, Math.round((selectedElement.styles.fontSize || 16) * 1.05))
-                                  }
-                                  onChange={(e) =>
-                                    updateSelectedElement({}, { buttonIconSize: Math.max(8, parseInt(e.target.value) || 8) })
-                                  }
-                                  className="w-16 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-white focus:outline-[#2848F0]"
-                                />
-                                <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                              </div>
-                            </div>
-                          </div>
+                          <InlineSliderInput
+                            label="Tamaño del icono:"
+                            value={
+                              selectedElement.content.buttonIconSize ??
+                              Math.max(14, Math.round((selectedElement.styles.fontSize || 16) * 1.05))
+                            }
+                            min={10}
+                            max={64}
+                            inputMin={8}
+                            unit="px"
+                            onChange={(val) => updateSelectedElement({}, { buttonIconSize: val })}
+                          />
 
                           {/* ESPACIADO ENTRE ICONO Y TEXTO */}
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Espaciado entre icono y texto:</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min={0}
-                                max={40}
-                                value={selectedElement.content.buttonIconSpacing ?? 8}
-                                onChange={(e) => updateSelectedElement({}, { buttonIconSpacing: Number(e.target.value) })}
-                                className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                              />
-                              <div className="flex items-center gap-1 shrink-0">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={80}
-                                  step={1}
-                                  value={selectedElement.content.buttonIconSpacing ?? 8}
-                                  onChange={(e) =>
-                                    updateSelectedElement({}, { buttonIconSpacing: Math.max(0, parseInt(e.target.value) || 0) })
-                                  }
-                                  className="w-16 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-white focus:outline-[#2848F0]"
-                                />
-                                <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                              </div>
-                            </div>
-                          </div>
+                          <InlineSliderInput
+                            label="Espaciado entre icono y texto:"
+                            value={selectedElement.content.buttonIconSpacing ?? 8}
+                            min={0}
+                            max={40}
+                            unit="px"
+                            onChange={(val) => updateSelectedElement({}, { buttonIconSpacing: val })}
+                          />
                         </div>
 
                         {/* RELLENO DEL BOTÓN (INTERNO DESDE EL TEXTO HACIA LOS BORDES) */}
@@ -7679,35 +7299,23 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <label className="text-[10px] font-semibold text-zinc-600 block mb-1">Vertical (arriba/abajo)</label>
-                              <div className="flex items-center border border-zinc-200 rounded-lg bg-white overflow-hidden">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  value={selectedElement.styles.buttonPaddingY ?? 14}
-                                  onChange={(e) =>
-                                    updateSelectedElement({ buttonPaddingY: Math.max(0, parseInt(e.target.value) || 0) })
-                                  }
-                                  className="w-full p-1.5 text-xs font-mono font-semibold text-center focus:outline-none"
-                                />
-                                <span className="text-[10px] text-zinc-400 pr-2 font-mono select-none">px</span>
-                              </div>
+                              <FreeNumberInput
+                                value={selectedElement.styles.buttonPaddingY ?? 14}
+                                min={0}
+                                unit="px"
+                                inputClassName="text-center"
+                                onChange={(val) => updateSelectedElement({ buttonPaddingY: val })}
+                              />
                             </div>
                             <div>
                               <label className="text-[10px] font-semibold text-zinc-600 block mb-1">Horizontal (laterales)</label>
-                              <div className="flex items-center border border-zinc-200 rounded-lg bg-white overflow-hidden">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={160}
-                                  value={selectedElement.styles.buttonPaddingX ?? 28}
-                                  onChange={(e) =>
-                                    updateSelectedElement({ buttonPaddingX: Math.max(0, parseInt(e.target.value) || 0) })
-                                  }
-                                  className="w-full p-1.5 text-xs font-mono font-semibold text-center focus:outline-none"
-                                />
-                                <span className="text-[10px] text-zinc-400 pr-2 font-mono select-none">px</span>
-                              </div>
+                              <FreeNumberInput
+                                value={selectedElement.styles.buttonPaddingX ?? 28}
+                                min={0}
+                                unit="px"
+                                inputClassName="text-center"
+                                onChange={(val) => updateSelectedElement({ buttonPaddingX: val })}
+                              />
                             </div>
                           </div>
                         </div>
@@ -8227,32 +7835,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       {openSections.typography && (
                         <div className="p-3 space-y-3 bg-white">
                           {/* Tamaño de fuente: barra desplazadora e input en la misma fila horizontal */}
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1">Tamaño de fuente:</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min={8}
-                                max={120}
-                                value={selectedElement.styles.fontSize || 16}
-                                onChange={(e) => updateSelectedElement({ fontSize: Number(e.target.value) })}
-                                className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                              />
-                              <div className="flex items-center gap-1 shrink-0">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  max={200}
-                                  value={selectedElement.styles.fontSize || 16}
-                                  onChange={(e) =>
-                                    updateSelectedElement({ fontSize: Math.max(1, parseInt(e.target.value) || 16) })
-                                  }
-                                  className="w-14 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
-                                />
-                                <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                              </div>
-                            </div>
-                          </div>
+                          <InlineSliderInput
+                            label="Tamaño de fuente:"
+                            value={selectedElement.styles.fontSize || 16}
+                            min={8}
+                            max={120}
+                            inputMin={1}
+                            unit="px"
+                            onChange={(val) => updateSelectedElement({ fontSize: val })}
+                          />
 
                           <div>
                             <div className="flex items-center justify-between mb-1">
@@ -8623,32 +8214,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
                           {(selectedElement.styles.borderWidth ?? 0) > 0 && (
                             <div className="space-y-2.5 p-2.5 bg-zinc-50 rounded-xl border border-zinc-200">
-                              <div>
-                                <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Grosor de borde:</label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="range"
-                                    min={1}
-                                    max={12}
-                                    value={selectedElement.styles.borderWidth || 1}
-                                    onChange={(e) => updateSelectedElement({ borderWidth: Number(e.target.value) })}
-                                    className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                                  />
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      max={24}
-                                      value={selectedElement.styles.borderWidth || 1}
-                                      onChange={(e) =>
-                                        updateSelectedElement({ borderWidth: Math.max(1, parseInt(e.target.value) || 1) })
-                                      }
-                                      className="w-14 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-white focus:outline-[#2848F0]"
-                                    />
-                                    <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                                  </div>
-                                </div>
-                              </div>
+                              <InlineSliderInput
+                                label="Grosor de borde:"
+                                value={selectedElement.styles.borderWidth || 1}
+                                min={1}
+                                max={12}
+                                inputMin={1}
+                                unit="px"
+                                onChange={(val) => updateSelectedElement({ borderWidth: val })}
+                              />
 
                               <div>
                                 <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">Tipo de borde:</label>
@@ -8666,32 +8240,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                           )}
 
                           {/* Borde redondeado (Radio): barra desplazable e input alineados horizontalmente */}
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1">Borde redondeado (Radio):</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min={0}
-                                max={60}
-                                value={selectedElement.styles.borderRadius ?? 0}
-                                onChange={(e) => updateSelectedElement({ borderRadius: Number(e.target.value) })}
-                                className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-                              />
-                              <div className="flex items-center gap-1 shrink-0">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={200}
-                                  value={selectedElement.styles.borderRadius ?? 0}
-                                  onChange={(e) =>
-                                    updateSelectedElement({ borderRadius: Math.max(0, parseInt(e.target.value) || 0) })
-                                  }
-                                  className="w-14 px-1.5 py-0.5 text-right font-mono font-semibold text-xs border border-zinc-300 rounded bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
-                                />
-                                <span className="text-[11px] text-zinc-500 font-mono">px</span>
-                              </div>
-                            </div>
-                          </div>
+                          <InlineSliderInput
+                            label="Borde redondeado (Radio):"
+                            value={selectedElement.styles.borderRadius ?? 0}
+                            min={0}
+                            max={60}
+                            unit="px"
+                            onChange={(val) => updateSelectedElement({ borderRadius: val })}
+                          />
                         </div>
                       )}
                     </div>
@@ -8703,36 +8259,38 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   {/* ============================================================== */}
                   {/* ACCORDION: ESPACIADO (MARGEN Y RELLENO - AGRUPADOS EN 1 LÍNEA) */}
                   {/* ============================================================== */}
-                  <div className="border border-zinc-200 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => toggleAccordion('spacing')}
-                      className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Layout className="w-3.5 h-3.5 text-[#2848F0]" />
-                        Disposición
-                      </span>
-                      {openSections.spacing !== false ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    </button>
+                  {selectedElement.type !== 'simple_form' && (
+                    <div className="border border-zinc-200 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => toggleAccordion('spacing')}
+                        className="w-full px-3 py-2 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-zinc-800 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Layout className="w-3.5 h-3.5 text-[#2848F0]" />
+                          Disposición
+                        </span>
+                        {openSections.spacing !== false ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      </button>
 
-                    {openSections.spacing !== false && (
-                      <div className="p-3 bg-white">
-                        <BoxModelSpacingControl
-                          marginTop={selectedElement.styles.marginTop ?? 0}
-                          marginRight={selectedElement.styles.marginRight ?? 0}
-                          marginBottom={selectedElement.styles.marginBottom ?? 16}
-                          marginLeft={selectedElement.styles.marginLeft ?? 0}
-                          paddingTop={selectedElement.styles.paddingTop ?? 0}
-                          paddingRight={selectedElement.styles.paddingRight ?? 0}
-                          paddingBottom={selectedElement.styles.paddingBottom ?? 0}
-                          paddingLeft={selectedElement.styles.paddingLeft ?? 0}
-                          onChangeMargin={(margins) => updateSelectedElement(margins)}
-                          onChangePadding={(paddings) => updateSelectedElement(paddings)}
-                          showPadding={selectedElement.type !== 'divider'}
-                        />
-                      </div>
-                    )}
-                  </div>
+                      {openSections.spacing !== false && (
+                        <div className="p-3 bg-white">
+                          <BoxModelSpacingControl
+                            marginTop={selectedElement.styles.marginTop ?? 0}
+                            marginRight={selectedElement.styles.marginRight ?? 0}
+                            marginBottom={selectedElement.styles.marginBottom ?? 16}
+                            marginLeft={selectedElement.styles.marginLeft ?? 0}
+                            paddingTop={selectedElement.styles.paddingTop ?? 0}
+                            paddingRight={selectedElement.styles.paddingRight ?? 0}
+                            paddingBottom={selectedElement.styles.paddingBottom ?? 0}
+                            paddingLeft={selectedElement.styles.paddingLeft ?? 0}
+                            onChangeMargin={(margins) => updateSelectedElement(margins)}
+                            onChangePadding={(paddings) => updateSelectedElement(paddings)}
+                            showPadding={selectedElement.type !== 'divider'}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : activeColForInspector && selectionCtx.selectedColParentRow ? (
@@ -8743,6 +8301,21 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                 parentRow={selectionCtx.selectedColParentRow}
                 sectionName={selectedSec?.name}
                 onUpdate={(props) => updateSelectedColumn(props)}
+                onResizeColumnWidth={(pct) => {
+                  const nextSections = resizeColumnWidthInSections(
+                    sections,
+                    activeColForInspector.id,
+                    pct
+                  );
+                  pushHistory(nextSections);
+                  setHasUnsavedChanges(true);
+                }}
+                onEqualizeColumns={() =>
+                  changeRowColumnsCount(
+                    selectionCtx.selectedColParentRow!.id,
+                    selectionCtx.selectedColParentRow!.columns.length
+                  )
+                }
                 onSelectSiblingColumn={(colId) => {
                   setSelectedColumnId(colId);
                   setSelectedElementId(null);
@@ -8784,6 +8357,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     governingLabel={rowGoverningLabel}
                     onUpdate={(props) => updateSelectedRow(props)}
                     onChangeColumnsCount={(count) => changeRowColumnsCount(activeRowForInspector.id, count)}
+                    onSelectColumn={(colId) => {
+                      setSelectedColumnId(colId);
+                      setSelectedRowId(null);
+                      setSelectedElementId(null);
+                    }}
                     onMoveUp={() => moveRow('up', selectedSec?.id, activeRowForInspector.id)}
                     onMoveDown={() => moveRow('down', selectedSec?.id, activeRowForInspector.id)}
                     canMoveUp={selectionCtx.canMoveRowUp}
@@ -9706,7 +9284,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             }}
           >
             {/* Optional Canvas Background Image Layer (supports opacity, fit, position, repeat, attachment) */}
-            {pageSettings.pageBgImageUrl && pageSettings.pageBgImageUrl.trim() !== '' && (
+            {pageSettings.pageBgImageEnabled !== false &&
+              pageSettings.pageBgImageUrl &&
+              pageSettings.pageBgImageUrl.trim() !== '' && (
               <div
                 aria-hidden="true"
                 className="absolute inset-0 pointer-events-none"
@@ -9842,7 +9422,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
               if (effectiveBgType === 'solid') {
                 const hasCustomCanvasSurface = Boolean(
-                  (pageSettings.pageBgImageUrl && pageSettings.pageBgImageUrl.trim() !== '') ||
+                  (pageSettings.pageBgImageEnabled !== false &&
+                    pageSettings.pageBgImageUrl &&
+                    pageSettings.pageBgImageUrl.trim() !== '') ||
                     (pageSettings.pageBgColor &&
                       pageSettings.pageBgColor.toUpperCase() !== '#FFFFFF')
                 );
@@ -11562,6 +11144,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                         <SimpleFormElement
                                           element={element}
                                           isEditable={!isPreviewMode}
+                                          defaultPrimaryColor={pageSettings.primaryColor}
+                                          defaultFontFamily={pageSettings.bodyFontFamily}
                                           onSubmitSuccess={() => {
                                             showToast('¡Información enviada con éxito!');
                                           }}

@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { PageBlockSection } from '../../types';
-import { NumberControl } from '../common/NumberControl';
+import { NumberControl, InlineSliderInput, FreeNumberInput } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
 import { BoxModelSpacingControl, SingleBoxModelRow } from '../common/BoxModelSpacingControl';
 import {
@@ -20,91 +20,6 @@ import {
   Minimize2,
   Square,
 } from 'lucide-react';
-
-interface SectionInlineSliderProps {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  unit?: string;
-  onChange: (val: number) => void;
-}
-
-const SectionInlineSlider: React.FC<SectionInlineSliderProps> = ({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  unit = 'px',
-  onChange,
-}) => {
-  const [inputStr, setInputStr] = useState<string>(String(value));
-
-  useEffect(() => {
-    setInputStr(String(value));
-  }, [value]);
-
-  const handleNumberChange = (raw: string) => {
-    setInputStr(raw);
-    if (raw.trim() === '' || raw === '-') return;
-    const parsed = Number(raw);
-    if (!Number.isNaN(parsed)) {
-      const clamped = Math.min(max, Math.max(min, parsed));
-      onChange(clamped);
-    }
-  };
-
-  const handleBlur = () => {
-    const parsed = Number(inputStr);
-    if (inputStr.trim() === '' || Number.isNaN(parsed)) {
-      setInputStr(String(value));
-      return;
-    }
-    const clamped = Math.min(max, Math.max(min, parsed));
-    setInputStr(String(clamped));
-    if (clamped !== value) {
-      onChange(clamped);
-    }
-  };
-
-  return (
-    <div className="space-y-1.5">
-      <label className="font-semibold text-zinc-700 block text-xs">{label}:</label>
-      <div className="flex items-center gap-2.5">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={Math.min(max, Math.max(min, value))}
-          onChange={(e) => {
-            const next = Number(e.target.value);
-            setInputStr(String(next));
-            onChange(next);
-          }}
-          className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-        />
-        <div className="flex items-center gap-1 shrink-0">
-          <input
-            type="number"
-            min={min}
-            max={max}
-            step={step}
-            value={inputStr}
-            onChange={(e) => handleNumberChange(e.target.value)}
-            onBlur={handleBlur}
-            className="w-[68px] px-1.5 py-1 text-right font-mono font-semibold text-xs border border-zinc-300 rounded-md bg-zinc-50 focus:bg-white text-zinc-900 focus:outline-[#2848F0] [&::-webkit-inner-spin-button]:opacity-100 [&::-webkit-inner-spin-button]:cursor-pointer"
-          />
-          {unit && (
-            <span className="text-[11px] text-zinc-500 font-mono select-none">{unit}</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 
 interface SectionInspectorProps {
@@ -178,7 +93,8 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
   };
 
   const maxAllowedWidth = Math.max(320, Math.round(canvasMaxWidth || 1200));
-  const minAllowedWidth = Math.min(320, maxAllowedWidth);
+  const minAllowedWidth = Math.min(100, maxAllowedWidth);
+  const sliderMinWidth = Math.min(200, maxAllowedWidth);
   const numericMaxWidth = typeof section.maxWidth === 'number' ? section.maxWidth : undefined;
   const currentWidthType: 'boxed' | 'full' = section.widthType
     ? section.widthType
@@ -385,8 +301,11 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                   <NumberControl
                     label="Ancho máximo exacto"
                     value={currentMaxWidth}
-                    min={minAllowedWidth}
+                    min={sliderMinWidth}
                     max={maxAllowedWidth}
+                    inputMin={minAllowedWidth}
+                    inputMax={maxAllowedWidth}
+                    strictMax={true}
                     step={10}
                     unit="px"
                     onChange={(val) =>
@@ -680,6 +599,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                         value={section.bgOverlayOpacity ?? 60}
                         min={0}
                         max={95}
+                        strictMax={true}
                         step={5}
                         unit="%"
                         onChange={(val) => onUpdate({ bgOverlayOpacity: val })}
@@ -774,7 +694,7 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                 </div>
               </div>
 
-              <SectionInlineSlider
+              <InlineSliderInput
                 label="Radio de Esquinas"
                 value={section.borderRadius ?? 0}
                 min={0}
@@ -903,44 +823,28 @@ export const SectionInspector: React.FC<SectionInspectorProps> = ({
                   <label className="font-semibold text-zinc-700 block mb-1">
                     Minutos:
                   </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min={0}
-                      max={60}
-                      value={section.delayMinutes ?? 0}
-                      onChange={(e) => {
-                        const val = Math.max(0, Math.min(60, parseInt(e.target.value, 10) || 0));
-                        onUpdate({ delayMinutes: val });
-                      }}
-                      className="w-full p-2 pr-7 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
-                    />
-                    <span className="absolute right-2 top-2 text-[10px] font-bold text-zinc-400 select-none">
-                      min
-                    </span>
-                  </div>
+                  <FreeNumberInput
+                    value={section.delayMinutes ?? 0}
+                    min={0}
+                    max={60}
+                    strictMax={true}
+                    unit="min"
+                    onChange={(val) => onUpdate({ delayMinutes: val })}
+                  />
                 </div>
 
                 <div>
                   <label className="font-semibold text-zinc-700 block mb-1">
                     Segundos:
                   </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min={0}
-                      max={59}
-                      value={section.delaySeconds ?? 0}
-                      onChange={(e) => {
-                        const val = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
-                        onUpdate({ delaySeconds: val });
-                      }}
-                      className="w-full p-2 pr-7 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-mono"
-                    />
-                    <span className="absolute right-2 top-2 text-[10px] font-bold text-zinc-400 select-none">
-                      seg
-                    </span>
-                  </div>
+                  <FreeNumberInput
+                    value={section.delaySeconds ?? 0}
+                    min={0}
+                    max={59}
+                    strictMax={true}
+                    unit="seg"
+                    onChange={(val) => onUpdate({ delaySeconds: val })}
+                  />
                 </div>
               </div>
 

@@ -17,6 +17,7 @@ import {
   Appointment,
   AppointmentStatus,
   EmailIntegration,
+  CompleteFormEmailTarget,
   CustomDomain,
 } from '../types';
 import { getAccessToken, createCalendarEvent } from '../services/googleCalendarService';
@@ -83,6 +84,13 @@ interface AppContextType {
     answers: Record<string, any>,
     utm?: Record<string, string>
   ) => { isQualified: boolean; score: number; contactId: string };
+  submitCompleteFormLead: (params: {
+    formName: string;
+    entries: { id: string; label: string; type: string; value: any }[];
+    addToCrm: boolean;
+    sendToEmailMarketing: boolean;
+    emailTargets?: CompleteFormEmailTarget[];
+  }) => { contactId?: string };
 
   // Native Calendar & Appointments
   availability: AvailabilityRule[];
@@ -667,6 +675,135 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return { isQualified, score, contactId: newContactId };
   };
 
+  const submitCompleteFormLead = ({
+    formName,
+    entries,
+    addToCrm,
+    sendToEmailMarketing,
+    emailTargets = [],
+  }: {
+    formName: string;
+    entries: { id: string; label: string; type: string; value: any }[];
+    addToCrm: boolean;
+    sendToEmailMarketing: boolean;
+    emailTargets?: CompleteFormEmailTarget[];
+  }): { contactId?: string } => {
+    const emailEntry = entries.find((e) => e.type === 'email' && String(e.value || '').trim());
+    const phoneEntry = entries.find(
+      (e) => (e.type === 'whatsapp' || e.type === 'tel') && String(e.value || '').trim()
+    );
+    const nameEntry =
+      entries.find(
+        (e) =>
+          e.type === 'text' &&
+          /nombre|name/i.test(e.label || '') &&
+          String(e.value || '').trim()
+      ) || entries.find((e) => e.type === 'text' && String(e.value || '').trim());
+
+    const resolvedEmail = emailEntry ? String(emailEntry.value).trim() : '';
+    const resolvedPhone = phoneEntry ? String(phoneEntry.value).trim() : '';
+    const resolvedName = nameEntry
+      ? String(nameEntry.value).trim()
+      : resolvedEmail
+      ? resolvedEmail.split('@')[0]
+      : 'Nuevo Lead';
+
+    const activeEmailTargets = sendToEmailMarketing
+      ? emailTargets.filter((t) => t.enabled)
+      : [];
+
+    if (activeEmailTargets.length > 0) {
+      const nowIso = new Date().toISOString();
+      setIntegrations((prev) =>
+        prev.map((integ) => {
+          const target = activeEmailTargets.find((t) => t.provider === integ.provider);
+          if (!target) return integ;
+          return {
+            ...integ,
+            list_name: target.listOrTag.trim() || integ.list_name,
+            last_synced_at: nowIso,
+          };
+        })
+      );
+    }
+
+    let contactId: string | undefined;
+
+    if (addToCrm) {
+      const nowIso = new Date().toISOString();
+      const existing = resolvedEmail
+        ? contacts.find((c) => c.email.toLowerCase() === resolvedEmail.toLowerCase())
+        : undefined;
+
+      if (existing) {
+        contactId = existing.id;
+        setContacts((prev) =>
+          prev.map((c) =>
+            c.id === existing.id
+              ? {
+                  ...c,
+                  full_name: resolvedName || c.full_name,
+                  phone: resolvedPhone || c.phone,
+                  last_activity_at: nowIso,
+                }
+              : c
+          )
+        );
+      } else {
+        contactId = `cnt_${Date.now()}`;
+        const newContact: Contact = {
+          id: contactId,
+          organization_id: organization.id,
+          full_name: resolvedName,
+          email: resolvedEmail || 'sin-correo@lead.local',
+          phone: resolvedPhone || '',
+          status: 'nuevo',
+          source: formName || 'Formulario Completo',
+          score: 65,
+          last_activity_at: nowIso,
+          created_at: nowIso,
+        };
+        setContacts((prev) => [newContact, ...prev]);
+      }
+
+      const summaryParts = entries
+        .filter((e) => {
+          if (Array.isArray(e.value)) return e.value.length > 0;
+          return String(e.value ?? '').trim() !== '';
+        })
+        .map((e) => {
+          const valStr = Array.isArray(e.value) ? e.value.join(', ') : String(e.value);
+          return `${e.label}: ${valStr}`;
+        });
+
+      const emailSyncSummary =
+        activeEmailTargets.length > 0
+          ? ` · Sincronizado con: ${activeEmailTargets
+              .map((t) => `${t.provider}${t.listOrTag ? ` (${t.listOrTag})` : ''}`)
+              .join(', ')}`
+          : '';
+
+      const newEvent: ContactEvent = {
+        id: `evt_${Date.now()}`,
+        contact_id: contactId,
+        organization_id: organization.id,
+        event_type: 'form_submitted',
+        description: `Envió "${formName || 'Formulario Completo'}"${
+          summaryParts.length > 0 ? ` — ${summaryParts.join(' | ')}` : ''
+        }${emailSyncSummary}`,
+        payload: {
+          formName,
+          entries,
+          emailTargets: activeEmailTargets,
+        },
+        created_at: nowIso,
+      };
+      setContactEvents((prev) => [newEvent, ...prev]);
+    }
+
+    return { contactId };
+  };
+
   // Availability & Native Appointments
   const updateAvailability = (rules: AvailabilityRule[]) => {
     setAvailability(rules);
@@ -961,6 +1098,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         togglePublishFunnel,
         forms,
         submitPublicForm,
+        submitCompleteFormLead,
         availability,
         appointmentType,
         appointments,

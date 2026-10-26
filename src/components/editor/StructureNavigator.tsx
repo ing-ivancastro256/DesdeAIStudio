@@ -221,8 +221,9 @@ const getElementName = (el: PageBlockElement) => {
     case 'video':
       return 'Vídeo';
     case 'form':
-    case 'simple_form':
       return 'Formulario Completo';
+    case 'simple_form':
+      return el.content?.formName?.trim() || 'Formulario Completo';
     case 'form_button':
       return 'Botón de Formulario';
     case 'popup_button':

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { FunnelPageGlobalSettings, AVAILABLE_FONTS } from '../../types';
-import { NumberControl } from '../common/NumberControl';
+import { NumberControl, InlineSliderInput } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
 import { BoxModelSpacingControl } from '../common/BoxModelSpacingControl';
 import {
@@ -18,91 +18,6 @@ import {
   Trash2,
 } from 'lucide-react';
 
-interface InlineSliderInputProps {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  unit?: string;
-  onChange: (val: number) => void;
-}
-
-const InlineSliderInput: React.FC<InlineSliderInputProps> = ({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  unit = 'px',
-  onChange,
-}) => {
-  const [inputStr, setInputStr] = useState<string>(String(value));
-
-  useEffect(() => {
-    setInputStr(String(value));
-  }, [value]);
-
-  const handleNumberChange = (raw: string) => {
-    setInputStr(raw);
-    if (raw.trim() === '' || raw === '-') return;
-    const parsed = Number(raw);
-    if (!Number.isNaN(parsed)) {
-      const clamped = Math.min(max, Math.max(min, parsed));
-      onChange(clamped);
-    }
-  };
-
-  const handleBlur = () => {
-    const parsed = Number(inputStr);
-    if (inputStr.trim() === '' || Number.isNaN(parsed)) {
-      setInputStr(String(value));
-      return;
-    }
-    const clamped = Math.min(max, Math.max(min, parsed));
-    setInputStr(String(clamped));
-    if (clamped !== value) {
-      onChange(clamped);
-    }
-  };
-
-  return (
-    <div className="space-y-1.5">
-      <label className="font-semibold text-zinc-700 block text-xs">{label}:</label>
-      <div className="flex items-center gap-2.5">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={Math.min(max, Math.max(min, value))}
-          onChange={(e) => {
-            const next = Number(e.target.value);
-            setInputStr(String(next));
-            onChange(next);
-          }}
-          className="flex-1 accent-[#2848F0] h-1.5 bg-zinc-200 rounded-lg cursor-pointer"
-        />
-        <div className="flex items-center gap-1 shrink-0">
-          <input
-            type="number"
-            min={min}
-            max={max}
-            step={step}
-            value={inputStr}
-            onChange={(e) => handleNumberChange(e.target.value)}
-            onBlur={handleBlur}
-            className="w-[68px] px-1.5 py-1 text-right font-mono font-semibold text-xs border border-zinc-300 rounded-md bg-zinc-50 focus:bg-white text-zinc-900 focus:outline-[#2848F0] [&::-webkit-inner-spin-button]:opacity-100 [&::-webkit-inner-spin-button]:cursor-pointer"
-          />
-          {unit && (
-            <span className="text-[11px] text-zinc-500 font-mono select-none">{unit}</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 interface PageSettingsInspectorProps {
   settings: FunnelPageGlobalSettings;
   pageTitle?: string;
@@ -119,10 +34,10 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
   const bgImageInputRef = useRef<HTMLInputElement>(null);
 
   const [openSections, setOpenSections] = useState({
+    seo: true,
     canvasWidth: true,
     colors: true,
     typography: true,
-    seo: true,
     borderRadius: true,
     bgImage: true,
     spacing: true,
@@ -144,6 +59,8 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
   ];
 
   const hasBgImage = Boolean(settings.pageBgImageUrl && settings.pageBgImageUrl.trim() !== '');
+  const isBgImageEnabled =
+    settings.pageBgImageEnabled !== undefined ? settings.pageBgImageEnabled : hasBgImage;
   const currentBgSize = settings.pageBgImageSize || 'cover';
   const currentBgPosition = settings.pageBgImagePosition || 'center';
   const currentBgRepeat = settings.pageBgImageRepeat || 'no-repeat';
@@ -166,6 +83,7 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
               const dataUrl = uploadEv.target?.result as string;
               if (dataUrl) {
                 onUpdate({
+                  pageBgImageEnabled: true,
                   pageBgImageUrl: dataUrl,
                   pageBgImageOpacity: settings.pageBgImageOpacity ?? 100,
                   pageBgImageSize: settings.pageBgImageSize || 'cover',
@@ -207,7 +125,58 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
       {/* Body Scrollable Options */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* ============================================================== */}
-        {/* 1. ANCHO DEL CANVAS (PANTALLA)                                  */}
+        {/* 1. SEO Y METADATOS DE LA PÁGINA                                 */}
+        {/* ============================================================== */}
+        <div className="border border-zinc-200 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('seo')}
+            className="w-full px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-xs text-zinc-800 cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-teal-600" />
+              SEO y Metadatos de la Página
+            </span>
+            {openSections.seo ? (
+              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
+            )}
+          </button>
+
+          {openSections.seo && (
+            <div className="p-3.5 space-y-3 bg-white text-xs">
+              <div>
+                <label className="font-semibold text-zinc-700 block mb-1">
+                  Título SEO (Etiqueta Title):
+                </label>
+                <input
+                  type="text"
+                  value={settings.seo_title || ''}
+                  onChange={(e) => onUpdate({ seo_title: e.target.value })}
+                  placeholder="Ej. Sesión Estratégica High-Ticket | Tu Empresa"
+                  className="w-full p-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-zinc-700 block mb-1">
+                  Descripción SEO (Meta Description):
+                </label>
+                <textarea
+                  rows={3}
+                  value={settings.seo_description || ''}
+                  onChange={(e) => onUpdate({ seo_description: e.target.value })}
+                  placeholder="Describe el beneficio principal de tu oferta en 150 caracteres..."
+                  className="w-full p-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================== */}
+        {/* 2. ANCHO DEL CANVAS (PANTALLA)                                  */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
@@ -298,6 +267,7 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
                     value={currentMaxWidth}
                     min={640}
                     max={1920}
+                    inputMin={320}
                     step={10}
                     unit="px"
                     onChange={(val) => onUpdate({ pageContentMaxWidth: val })}
@@ -309,7 +279,7 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* 2. COLORES GENERALES DE LA PÁGINA                               */}
+        {/* 3. COLORES GENERALES DE LA PÁGINA                               */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
@@ -358,7 +328,7 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* 3. TIPOGRAFÍA GLOBAL (GOOGLE FONTS)                             */}
+        {/* 4. TIPOGRAFÍA GLOBAL (GOOGLE FONTS)                             */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
           <button
@@ -471,57 +441,6 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
         </div>
 
         {/* ============================================================== */}
-        {/* 4. SEO Y METADATOS DE LA PÁGINA                                 */}
-        {/* ============================================================== */}
-        <div className="border border-zinc-200 rounded-xl overflow-hidden">
-          <button
-            type="button"
-            onClick={() => toggleSection('seo')}
-            className="w-full px-3 py-2.5 bg-zinc-50 hover:bg-zinc-100 flex items-center justify-between font-semibold text-xs text-zinc-800 cursor-pointer"
-          >
-            <span className="flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5 text-teal-600" />
-              SEO y Metadatos de la Página
-            </span>
-            {openSections.seo ? (
-              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
-            ) : (
-              <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
-            )}
-          </button>
-
-          {openSections.seo && (
-            <div className="p-3.5 space-y-3 bg-white text-xs">
-              <div>
-                <label className="font-semibold text-zinc-700 block mb-1">
-                  Título SEO (Etiqueta Title):
-                </label>
-                <input
-                  type="text"
-                  value={settings.seo_title || ''}
-                  onChange={(e) => onUpdate({ seo_title: e.target.value })}
-                  placeholder="Ej. Sesión Estratégica High-Ticket | Tu Empresa"
-                  className="w-full p-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-zinc-700 block mb-1">
-                  Descripción SEO (Meta Description):
-                </label>
-                <textarea
-                  rows={3}
-                  value={settings.seo_description || ''}
-                  onChange={(e) => onUpdate({ seo_description: e.target.value })}
-                  placeholder="Describe el beneficio principal de tu oferta en 150 caracteres..."
-                  className="w-full p-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:bg-white focus:outline-[#2848F0]"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ============================================================== */}
         {/* 5. REDONDEO DE ESQUINAS / PUNTAS                                */}
         {/* ============================================================== */}
         <div className="border border-zinc-200 rounded-xl overflow-hidden">
@@ -616,43 +535,93 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
 
           {openSections.bgImage && (
             <div className="p-3.5 space-y-3 bg-white text-xs">
-              <button
-                type="button"
-                onClick={() => bgImageInputRef.current?.click()}
-                className="w-full py-2 px-3 bg-white border border-[#2848F0] text-[#2848F0] hover:bg-blue-50/70 font-semibold rounded-lg flex items-center justify-center gap-2 shadow-2xs transition-colors cursor-pointer"
+              {/* Toggle Switch: Normal (No) vs Imagen de Fondo (Sí) */}
+              <div
+                onClick={() => onUpdate({ pageBgImageEnabled: !isBgImageEnabled })}
+                className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-zinc-200 bg-zinc-50/80 hover:bg-zinc-100/70 transition-colors cursor-pointer select-none"
               >
-                <Upload className="w-3.5 h-3.5" />
-                <span>{hasBgImage ? 'Cambiar imagen de fondo' : 'Subir imagen desde explorador'}</span>
-              </button>
+                <div className="min-w-0">
+                  <div className="font-semibold text-zinc-800 text-xs">
+                    Usar imagen de fondo
+                  </div>
+                  <div className="text-[10px] text-zinc-500">
+                    {isBgImageEnabled
+                      ? 'Imagen activa en el lienzo'
+                      : 'Usando color de fondo normal'}
+                  </div>
+                </div>
 
-              <div>
-                <label className="text-[11px] font-semibold text-zinc-600 block mb-1">
-                  O pegar URL de imagen:
-                </label>
-                <input
-                  type="text"
-                  value={
-                    settings.pageBgImageUrl?.startsWith('data:')
-                      ? ''
-                      : settings.pageBgImageUrl || ''
-                  }
-                  onChange={(e) =>
-                    onUpdate({
-                      pageBgImageUrl: e.target.value,
-                      pageBgImageOpacity: settings.pageBgImageOpacity ?? 100,
-                      pageBgImageSize: settings.pageBgImageSize || 'cover',
-                      pageBgImagePosition: settings.pageBgImagePosition || 'center',
-                      pageBgImageRepeat: settings.pageBgImageRepeat || 'no-repeat',
-                    })
-                  }
-                  placeholder={
-                    settings.pageBgImageUrl?.startsWith('data:')
-                      ? 'Imagen local cargada (pega otra URL si deseas)'
-                      : 'https://...'
-                  }
-                  className="w-full p-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:bg-white focus:outline-[#2848F0] font-mono"
-                />
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`text-[11px] font-bold ${
+                      isBgImageEnabled ? 'text-[#2848F0]' : 'text-zinc-400'
+                    }`}
+                  >
+                    {isBgImageEnabled ? 'Sí' : 'No'}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isBgImageEnabled}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdate({ pageBgImageEnabled: !isBgImageEnabled });
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none cursor-pointer ${
+                      isBgImageEnabled ? 'bg-[#2848F0]' : 'bg-zinc-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        isBgImageEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
+
+              {isBgImageEnabled && (
+                <div className="space-y-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => bgImageInputRef.current?.click()}
+                    className="w-full py-2 px-3 bg-white border border-[#2848F0] text-[#2848F0] hover:bg-blue-50/70 font-semibold rounded-lg flex items-center justify-center gap-2 shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>
+                      {hasBgImage ? 'Cambiar imagen de fondo' : 'Subir imagen desde explorador'}
+                    </span>
+                  </button>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-zinc-600 block mb-1">
+                      O pegar URL de imagen:
+                    </label>
+                    <input
+                      type="text"
+                      value={
+                        settings.pageBgImageUrl?.startsWith('data:')
+                          ? ''
+                          : settings.pageBgImageUrl || ''
+                      }
+                      onChange={(e) =>
+                        onUpdate({
+                          pageBgImageEnabled: true,
+                          pageBgImageUrl: e.target.value,
+                          pageBgImageOpacity: settings.pageBgImageOpacity ?? 100,
+                          pageBgImageSize: settings.pageBgImageSize || 'cover',
+                          pageBgImagePosition: settings.pageBgImagePosition || 'center',
+                          pageBgImageRepeat: settings.pageBgImageRepeat || 'no-repeat',
+                        })
+                      }
+                      placeholder={
+                        settings.pageBgImageUrl?.startsWith('data:')
+                          ? 'Imagen local cargada (pega otra URL si deseas)'
+                          : 'https://...'
+                      }
+                      className="w-full p-2 border border-zinc-200 rounded-lg text-xs bg-zinc-50 focus:bg-white focus:outline-[#2848F0] font-mono"
+                    />
+                  </div>
 
               {hasBgImage && (
                 <div className="space-y-3 pt-2 border-t border-zinc-100">
@@ -686,6 +655,7 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
                     value={currentBgOpacity}
                     min={0}
                     max={100}
+                    strictMax={true}
                     step={1}
                     unit="%"
                     onChange={(val) => onUpdate({ pageBgImageOpacity: val })}
@@ -812,6 +782,8 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
                       ))}
                     </div>
                   </div>
+                </div>
+              )}
                 </div>
               )}
             </div>

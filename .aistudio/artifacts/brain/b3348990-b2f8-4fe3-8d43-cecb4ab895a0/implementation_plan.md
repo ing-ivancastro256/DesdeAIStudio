@@ -1,108 +1,130 @@
-# Control de Ancho en Sección Externa, Jerarquía de Anchos en Cascada y Degradado de 2 Colores
+# Rediseño Integral del Elemento "Formulario Completo"
 
-Este plan incorpora el control completo de **Ancho de la Sección Externa** (`En Caja` / `100% Ancho`, deslizador y presets), establece una jerarquía estricta de anchos en cascada donde ningún contenedor interno puede superar a su contenedor padre (**Canvas ≥ Sección Externa ≥ Bloque Div / Sección Interna**), y moderniza el fondo en degradado de la Sección Externa permitiendo elegir dos colores personalizados junto a los estilos por defecto sin campos de código CSS.
+Transformación del elemento **Formulario completo** dentro del grupo **FORMULARIO** en un constructor modular de captación de leads sin contenedor decorativo, sin título ni subtítulo predefinidos, con radio de esquinas de `0px` por defecto en campos y botón, gestión avanzada de campos arrastrables, personalización completa del botón, casilla de políticas con texto enriquecido y automatizaciones post-envío conectadas al CRM y proveedores de Email Marketing.
 
-## Decisiones Confirmadas y Revisión del Usuario
+## Revisión del Usuario y Decisiones Confirmadas
 
 > [!IMPORTANT]
-> Se aplican las tres decisiones confirmadas para el comportamiento visual y el diseño del panel de propiedades:
-> - **Comportamiento visual de la Sección Externa en modo `En Caja`**: Al establecer un ancho menor que el del Canvas, se achica toda la caja exterior de la Sección Externa (incluyendo su color de fondo, degradado o imagen, superposición y bordes) manteniéndose centrada horizontalmente dentro del lienzo.
-> - **Ubicación en el panel de Sección Externa**: El nuevo grupo desplegable **Ancho de la Sección Externa** se ubica en primer lugar arriba de todo, justo antes de **Fondo de la Sección**, abierto por defecto al igual que el resto de grupos.
-> - **Degradado en Sección Externa**: Se conservan los estilos rápidos predefinidos, se añaden los **dos selectores de color** (`Color inicial (1)` y `Color final (2)`) con el mismo diseño directo que en Columnas, y se elimina por completo el cuadro de texto `CSS Personalizado`.
+> Las siguientes decisiones estratégicas fueron confirmadas directamente y guían el diseño e interacción del componente:
+
+- **Decisión Confirmada 1 — Apariencia del Contenedor en el Lienzo**: El formulario se inserta con un contenedor exterior **limpio y transparente**, mostrando únicamente los campos configurados, la casilla opcional de políticas y el botón de envío (sin tarjeta blanca envolvente, sombras ni título/subtítulo explicativo).
+- **Decisión Confirmada 2 — Alcance del Estilo de Campos**: La tipografía, colores, borde (`1px` por defecto) y redondeo (`0px` por defecto) funcionan de manera **compartida en todos los campos**, incluyendo un interruptor opcional dentro de cada campo para aplicar **ajustes visuales individuales** cuando se requiera destacar o diferenciar un campo específico.
+- **Decisión Confirmada 3 — Proveedores de Email Marketing Post-Envío**: En **Acción Después de Enviar**, se mostrarán **todos los proveedores disponibles** (`GetResponse`, `ActiveCampaign`, `ConvertKit / Kit`, `MailerLite`, `Brevo`) permitiendo activar uno o varios simultáneamente y especificar la **Lista o Etiqueta (Tag)** de destino en cada uno.
 
 ---
 
 ## 1. Visión General y Concepto Central
 
-- **Qué resuelve**:
-  1. Permite redimensionar el ancho propio de cualquier **Sección Externa** (por ejemplo, el Hero principal o cualquier bloque de sección) alternando entre `100% Ancho` (comportamiento actual que ocupa todo el Canvas) y `En Caja` con medida exacta en píxeles centrada en el lienzo.
-  2. Garantiza coherencia geométrica absoluta en toda la estructura anidada de la página: el **Canvas** gobierna el tope máximo de la **Sección Externa**, y a su vez la **Sección Externa** gobierna el tope máximo de cualquier **Bloque Div / Sección Interna** contenido dentro de ella.
-  3. Facilita la personalización de fondos degradados en la Sección Externa mediante selectores visuales de dos colores sincronizados con los presets rápidos, retirando el campo técnico de CSS manual.
-- **Usuarios y contexto**: Creadores de páginas y embudos que diseñan secciones con fondos de color o degradados acotados respecto al lienzo general y necesitan que todos los bloques internos respeten automáticamente las dimensiones del contenedor que los envuelve.
-- **Valor principal**: Control total de encuadre en cada nivel jerárquico (`Canvas` → `Sección Externa` → `Bloque Div`), fidelidad idéntica entre Modo Edición y Vista Previa, y edición visual sin fricción técnica.
+- **Qué Hace**: Permite diseñar formularios a medida directamente en el editor visual de páginas y ventanas emergentes, controlando el orden, ancho en columnas, tipos de entrada, estilos tipográficos/bordes, botón de acción, consentimiento legal con enlaces y flujo de conversión posterior al envío.
+- **Audiencia y Contexto**: Creadores de embudos y páginas de captura que necesitan integrar formularios limpios sobre cualquier fondo de sección o columna sin cajas forzadas, manteniendo control quirúrgico sobre cada campo y conectando cada registro con el CRM y herramientas de automatización.
+- **Valor Principal**: Elimina la rigidez del formulario fijo tradicional, unificando en un solo inspector seis bloques ordenados y predecibles con paridad visual respecto al resto del constructor.
 
 ---
 
 ## 2. Experiencia de Usuario y Diseño Visual
 
-### Flujos Clave de Interacción
-1. **Control de Ancho de la Sección Externa**:
-   - Al seleccionar una Sección Externa en el lienzo o desde Estructura, el primer grupo desplegado arriba en el inspector es **Ancho de la Sección Externa**.
-   - Incluye dos botones de modo: **`En Caja`** y **`100% Ancho`** (las secciones existentes sin medida fija inician en `100% Ancho` para respetar el ancho actual del Canvas; al activar `En Caja` adoptan una medida inicial acotada al Canvas, como `1200px` o el máximo permitido por el lienzo).
-   - En modo `En Caja`, se muestran el deslizador continuo con entrada numérica en `px` y los botones de presets rápidos (`720px`, `960px`, `1140px`, `1200px`, `1440px`), deshabilitando u ocultando límites que superen el ancho gobernante del Canvas.
-   - En el lienzo (tanto en Edición como en Vista Previa), la caja completa de la Sección Externa se ajusta a ese ancho y se centra horizontalmente con su fondo y bordes.
-2. **Concordancia en Cascada (`Canvas` → `Sección Externa` → `Bloque Div`)**:
-   - Si el **Canvas** se reduce (ej. a `960px`), cualquier Sección Externa que tuviera `1200px` se ajusta automáticamente a `960px`.
-   - Si una **Sección Externa** se reduce (ej. a `800px`), cualquier **Bloque Div / Sección Interna** (incluidos bloques anidados) dentro de esa sección cuyo ancho supere `800px` se recorta automáticamente a `800px`, y su propio inspector pasa a mostrar `800px` como tope máximo gobernado por la Sección Externa.
-3. **Degradado Visual de 2 Colores en Fondo de la Sección**:
-   - Dentro de **Fondo de la Sección → Degradado**, el usuario dispone de la tarjeta **Degradado de 2 colores** con los selectores visuales **`Color inicial (1)`** y **`Color final (2)`** (selector cromático + código hexadecimal), idénticos a los de Columnas.
-   - Debajo se mantienen los **Estilos rápidos** por defecto; al pulsar cualquiera de ellos, se aplica el degradado a la sección y se sincronizan automáticamente ambos selectores de color para que el usuario pueda partir de un preset y ajustar cualquiera de sus dos tonos.
-   - El campo inferior `CSS Personalizado` desaparece por completo.
+### Flujo Paso a Paso en el Editor y Lienzo
 
-### Identidad Visual y Precisión Espacial
-- **Dirección estética**: Paneles de inspección oscuros de alto contraste (`#1e293b` / `#0f172a` con acentos azul/índigo en estados activos), todos los acordeones abiertos por defecto sin controles colapsados ocultos.
-- **Tipografía y cifras tabulares**: Valores numéricos de ancho (`px`) renderizados con `tabular-nums` / `font-mono` para mantener alineación estable al deslizar controles de dimensión, y etiquetas de botones en una sola línea (`whitespace-nowrap`).
-- **Retroalimentación inmediata**: Ajuste en tiempo real (`< 150ms`) de la caja de la Sección Externa y de sus Bloques Div hijos tanto al arrastrar el deslizador como al pulsar un preset.
+1. **Inserción Limpia en el Lienzo**:
+   - Al arrastrar **Formulario completo** al lienzo, aparecen únicamente sus campos iniciales y el botón de envío sobre fondo transparente, sin encabezados ni subtítulos automáticos.
+   - Tanto los campos como el botón nacen con esquinas rectas (`0px` de radio) y los campos con borde sólido de `1px`.
+2. **Grupo 1 — Nombre del Formulario**:
+   - Primer bloque superior del inspector para asignar el identificador del formulario (usado en registros del CRM, eventos de conversión y trazabilidad de leads).
+3. **Grupo 2 — Campos del Formulario**:
+   - **Lista Vertical Reordenable**: Cada campo se presenta en una fila compacta uno debajo de otro con tirador para **arrastrar y soltar** (con línea azul indicadora de posición), botón de **Duplicar/Copiar** y botón de **Eliminar (`×`)**.
+   - **Botón `+ Añadir campo`**: Agrega instantáneamente un nuevo campo al final de la lista y abre su configuración.
+   - **Configuración Interna Desplegable por Campo** (organizada en pestañas **Contenido** y **Estilo** al hacer clic sobre un campo):
+     - *Pestaña Contenido*:
+       - Selector **Tipo de campo**: `Texto`, `Email`, `Text Area`, `Teléfono`, `WhatsApp`, `Select`, `Radio`, `Checkbox`.
+       - Edición de **Etiqueta (Label)**, **Placeholder** (en campos de entrada de texto), interruptor **Requerido** (`Sí` / `No`) y selector **Ancho de columna** (`100%`, `50%`, `33%`, `25%`, `66%`, `75%`) para distribuir campos en una o varias columnas.
+       - **Configuración de Múltiples Opciones** (exclusiva cuando el tipo es `Select`, `Radio` o `Checkbox`): área de texto multilínea para escribir una opción por línea (soportando tanto texto directo como formato `Etiqueta|valor`).
+     - *Pestaña Estilo*:
+       - Edición directa del estilo global compartido de los campos (familia tipográfica, tamaño de letra, color de texto, color de fondo, espesor de borde con `1px` por defecto, color de borde y radio de esquina con `0px` por defecto) junto con un interruptor **"Personalizar solo este campo"** para sobrescribir cualquiera de esos valores únicamente en el campo seleccionado.
+   - **Controles Globales Inferiores de Campos** (debajo de `+ Añadir campo`):
+     - Selector **Tamaño de campo** (`Extra Pequeño`, `Pequeño`, `Mediano`, `Grande`).
+     - Interruptor **Mostrar / Ocultar Etiquetas (Label)** encima de los campos e interruptor **Marca de requerido (`*`)**.
+4. **Grupo 3 — Botón del Formulario**:
+   - Réplica exacta de todas las capacidades del elemento **Botón** independiente:
+     - **Texto del botón** (texto principal, subtexto opcional, ancho completo o ajustado).
+     - **Icono del botón** (selector visual completo de iconos, posición antes o después del texto, tamaño del icono y separación respecto al texto).
+     - **Tipografía y Formato** (fuente, tamaño, peso negrita, cursiva, subrayado, transformación mayúsculas/minúsculas y alineación).
+     - **Color y Fondo** (color sólido o degradado de 2 colores, color de texto y colores de acento/hover).
+     - **Borde y Redondeo** (activación de borde, grosor, estilo sólido/punteado/discontinuo, color de borde y radio de esquinas con `0px` por defecto).
+5. **Grupo 4 — Checkbox de Políticas**:
+   - Interruptor superior (`No` / `Sí`) para activar o desactivar la casilla de aceptación de políticas encima del botón.
+   - Barra de formato enriquecido en línea (**Negrita `B`**, **Cursiva `I`**, **Subrayado `U`** e **Insertar Enlace / URL**) que permite seleccionar palabras específicas (por ejemplo, *"políticas de privacidad"* o *"términos y condiciones"*) y convertirlas en hipervínculos clicables hacia la URL deseada, además de configurar obligatoriedad y tamaño/color del texto.
+6. **Grupo 5 — Acción Después de Enviar**:
+   - Sistema multi-selección donde el usuario puede combinar simultáneamente una o varias acciones al completar el envío:
+     - **Siguiente página del embudo**: avanza automáticamente al siguiente paso configurado en el embudo.
+     - **Redirección a URL**: redirige a una dirección web externa o interna (misma pestaña o nueva pestaña).
+     - **Añadir al CRM**: crea o actualiza automáticamente el contacto real en el módulo CRM con su nombre, correo, teléfono/WhatsApp, respuestas personalizadas y etiqueta de origen del formulario.
+     - **Email Marketing**: despliega los proveedores (`ActiveCampaign`, `GetResponse`, `ConvertKit / Kit`, `MailerLite`, `Brevo`) con casillas de activación independientes e input de **Lista o Etiqueta (Tag)** para cada proveedor seleccionado.
+7. **Grupo 6 — Disposición**:
+   - Control unificado en una sola línea de 4 lados vinculables para **Margen** y **Relleno (Padding)** (`Superior`, `Inferior`, `Derecha`, `Izquierda`), consistente con el resto de elementos del constructor.
+
+### Identidad Visual, Tipografía y Micro-interacciones
+- **Dirección Estética**: Inspector técnico de alta densidad estilo SaaS profesional, con jerarquía clara de tarjetas limpias, bordes sutiles (`--border` / `slate-200`), acentos precisos en índigo/azul (`indigo-600` / `blue-600`) y superficies de lienzo 100% fieles al diseño final del usuario.
+- **Tipografía y Ritmo Espacial**: Etiquetas de control legibles (`11px–12px` semibold), controles numéricos alineados horizontalmente con deslizadores y flechas de incremento, y grilla flexible de 12 columnas internas en el formulario para soportar combinaciones de campos al `100%`, `50%` o `33%` sin desbordes.
+- **Feedback Interactivo**: Indicador lineal azul limpio durante el reordenamiento por arrastrar y soltar de campos, validación en vivo de campos requeridos y casilla de políticas al probar en Vista Previa o Embudo Público, y notificación de confirmación al registrar el lead en el CRM.
 
 ---
 
-## 3. Decisiones de Producto y Razonamiento
+## 3. Decisiones de Producto y Equilibrios Técnicos
 
-- **Achicar y centrar la caja completa de la Sección Externa**:
-  - *Enfoque elegido*: Aplicar el `maxWidth` y centrado horizontal (`margin: auto` cuando no hay margen lateral explícito) directamente sobre el contenedor raíz de la Sección Externa en vistas de escritorio.
-  - *Por qué*: Permite que al asignar un color sólido, degradado o imagen de fondo a una Sección Externa en modo `En Caja`, dicho fondo se vea contenido dentro del ancho elegido dejando visible el lienzo exterior alrededor, exactamente igual que ocurre con un Bloque Div respecto a su sección.
-  - *Alternativa descartada*: Restringir únicamente un contenedor interno invisible manteniendo el fondo al 100%, lo cual impediría ver el recorte real del fondo de la sección cuando el usuario busca encajonarla.
-- **Propagación descendente automática de límites de ancho**:
-  - *Enfoque elegido*: Evaluar en cascada `Límite Canvas` → `Límite Efectivo de cada Sección Externa` → `Límite Efectivo de sus Bloques Div`, recortando de inmediato en el estado cualquier valor hijo que quede por encima cuando cambia un contenedor superior.
-  - *Por qué*: Evita estados inconsistentes donde un bloque interno afirme medir `1140px` dentro de una sección de `800px` o un lienzo de `640px`.
-- **Unificación del selector de Degradado con el estándar de Columnas**:
-  - *Enfoque elegido*: Combinar los dos selectores `Color inicial (1)` y `Color final (2)` (en ángulo diagonal suave de `135deg`) con la galería de presets existentes y eliminar la caja de texto CSS.
-  - *Por qué*: Mantiene un lenguaje visual idéntico entre Columnas y Sección Externa y elimina código técnico innecesario de la interfaz.
+- **Decisión 1 — Herencia Inteligente de Estilo con Sobrescritura Opcional por Campo**
+  - *Enfoque Elegido*: Mantener tokens base de estilo de campo a nivel de formulario (editables desde la pestaña de estilo de cualquier campo) con un conmutador opcional para personalizar un campo individual.
+  - *Por Qué*: Evita tener que repetir cambios de fuente, color o borde 6 veces cuando el usuario quiere cambiar la estética del formulario entero, pero conserva total libertad si desea resaltar un campo concreto.
+  - *Alternativas Descartadas*: Estilos exclusivamente individuales por campo (tedioso y propenso a inconsistencias visuales) o exclusivamente globales (impide excepciones puntuales).
+
+- **Decisión 2 — Editor Ligero de Texto Enriquecido y Enlaces para Políticas**
+  - *Enfoque Elegido*: Editor interactivo con selección de texto y aplicación directa de **Negrita**, **Cursiva**, **Subrayado** e **Hipervínculo (`URL`)** sanitizado, renderizado fielmente junto al checkbox.
+  - *Por Qué*: Permite enlazar múltiples documentos legales dentro de una misma oración (*"Acepto los Términos de Uso y la Política de Privacidad"*) sin obligar al usuario a escribir código HTML manual.
+
+- **Decisión 3 — Retrocompatibilidad Transparente con Formularios Existentes**
+  - *Enfoque Elegido*: Si una plantilla previa contiene la estructura antigua de campos básicos, se convierte automáticamente en la lista ordenada de campos editables sin perder etiquetas ni textos configurados; mientras que todo nuevo **Formulario completo** insertado nace limpio, sin títulos y con radios en `0px`.
 
 ---
 
-## 4. Arquitectura Técnica y Estrategia de Estado
+## 4. Arquitectura Técnica y Estrategia de Datos
 
-### Diagrama de Jerarquía de Anchos y Sincronización
+### Diagrama de Arquitectura y Flujo de Componentes
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│ 1. CANVAS PRINCIPAL (Lienzo de Página)                                     │
-│    Límite Canvas = Ancho en Caja (ej. 1200px / 640px) o Ancho Real (100%)  │
-└─────────────────────────────────────┬──────────────────────────────────────┘
-                                      │ Gobierna (Ancho Sección ≤ Límite Canvas)
-                                      ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│ 2. SECCIÓN EXTERNA                                                         │
-│    • Inspector (Grupo #1 arriba): Ancho de la Sección Externa              │
-│      [En Caja | 100% Ancho] + Slider + Presets ≤ Límite Canvas             │
-│    • Inspector (Grupo #2): Fondo de la Sección                             │
-│      Degradado = Color Inicial (1) + Color Final (2) + Presets (sin CSS)   │
-│    • Renderizado en Caja: Caja completa con fondo centrada en el Canvas    │
-│    • Límite Sección = En Caja ? min(Ancho Sección, Límite Canvas)          │
-│                               : Límite Canvas                              │
-└─────────────────────────────────────┬──────────────────────────────────────┘
-                                      │ Gobierna (Ancho Bloque Div ≤ Límite Sección)
-                                      ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│ 3. BLOQUE DIV / SECCIÓN INTERNA (y Contenedores Anidados)                  │
-│    • Inspector: Tope máximo dinámico = Límite Sección padre                │
-│    • Recorte automático si Límite Sección o Límite Canvas disminuye        │
-└────────────────────────────────────────────────────────────────────────────┘
+│                      EDITOR VISUAL & VISTA PÚBLICA                         │
+├───────────────────────────────────┬────────────────────────────────────────┤
+│   INSPECTOR FORMULARIO COMPLETO   │     LIENZO / RENDERIZADOR DE FORM      │
+│                                   │                                        │
+│  1. Nombre del Formulario         │  ┌──────────────────────────────────┐  │
+│  2. Campos del Formulario         │  │ Grilla Dinámica (100% / 50% /33%)│  │
+│     ├─ Lista Drag & Drop + Copy/× │  │  ├─ Texto / Email / Text Area    │  │
+│     ├─ Config Interna (Tabs):     │  │  ├─ Teléfono / WhatsApp          │  │
+│     │   • Contenido (Tipo/Opciones│  │  └─ Select / Radio / Checkbox    │  │
+│     │   • Estilo Global/Individual│  ├──────────────────────────────────┤  │
+│     └─ Tamaño + Switch Labels     │  │ [✓] Checkbox Políticas (Rich URL)│  │
+│  3. Botón del Formulario          │  ├──────────────────────────────────┤  │
+│     └─ Texto/Icono/Fuente/Fondo/  │  │ [ Icono  Botón Envío (0px rad) ] │  │
+│        Borde & Radio (0px def.)   │  └────────────────┬─────────────────┘  │
+│  4. Checkbox de Políticas         │                   │ Al Enviar (Submit) │
+│  5. Acción Después de Enviar      │                   ▼                    │
+│  6. Disposición (Margen/Relleno)  │  ┌──────────────────────────────────┐  │
+└─────────────────┬─────────────────┘  │   MOTOR DE ACCIONES POST-ENVÍO   │  │
+                  │                    │  ├─ Añadir Contacto + Evento CRM │  │
+                  ▼                    │  ├─ Sincronizar Email Marketing  │  │
+┌───────────────────────────────────┐  │  │   (Proveedor + Lista/Etiqueta)│  │
+│   ESTADO DEL ELEMENTO (JSON)      │  │  ├─ Avanzar Paso del Embudo      │  │
+│   Campos, Estilos, Botón, Reglas  │──┼─►└─ Redirigir a URL Personalizada│  │
+└───────────────────────────────────┘  └──────────────────────────────────┘  │
 ```
 
 ### Modelo de Datos y Estado
-- **Propiedades de Sección Externa**:
-  - `widthType`: `'boxed' | 'full'` (por defecto `'full'` en secciones existentes sin ancho numérico definido para preservar compatibilidad visual inmediata).
-  - `maxWidth`: medida numérica en píxeles cuando opera en modo `'boxed'`, siempre acotada a `Límite Canvas`.
-  - `bgGradientColor1` y `bgGradientColor2`: colores hexadecimales inicial y final del degradado de la sección, sincronizados bidireccionalmente con la propiedad de degradado renderizada (`linear-gradient(135deg, color1 0%, color2 100%)`) y con los presets rápidos.
 
-### Mapeo Interactivo de Componentes y Manejadores
-- **Actualización de Sección Externa**:
-  - Al cambiar `widthType` a `'boxed'` o reducir `maxWidth` en la Sección Externa, el manejador de actualización valida primero que no exceda el `Límite Canvas` y recorre en el mismo paso todas las filas (`Bloque Div`) y contenedores internos anidados de esa sección para ajustar cualquier `maxWidth` hijo que supere el nuevo ancho de la sección.
-- **Actualización del Canvas Global**:
-  - Cuando disminuye el `Límite Canvas`, el efecto de normalización ajusta primero las Secciones Externas en caja que excedan el lienzo y, acto seguido, ajusta los Bloques Div internos respecto al límite efectivo resultante de su respectiva Sección Externa.
-- **Inspector del Bloque Div**:
-  - Recibe como límite máximo gobernante el ancho efectivo de la Sección Externa que lo contiene (e informa claramente en su nota inferior si el tope proviene de la Sección Externa o del Canvas).
-- **Fidelidad Edición / Publicación**:
-  - Tanto el lienzo del Editor Visual (en escritorio y vista previa de plantillas) como la vista pública publicada aplican la misma regla de ancho máximo y centrado exterior sobre la caja de la Sección Externa, manteniendo `100%` fluido en vista móvil (`390px`) para preservar la adaptabilidad responsiva.
+- **Entidad de Campo de Formulario**: Identificador único, tipo (`text`, `email`, `textarea`, `tel`, `whatsapp`, `select`, `radio`, `checkbox`), etiqueta, placeholder, indicador de requerido, ancho porcentual de columna, lista de opciones multilínea (`Etiqueta|valor`) y objeto opcional de sobrescritura de estilo individual (`fuente`, `tamaño`, `colorTexto`, `colorFondo`, `grosorBorde`, `colorBorde`, `radioEsquina`).
+- **Configuración Global de Campos**: Visibilidad de etiquetas (`showLabels`), indicador de asterisco requerido (`showRequiredMark`), escala de altura/relleno (`inputSize`) y estilo base compartido (`borderWidth: 1`, `borderRadius: 0`, colores y tipografía).
+- **Configuración Completa del Botón**: Propiedades unificadas con el botón estándar (texto, icono, posición/tamaño/espaciado de icono, familia/tamaño/formato tipográfico, fondo sólido o degradado de 2 colores, borde configurable y `borderRadius: 0` por defecto).
+- **Configuración de Políticas y Post-Envío**: Estado activo e HTML enriquecido seguro para la casilla de políticas; banderas independientes de acciones post-envío (`irSiguientePaso`, `redirigirUrl`, `agregarCrm`, `emailMarketing`) junto con el arreglo de destinos de Email Marketing (`proveedor`, `activo`, `listaOEtiqueta`).
+
+### Mapeo Interactivo de Eventos y Validaciones
+
+- **Reordenamiento, Copia y Eliminación de Campos**: Arrastrar una fila actualiza el índice del arreglo en tiempo real mostrando una línea divisoria azul; duplicar clona el campo con un nuevo identificador justo debajo del original; eliminar remueve el campo cerrando su panel interno si estaba activo.
+- **Validación y Envío Real en Vista Previa y Embudo Público**: Al enviar el formulario, se validan los campos marcados como requeridos, formato de correo/teléfono y la casilla obligatoria de políticas; luego se ejecutan en secuencia las acciones activadas: creación del contacto con historial detallado en el CRM, registro de listas/etiquetas de Email Marketing seleccionadas y navegación automática al siguiente paso del embudo o URL configurada.

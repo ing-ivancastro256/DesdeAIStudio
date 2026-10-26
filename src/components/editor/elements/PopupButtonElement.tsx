@@ -64,7 +64,7 @@ export const PopupButtonElement: React.FC<PopupButtonElementProps> = ({
         type: 'simple_form',
         content: {
           showNameField: true,
-          showPhoneField: true,
+          showPhoneField: false,
           submitButtonText: 'Quiero Acceder de Inmediato',
           formSuccessMessage: '¡Gracias! Hemos recibido tus datos y te contactaremos de inmediato.',
         },

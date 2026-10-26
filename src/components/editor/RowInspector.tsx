@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { PageBlockRow } from '../../types';
-import { NumberControl } from '../common/NumberControl';
+import { NumberControl, InlineSliderInput, FreeNumberInput } from '../common/NumberControl';
 import { HexColorPicker } from '../common/HexColorPicker';
 import { BoxModelSpacingControl } from '../common/BoxModelSpacingControl';
+import { resizeColumnWidthInRow } from '../../utils/editorTreeUtils';
 import {
   ArrowLeft,
   Maximize2,
@@ -44,6 +45,7 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
   canvasMaxWidth,
   governingLabel,
   onUpdate,
+  onSelectColumn,
   onChangeColumnsCount,
   onMoveUp,
   onMoveDown,
@@ -68,7 +70,8 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
   };
 
   const maxAllowedWidth = Math.max(320, Math.round(canvasMaxWidth || 1200));
-  const minAllowedWidth = Math.min(320, maxAllowedWidth);
+  const minAllowedWidth = Math.min(100, maxAllowedWidth);
+  const sliderMinWidth = Math.min(200, maxAllowedWidth);
   const currentWidthType = row.widthType || 'boxed';
   const currentMaxWidth = Math.min(row.maxWidth ?? maxAllowedWidth, maxAllowedWidth);
 
@@ -186,26 +189,85 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
           </button>
 
           {openSections.columnsList && (
-            <div className="p-3.5 bg-white text-xs">
-              <label className="font-semibold text-zinc-700 block mb-1.5">
-                Número de columnas:
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[1, 2, 3, 4].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => onChangeColumnsCount?.(num)}
-                    className={`py-1.5 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
-                      row.columns.length === num
-                        ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                        : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
-                    }`}
-                  >
-                    {num} Col
-                  </button>
-                ))}
+            <div className="p-3.5 bg-white text-xs space-y-3">
+              <div>
+                <label className="font-semibold text-zinc-700 block mb-1.5">
+                  Número de columnas:
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[1, 2, 3, 4].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => onChangeColumnsCount?.(num)}
+                      className={`py-1.5 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
+                        row.columns.length === num
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                          : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+                      }`}
+                    >
+                      {num} Col
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {row.columns.length > 1 && (
+                <div className="pt-2.5 border-t border-zinc-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-zinc-700 text-[11px]">
+                      Ancho por columna (%):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onChangeColumnsCount?.(row.columns.length)}
+                      className="text-[10px] font-semibold text-purple-600 hover:text-purple-800 hover:underline cursor-pointer"
+                    >
+                      Igualar anchos
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {row.columns.map((col, idx) => {
+                      const maxColPct = 100 - (row.columns.length - 1) * 10;
+                      return (
+                        <div
+                          key={col.id}
+                          className="p-2 rounded-lg bg-zinc-50/80 border border-zinc-200/80 space-y-1"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-zinc-700">
+                              Columna {idx + 1}
+                            </span>
+                            {onSelectColumn && (
+                              <button
+                                type="button"
+                                onClick={() => onSelectColumn(col.id)}
+                                className="text-[10px] font-semibold text-teal-700 hover:underline cursor-pointer"
+                              >
+                                Editar columna →
+                              </button>
+                            )}
+                          </div>
+                          <InlineSliderInput
+                            value={Math.round(col.widthPercentage)}
+                            min={10}
+                            max={maxColPct}
+                            strictMax={true}
+                            step={1}
+                            unit="%"
+                            accentClassName="accent-purple-600"
+                            onChange={(val) => {
+                              const nextRow = resizeColumnWidthInRow(row, col.id, val);
+                              onUpdate({ columns: nextRow.columns });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -303,8 +365,11 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
                   <NumberControl
                     label="Ancho máximo exacto"
                     value={currentMaxWidth}
-                    min={minAllowedWidth}
+                    min={sliderMinWidth}
                     max={maxAllowedWidth}
+                    inputMin={minAllowedWidth}
+                    inputMax={maxAllowedWidth}
+                    strictMax={true}
                     step={10}
                     unit="px"
                     onChange={(val) =>
@@ -502,44 +567,28 @@ export const RowInspector: React.FC<RowInspectorProps> = ({
                   <label className="font-semibold text-zinc-700 block mb-1">
                     Minutos:
                   </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min={0}
-                      max={60}
-                      value={row.delayMinutes ?? 0}
-                      onChange={(e) => {
-                        const val = Math.max(0, Math.min(60, parseInt(e.target.value, 10) || 0));
-                        onUpdate({ delayMinutes: val });
-                      }}
-                      className="w-full p-2 pr-7 text-xs border border-zinc-200 rounded-lg focus:outline-indigo-600 bg-white font-mono"
-                    />
-                    <span className="absolute right-2 top-2 text-[10px] font-bold text-zinc-400 select-none">
-                      min
-                    </span>
-                  </div>
+                  <FreeNumberInput
+                    value={row.delayMinutes ?? 0}
+                    min={0}
+                    max={60}
+                    strictMax={true}
+                    unit="min"
+                    onChange={(val) => onUpdate({ delayMinutes: val })}
+                  />
                 </div>
 
                 <div>
                   <label className="font-semibold text-zinc-700 block mb-1">
                     Segundos:
                   </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      min={0}
-                      max={59}
-                      value={row.delaySeconds ?? 0}
-                      onChange={(e) => {
-                        const val = Math.max(0, Math.min(59, parseInt(e.target.value, 10) || 0));
-                        onUpdate({ delaySeconds: val });
-                      }}
-                      className="w-full p-2 pr-7 text-xs border border-zinc-200 rounded-lg focus:outline-indigo-600 bg-white font-mono"
-                    />
-                    <span className="absolute right-2 top-2 text-[10px] font-bold text-zinc-400 select-none">
-                      seg
-                    </span>
-                  </div>
+                  <FreeNumberInput
+                    value={row.delaySeconds ?? 0}
+                    min={0}
+                    max={59}
+                    strictMax={true}
+                    unit="seg"
+                    onChange={(val) => onUpdate({ delaySeconds: val })}
+                  />
                 </div>
               </div>
 

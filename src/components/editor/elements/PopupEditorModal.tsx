@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { PopupModal, PageBlockElement, ElementType } from '../../../types';
 import { SimpleFormElement } from './SimpleFormElement';
+import { createDefaultCompleteFormFields } from '../../../utils/completeFormUtils';
 
 interface PopupEditorModalProps {
   popup: PopupModal;
@@ -47,9 +48,16 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
         id: `pop_el_${Date.now()}_3`,
         type: 'simple_form',
         content: {
-          showNameField: true,
-          showPhoneField: false,
-          submitButtonText: '🚀 Reclamar Mi Regalo Ahora',
+          formName: 'Formulario Pop-up',
+          formFields: createDefaultCompleteFormFields(),
+          formButtonStyles: {
+            text: 'Reclamar Mi Regalo Ahora',
+            borderRadius: 0,
+            bgColor: '#2848F0',
+            textColor: '#FFFFFF',
+            fullWidth: true,
+          },
+          submitButtonText: 'Reclamar Mi Regalo Ahora',
           formSuccessMessage: '¡Te hemos enviado el acceso! Revisa tu email.',
         },
         styles: { marginBottom: 10 },
@@ -88,8 +96,16 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
       newEl.styles.opacity = 1;
     } else if (type === 'simple_form') {
       newEl.content = {
-        showNameField: true,
-        submitButtonText: '👉 Quiero la Oferta',
+        formName: 'Formulario Pop-up',
+        formFields: createDefaultCompleteFormFields(),
+        formButtonStyles: {
+          text: 'Quiero la Oferta',
+          borderRadius: 0,
+          bgColor: '#2848F0',
+          textColor: '#FFFFFF',
+          fullWidth: true,
+        },
+        submitButtonText: 'Quiero la Oferta',
       };
     } else if (type === 'button') {
       newEl.content = { buttonText: '👉 Acceder Ahora' };

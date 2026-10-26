@@ -40,6 +40,7 @@ export const RichTextElement: React.FC<RichTextElementProps> = ({
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [toolbarTextColor, setToolbarTextColor] = useState('#18181B');
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
@@ -86,7 +87,21 @@ export const RichTextElement: React.FC<RichTextElementProps> = ({
     if (!contentRef.current) return;
     contentRef.current.focus();
     restoreSelection();
+    if (command === 'foreColor') {
+      try {
+        document.execCommand('styleWithCSS', false, 'true');
+      } catch {
+        // Ignore if unsupported
+      }
+    }
     document.execCommand(command, false, value);
+    if (command === 'foreColor') {
+      try {
+        document.execCommand('styleWithCSS', false, 'false');
+      } catch {
+        // Ignore if unsupported
+      }
+    }
     const newHtml = contentRef.current.innerHTML;
     lastHtmlRef.current = newHtml;
     if (onChange) {
@@ -345,8 +360,9 @@ export const RichTextElement: React.FC<RichTextElementProps> = ({
           <div onMouseDown={() => saveSelection()}>
             <HexColorPicker
               compact
-              value="#18181b"
+              value={toolbarTextColor}
               onChange={(newColor) => {
+                setToolbarTextColor(newColor);
                 restoreSelection();
                 executeCommand('foreColor', newColor);
               }}
