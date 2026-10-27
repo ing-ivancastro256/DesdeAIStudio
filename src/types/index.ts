@@ -602,6 +602,27 @@ export interface FunnelPage {
   settings: FunnelPageGlobalSettings;
 }
 
+export type LibraryItemKind =
+  | 'template'
+  | 'block'
+  | 'popup'
+  | 'element'
+  | 'webpage'
+  | 'image';
+
+export interface LibraryItem {
+  id: string;
+  kind: LibraryItemKind;
+  name: string;
+  category: string;
+  isFavorite: boolean;
+  isSystemSeed?: boolean;
+  sections: PageBlockSection[];
+  pageSettings?: Partial<FunnelPageGlobalSettings>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Funnel {
   id: string;
   organization_id: string;

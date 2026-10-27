@@ -19,7 +19,17 @@ import {
   EmailIntegration,
   CompleteFormEmailTarget,
   CustomDomain,
+  LibraryItem,
+  LibraryItemKind,
+  PageBlockSection,
+  FunnelPageGlobalSettings,
 } from '../types';
+import {
+  DEFAULT_LIBRARY_CATEGORY,
+  INITIAL_LIBRARY_CATEGORIES,
+  buildInitialLibrarySeed,
+  cloneSectionsWithFreshIds,
+} from '../utils/libraryUtils';
 import { getAccessToken, createCalendarEvent } from '../services/googleCalendarService';
 import {
   INITIAL_ORGANIZATION,
@@ -126,6 +136,30 @@ interface AppContextType {
   // Hotmart Webhook Simulation
   simulateHotmartPurchase: (promoApplied?: boolean) => void;
   simulateHotmartCancel: () => void;
+
+  // Library (Plantillas, Bloques & Favoritos)
+  libraryItems: LibraryItem[];
+  libraryCategories: string[];
+  saveLibraryItem: (params: {
+    kind: LibraryItemKind;
+    name: string;
+    category: string;
+    sections: PageBlockSection[];
+    pageSettings?: Partial<FunnelPageGlobalSettings>;
+  }) => LibraryItem;
+  updateLibraryItem: (
+    id: string,
+    patch: Partial<
+      Pick<
+        LibraryItem,
+        'name' | 'category' | 'isFavorite' | 'sections' | 'pageSettings' | 'kind'
+      >
+    >
+  ) => void;
+  duplicateLibraryItem: (id: string) => LibraryItem | null;
+  deleteLibraryItem: (id: string) => void;
+  toggleFavoriteLibraryItem: (id: string) => void;
+  addLibraryCategory: (categoryName: string) => string;
 
   // Notification Toast
   toastMessage: string | null;
@@ -373,6 +407,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     },
   ]);
 
+  // Library State (Plantillas, Bloques, Favoritos & Categorías)
+  const [libraryItems, setLibraryItems] = useState<LibraryItem[]>(() => {
+    const saved = localStorage.getItem('ssp_library_items_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      } catch {
+        // fallback to seed
+      }
+    }
+    return buildInitialLibrarySeed();
+  });
+
+  const [libraryCategories, setLibraryCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('ssp_library_categories_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.includes(DEFAULT_LIBRARY_CATEGORY)
+            ? parsed
+            : [DEFAULT_LIBRARY_CATEGORY, ...parsed];
+        }
+      } catch {
+        // fallback
+      }
+    }
+    return INITIAL_LIBRARY_CATEGORIES;
+  });
+
   // Sync to LocalStorage
   useEffect(() => {
     localStorage.setItem('ssp_org', JSON.stringify(organization));
@@ -409,6 +476,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem('ssp_integrations', JSON.stringify(integrations));
   }, [integrations]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ssp_library_items_v1', JSON.stringify(libraryItems));
+    } catch {
+      // Ignore storage quota errors if large data URLs exist
+    }
+  }, [libraryItems]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'ssp_library_categories_v1',
+        JSON.stringify(libraryCategories)
+      );
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [libraryCategories]);
 
   const planEntitlements = PLAN_ENTITLEMENTS_MAP[organization.plan_code] || PLAN_ENTITLEMENTS_MAP.FREE;
 
@@ -1071,6 +1157,155 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast('⚠️ Webhook de Hotmart: Suscripción cancelada. Tu cuenta ha vuelto al Plan Free.');
   };
 
+  // Library Handlers (Scale Sales Pro)
+  const addLibraryCategory = (categoryName: string): string => {
+    const cleaned = categoryName.trim();
+    if (!cleaned) return DEFAULT_LIBRARY_CATEGORY;
+
+    const existing = libraryCategories.find(
+      (cat) => cat.toLowerCase() === cleaned.toLowerCase()
+    );
+    if (existing) {
+      return existing;
+    }
+
+    setLibraryCategories((prev) => [...prev, cleaned]);
+    return cleaned;
+  };
+
+  const saveLibraryItem = ({
+    kind,
+    name,
+    category,
+    sections,
+    pageSettings,
+  }: {
+    kind: LibraryItemKind;
+    name: string;
+    category: string;
+    sections: PageBlockSection[];
+    pageSettings?: Partial<FunnelPageGlobalSettings>;
+  }): LibraryItem => {
+    const nowIso = new Date().toISOString();
+    const resolvedCategory = category?.trim()
+      ? addLibraryCategory(category.trim())
+      : DEFAULT_LIBRARY_CATEGORY;
+    const resolvedName =
+      name.trim() ||
+      (kind === 'template' ? 'Nueva Plantilla' : 'Nuevo Bloque');
+
+    const newItem: LibraryItem = {
+      id: `lib_${kind}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      kind,
+      name: resolvedName,
+      category: resolvedCategory,
+      isFavorite: false,
+      isSystemSeed: false,
+      sections: cloneSectionsWithFreshIds(sections),
+      pageSettings: pageSettings
+        ? JSON.parse(JSON.stringify(pageSettings))
+        : undefined,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    setLibraryItems((prev) => [newItem, ...prev]);
+    showToast(
+      kind === 'template'
+        ? `Plantilla "${resolvedName}" guardada en tu Biblioteca`
+        : `Bloque "${resolvedName}" guardado en tu Biblioteca`
+    );
+    return newItem;
+  };
+
+  const updateLibraryItem = (
+    id: string,
+    patch: Partial<
+      Pick<
+        LibraryItem,
+        'name' | 'category' | 'isFavorite' | 'sections' | 'pageSettings' | 'kind'
+      >
+    >
+  ) => {
+    const nowIso = new Date().toISOString();
+    const resolvedCategory =
+      patch.category !== undefined
+        ? patch.category.trim()
+          ? addLibraryCategory(patch.category.trim())
+          : DEFAULT_LIBRARY_CATEGORY
+        : undefined;
+
+    setLibraryItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          ...patch,
+          name: patch.name !== undefined ? patch.name.trim() || item.name : item.name,
+          category: resolvedCategory !== undefined ? resolvedCategory : item.category,
+          sections:
+            patch.sections !== undefined
+              ? cloneSectionsWithFreshIds(patch.sections)
+              : item.sections,
+          pageSettings:
+            patch.pageSettings !== undefined
+              ? patch.pageSettings
+                ? JSON.parse(JSON.stringify(patch.pageSettings))
+                : undefined
+              : item.pageSettings,
+          updatedAt: nowIso,
+        };
+      })
+    );
+  };
+
+  const duplicateLibraryItem = (id: string): LibraryItem | null => {
+    const source = libraryItems.find((item) => item.id === id);
+    if (!source) return null;
+
+    const nowIso = new Date().toISOString();
+    const copy: LibraryItem = {
+      id: `lib_${source.kind}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      kind: source.kind,
+      name: `${source.name} (Copia)`,
+      category: source.category || DEFAULT_LIBRARY_CATEGORY,
+      isFavorite: source.isFavorite,
+      isSystemSeed: false,
+      sections: cloneSectionsWithFreshIds(source.sections),
+      pageSettings: source.pageSettings
+        ? JSON.parse(JSON.stringify(source.pageSettings))
+        : undefined,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    setLibraryItems((prev) => {
+      const idx = prev.findIndex((i) => i.id === id);
+      if (idx === -1) return [copy, ...prev];
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+    showToast(`Copia creada: "${copy.name}"`);
+    return copy;
+  };
+
+  const deleteLibraryItem = (id: string) => {
+    const target = libraryItems.find((i) => i.id === id);
+    setLibraryItems((prev) => prev.filter((item) => item.id !== id));
+    if (target) {
+      showToast(`"${target.name}" eliminado de la Biblioteca`);
+    }
+  };
+
+  const toggleFavoriteLibraryItem = (id: string) => {
+    setLibraryItems((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+      )
+    );
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1117,6 +1352,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addCustomDomain,
         simulateHotmartPurchase,
         simulateHotmartCancel,
+        libraryItems,
+        libraryCategories,
+        saveLibraryItem,
+        updateLibraryItem,
+        duplicateLibraryItem,
+        deleteLibraryItem,
+        toggleFavoriteLibraryItem,
+        addLibraryCategory,
         toastMessage,
         showToast,
       }}

@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Upload,
   Trash2,
+  Save,
 } from 'lucide-react';
 
 interface PageSettingsInspectorProps {
@@ -23,6 +24,7 @@ interface PageSettingsInspectorProps {
   pageTitle?: string;
   onUpdate: (newSettings: Partial<FunnelPageGlobalSettings>) => void;
   onClose?: () => void;
+  onSavePageToLibrary?: () => void;
 }
 
 export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
@@ -30,6 +32,7 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
   pageTitle,
   onUpdate,
   onClose,
+  onSavePageToLibrary,
 }) => {
   const bgImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,14 +115,26 @@ export const PageSettingsInspector: React.FC<PageSettingsInspectorProps> = ({
             {pageTitle || 'Hoja / Canvas General'}
           </p>
         </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="text-zinc-400 hover:text-zinc-700 p-1 rounded-md hover:bg-zinc-200/60 transition-colors cursor-pointer text-xs font-semibold"
-          >
-            ✕
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {onSavePageToLibrary && (
+            <button
+              type="button"
+              onClick={onSavePageToLibrary}
+              className="p-1.5 text-zinc-600 hover:text-[#2848F0] hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+              title="Guardar esta página en tu Biblioteca"
+            >
+              <Save className="w-4 h-4" />
+            </button>
+          )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-zinc-400 hover:text-zinc-700 p-1 rounded-md hover:bg-zinc-200/60 transition-colors cursor-pointer text-xs font-semibold"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body Scrollable Options */}

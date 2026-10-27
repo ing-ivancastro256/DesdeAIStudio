@@ -13,6 +13,7 @@ import {
   AVAILABLE_FONTS,
   FaqItem,
   SocialLinkItem,
+  LibraryItem,
 } from '../../types';
 import {
   Type,
@@ -100,6 +101,7 @@ import {
   Flame,
   Heart,
   Disc,
+  BookOpen,
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { DelayedAppearance } from '../common/DelayedAppearance';
@@ -169,6 +171,18 @@ import {
   clampRowTreeToLimit,
   clampSectionsHierarchy,
 } from '../../utils/editorTreeUtils';
+import {
+  PREBUILT_BLOCK_DEFS,
+  createPrebuiltBlockSection,
+  cloneSectionWithFreshIds,
+  cloneSectionsWithFreshIds,
+  isCanvasEffectivelyEmpty,
+} from '../../utils/libraryUtils';
+import { SaveToLibraryModal } from './library/SaveToLibraryModal';
+import {
+  LibraryManagerModal,
+  LibrarySidebarTab,
+} from './library/LibraryManagerModal';
 
 interface VisualEditorProps {
   initialPage?: FunnelPage;
@@ -215,105 +229,11 @@ const CTA_BUTTON_ICONS = [
   'Crown',
 ];
 
-const PREBUILT_BLOCK_DEFS = [
-  {
-    type: 'header',
-    title: '🔝 Cabecera de Página (Header & Nav)',
-    badge: 'Cabecera',
-    badgeColor: 'bg-blue-50 text-[#2848F0]',
-    desc: 'Logotipo de marca a la izquierda, menú de navegación central y botón de llamada a la acción destacado.',
-  },
-  {
-    type: 'offer',
-    title: '📦 Presentación de la Oferta (Stack)',
-    badge: 'Carta de Venta',
-    badgeColor: 'bg-emerald-50 text-emerald-700',
-    desc: 'Mockup / imagen de producto, bullet points de valor acumulado y desglose de precio de lanzamiento.',
-  },
-  {
-    type: 'fascinations',
-    title: '🎯 Bullets de Fascinación y Beneficios',
-    badge: 'Copywriting',
-    badgeColor: 'bg-indigo-50 text-indigo-700',
-    desc: '2 columnas con viñetas de alta curiosidad que enganchan y explican lo que descubrirán.',
-  },
-  {
-    type: 'guarantee',
-    title: '🛡️ Garantía 100% Incondicional',
-    badge: 'Riesgo Cero',
-    badgeColor: 'bg-blue-50 text-[#2848F0]',
-    desc: 'Sello de seguridad, garantía de satisfacción de 30 días y reversión total del riesgo.',
-  },
-  {
-    type: 'comparison',
-    title: '⚖️ Comparativa: Antes vs Después',
-    badge: 'Contraste',
-    badgeColor: 'bg-zinc-100 text-zinc-700',
-    desc: 'Contraste directo entre el método antiguo disperso y tu sistema integrado de alto rendimiento.',
-  },
-  {
-    type: 'bonuses',
-    title: '🎁 Bonos Exclusivos (Bonus Stack)',
-    badge: '3 Tarjetas',
-    badgeColor: 'bg-purple-50 text-purple-700',
-    desc: '3 columnas con bonos de acción rápida (scripts, automatizaciones, soporte) valorados en USD.',
-  },
-  {
-    type: 'vsl',
-    title: '🎬 Bloque VSL Principal',
-    badge: 'Video',
-    badgeColor: 'bg-red-50 text-red-700',
-    desc: 'Titular provocador, reproductor de video centrado y botón de llamada a la acción.',
-  },
-  {
-    type: 'bio',
-    title: '👤 Sobre el Autor / Quién Soy',
-    badge: 'Autoridad',
-    badgeColor: 'bg-sky-50 text-sky-700',
-    desc: 'Foto del consultor, credenciales, historia de origen y justificación de por qué escucharte.',
-  },
-  {
-    type: 'testimonials',
-    title: '💬 Testimonios y Prueba Social',
-    badge: 'Casos Reales',
-    badgeColor: 'bg-teal-50 text-teal-700',
-    desc: '2 columnas con citas de clientes, nombres de negocio y resultados cuantificables.',
-  },
-  {
-    type: 'faq',
-    title: '❓ Preguntas Frecuentes (FAQ)',
-    badge: 'Objeciones',
-    badgeColor: 'bg-amber-50 text-amber-700',
-    desc: 'Derribo de objeciones comunes sobre conocimientos técnicos, tiempos y resultados esperados.',
-  },
-  {
-    type: 'urgency',
-    title: '⏳ Urgencia y Cupos Limitados',
-    badge: 'Escasez',
-    badgeColor: 'bg-orange-50 text-orange-700',
-    desc: 'Fondo oscuro contrastante con aviso de cupos limitados mensuales y botón de acción inmediata.',
-  },
-  {
-    type: 'cta',
-    title: '⚡ Llamada a la Acción de Cierre',
-    badge: 'Cierre',
-    badgeColor: 'bg-blue-50 text-blue-800',
-    desc: 'Fondo oscuro, recordatorio de plazas limitadas y botón de alta conversión.',
-  },
-  {
-    type: 'footer',
-    title: '🔻 Pie de Página (Footer Completo)',
-    badge: 'Footer',
-    badgeColor: 'bg-zinc-800 text-zinc-100',
-    desc: 'Logotipo, enlaces rápidos de navegación, botón de WhatsApp, aviso legal y copyright.',
-  },
-];
-
 import { BULLET_ICON_OPTIONS, renderBulletIcon } from '../../utils/bulletIcons';
 export { BULLET_ICON_OPTIONS, renderBulletIcon };
 
 export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelId: propFunnelId, onExit }) => {
-  const { funnels, activeFunnel, updateFunnelPage, showToast } = useApp();
+  const { funnels, activeFunnel, updateFunnelPage, updateLibraryItem, showToast } = useApp();
 
   const currentFunnel =
     (propFunnelId ? funnels.find((f) => f.id === propFunnelId) : null) ||
@@ -337,6 +257,41 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [templateToApply, setTemplateToApply] = useState<PageTemplate | null>(null);
   const [showTemplateConfirmModal, setShowTemplateConfirmModal] = useState<boolean>(false);
   const [templatePreviewModal, setTemplatePreviewModal] = useState<PageTemplate | null>(null);
+
+  // Biblioteca de Plantillas y Bloques (Scale Sales Pro)
+  const [saveToLibraryState, setSaveToLibraryState] = useState<{
+    isOpen: boolean;
+    sections: PageBlockSection[];
+    pageSettings?: Partial<FunnelPageGlobalSettings>;
+    suggestedName: string;
+    sourceType: 'section' | 'page';
+    defaultKind: 'template' | 'block';
+  }>({
+    isOpen: false,
+    sections: [],
+    suggestedName: '',
+    sourceType: 'section',
+    defaultKind: 'block',
+  });
+
+  const [libraryModalState, setLibraryModalState] = useState<{
+    isOpen: boolean;
+    initialTab: LibrarySidebarTab;
+  }>({
+    isOpen: false,
+    initialTab: 'blocks',
+  });
+
+  const [libraryEditSession, setLibraryEditSession] = useState<{
+    itemId: string;
+    itemKind: 'template' | 'block';
+    itemName: string;
+    stashedSections: PageBlockSection[];
+    stashedPageSettings: FunnelPageGlobalSettings;
+    stashedHistory: PageBlockSection[][];
+    stashedHistoryIndex: number;
+    stashedHasUnsavedChanges: boolean;
+  } | null>(null);
 
   // Global Page settings (Canvas width, Google Fonts, default H1-H4 sizes, colors, background image, 4-side padding)
   const [pageSettings, setPageSettings] = useState<FunnelPageGlobalSettings>(() => ({
@@ -2509,1222 +2464,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
   // Insert Pre-built Blocks (supports specific target index or append)
   const insertPrebuiltBlock = (blockType: string, targetIndex?: number) => {
-    let newSection: PageBlockSection;
-
-    if (blockType === 'header') {
-      newSection = {
-        id: `sec_hdr_${Date.now()}`,
-        name: 'Cabecera de Página (Header)',
-        bgColor: '#FFFFFF',
-        paddingY: 16,
-        paddingTop: 16,
-        paddingBottom: 16,
-        paddingLeft: 24,
-        paddingRight: 24,
-        borderBottomWidth: 1,
-        borderColor: '#E4E4E7',
-        rows: [
-          {
-            id: `row_hdr_${Date.now()}`,
-            name: 'Barra de Navegación',
-            widthType: 'boxed',
-            maxWidth: 1200,
-            columns: [
-              {
-                id: `col_hdr_brand_${Date.now()}`,
-                widthPercentage: 32,
-                elements: [
-                  {
-                    id: `el_hdr_logo_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '✦ MiNegocio Pro', level: 'h3' },
-                    styles: {
-                      fontSize: 20,
-                      fontFamily: 'Poppins',
-                      textColor: '#121111',
-                      isBold: true,
-                      marginBottom: 2,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                  {
-                    id: `el_hdr_tagline_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Soluciones Digitales de Alta Conversión' },
-                    styles: {
-                      fontSize: 11,
-                      fontFamily: 'Inter',
-                      textColor: '#71717A',
-                      marginBottom: 0,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                ],
-              },
-              {
-                id: `col_hdr_nav_${Date.now()}`,
-                widthPercentage: 40,
-                elements: [
-                  {
-                    id: `el_hdr_links_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Inicio   •   Servicios   •   Testimonios   •   Contacto' },
-                    styles: {
-                      fontSize: 13,
-                      fontFamily: 'Inter',
-                      textColor: '#52525B',
-                      textAlign: 'center',
-                      isBold: false,
-                      marginBottom: 0,
-                      marginTop: 10,
-                    },
-                  },
-                ],
-              },
-              {
-                id: `col_hdr_cta_${Date.now()}`,
-                widthPercentage: 28,
-                elements: [
-                  {
-                    id: `el_hdr_btn_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: '👉 Agendar Llamada' },
-                    styles: {
-                      fontSize: 13,
-                      fontFamily: 'Poppins',
-                      textColor: '#FFFFFF',
-                      bgColor: '#2848F0',
-                      isBold: true,
-                      paddingTop: 10,
-                      paddingBottom: 10,
-                      paddingLeft: 20,
-                      paddingRight: 20,
-                      borderRadius: 8,
-                      textAlign: 'right',
-                      marginBottom: 0,
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'footer') {
-      newSection = {
-        id: `sec_ftr_${Date.now()}`,
-        name: 'Pie de Página (Footer)',
-        bgColor: '#09090B',
-        paddingY: 48,
-        paddingTop: 48,
-        paddingBottom: 36,
-        paddingLeft: 24,
-        paddingRight: 24,
-        borderTopWidth: 1,
-        borderColor: '#27272A',
-        rows: [
-          {
-            id: `row_ftr_main_${Date.now()}`,
-            name: 'Contenido Principal Footer',
-            widthType: 'boxed',
-            maxWidth: 1200,
-            marginBottom: 20,
-            columns: [
-              {
-                id: `col_ftr_info_${Date.now()}`,
-                widthPercentage: 40,
-                elements: [
-                  {
-                    id: `el_ftr_brand_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '✦ MiNegocio Pro', level: 'h3' },
-                    styles: {
-                      fontSize: 18,
-                      fontFamily: 'Poppins',
-                      textColor: '#FFFFFF',
-                      isBold: true,
-                      marginBottom: 8,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                  {
-                    id: `el_ftr_desc_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: 'Ayudamos a profesionales, consultores y empresas a escalar sus resultados con sistemas predecibles y tecnología de vanguardia.',
-                    },
-                    styles: {
-                      fontSize: 13,
-                      fontFamily: 'Inter',
-                      textColor: '#94A3B8',
-                      lineHeight: 1.6,
-                      marginBottom: 12,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                  {
-                    id: `el_ftr_email_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: '✉️ Contacto: soporte@minegocio.com' },
-                    styles: {
-                      fontSize: 12,
-                      fontFamily: 'Inter',
-                      textColor: '#CBD5E1',
-                      marginBottom: 0,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                ],
-              },
-              {
-                id: `col_ftr_links_${Date.now()}`,
-                widthPercentage: 30,
-                elements: [
-                  {
-                    id: `el_ftr_links_title_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: 'ENLACES RÁPIDOS' },
-                    styles: {
-                      fontSize: 11,
-                      fontFamily: 'Inter',
-                      textColor: '#64748B',
-                      isBold: true,
-                      letterSpacing: 1,
-                      marginBottom: 8,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                  {
-                    id: `el_ftr_nav_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: '• Página Principal\n• Método y Beneficios\n• Casos de Éxito\n• Preguntas Frecuentes',
-                    },
-                    styles: {
-                      fontSize: 13,
-                      fontFamily: 'Inter',
-                      textColor: '#E2E8F0',
-                      lineHeight: 1.8,
-                      marginBottom: 0,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                ],
-              },
-              {
-                id: `col_ftr_cta_${Date.now()}`,
-                widthPercentage: 30,
-                elements: [
-                  {
-                    id: `el_ftr_cta_title_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: 'ATENCIÓN AL CLIENTE' },
-                    styles: {
-                      fontSize: 11,
-                      fontFamily: 'Inter',
-                      textColor: '#64748B',
-                      isBold: true,
-                      letterSpacing: 1,
-                      marginBottom: 8,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                  {
-                    id: `el_ftr_cta_text_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: '¿Tienes preguntas o requieres asistencia personalizada? Estamos a un mensaje de distancia.',
-                    },
-                    styles: {
-                      fontSize: 13,
-                      fontFamily: 'Inter',
-                      textColor: '#94A3B8',
-                      lineHeight: 1.5,
-                      marginBottom: 14,
-                      marginTop: 0,
-                      textAlign: 'left',
-                    },
-                  },
-                  {
-                    id: `el_ftr_btn_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: '💬 Contactar por WhatsApp' },
-                    styles: {
-                      fontSize: 13,
-                      fontFamily: 'Poppins',
-                      textColor: '#FFFFFF',
-                      bgColor: '#22C55E',
-                      isBold: true,
-                      paddingTop: 10,
-                      paddingBottom: 10,
-                      paddingLeft: 18,
-                      paddingRight: 18,
-                      borderRadius: 8,
-                      textAlign: 'center',
-                      marginBottom: 0,
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `row_ftr_legal_${Date.now()}`,
-            name: 'Avisos Legales y Derechos',
-            widthType: 'boxed',
-            maxWidth: 1200,
-            columns: [
-              {
-                id: `col_ftr_legal_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_ftr_div_${Date.now()}`,
-                    type: 'divider',
-                    content: {},
-                    styles: {
-                      borderColor: '#27272A',
-                      marginTop: 16,
-                      marginBottom: 20,
-                    },
-                  },
-                  {
-                    id: `el_ftr_copy_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: `Este sitio web no forma parte de Facebook™ ni Google™. Facebook es una marca registrada de Meta, Inc.\n\n© 2026 MiNegocio Pro. Todos los derechos reservados. | Políticas de Privacidad | Términos y Condiciones | Aviso Legal`,
-                    },
-                    styles: {
-                      fontSize: 11,
-                      fontFamily: 'Inter',
-                      textColor: '#64748B',
-                      textAlign: 'center',
-                      lineHeight: 1.6,
-                      marginBottom: 0,
-                      marginTop: 0,
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'vsl') {
-      newSection = {
-        id: `sec_vsl_${Date.now()}`,
-        name: 'Bloque VSL con Video',
-        bgColor: '#FAFAFB',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_vsl_${Date.now()}`,
-            columns: [
-              {
-                id: `col_vsl_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_vsl_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Descubre el Método Exacto de 3 Fases en Este Video', level: 'h2' },
-                    styles: {
-                      fontSize: 30,
-                      fontFamily: 'Poppins',
-                      textColor: '#121111',
-                      isBold: true,
-                      textAlign: 'center',
-                      marginBottom: 16,
-                      marginTop: 0,
-                    },
-                  },
-                  {
-                    id: `el_vsl_vid_${Date.now()}`,
-                    type: 'video',
-                    content: { videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
-                    styles: { maxWidth: '750px', marginBottom: 24, marginTop: 0 },
-                  },
-                  {
-                    id: `el_vsl_btn_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: '👉 Solicitar Mi Sesión de Diagnóstico Gratis' },
-                    styles: {
-                      fontSize: 17,
-                      fontFamily: 'Poppins',
-                      textColor: '#FFFFFF',
-                      bgColor: '#2848F0',
-                      isBold: true,
-                      paddingTop: 16,
-                      paddingBottom: 16,
-                      paddingLeft: 32,
-                      paddingRight: 32,
-                      borderRadius: 8,
-                      textAlign: 'center',
-                      buttonDestination: 'next_page',
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'testimonials') {
-      newSection = {
-        id: `sec_test_${Date.now()}`,
-        name: 'Testimonios y Prueba Social',
-        bgColor: '#FFFFFF',
-        paddingY: 44,
-        rows: [
-          {
-            id: `row_test_title_${Date.now()}`,
-            columns: [
-              {
-                id: `col_test_t_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_t_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Resultados Comprobados de Clientes Reales', level: 'h2' },
-                    styles: {
-                      fontSize: 26,
-                      fontFamily: 'Poppins',
-                      textColor: '#121111',
-                      isBold: true,
-                      textAlign: 'center',
-                      marginBottom: 28,
-                      marginTop: 0,
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `row_test_cols_${Date.now()}`,
-            columns: [
-              {
-                id: `col_t1_${Date.now()}`,
-                widthPercentage: 50,
-                elements: [
-                  {
-                    id: `el_t1_p_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: '"Logramos llenar nuestro calendario con 14 llamadas estratégicas en las primeras dos semanas sin invertir un solo centavo extra en pauta."',
-                    },
-                    styles: {
-                      fontSize: 15,
-                      fontFamily: 'Inter',
-                      textColor: '#121111',
-                      isItalic: true,
-                      marginBottom: 8,
-                      marginTop: 0,
-                    },
-                  },
-                  {
-                    id: `el_t1_author_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: '— Martín Estrada, Consultor Financiero' },
-                    styles: { fontSize: 13, fontFamily: 'Inter', textColor: '#2848F0', isBold: true },
-                  },
-                ],
-              },
-              {
-                id: `col_t2_${Date.now()}`,
-                widthPercentage: 50,
-                elements: [
-                  {
-                    id: `el_t2_p_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: '"Antes tenía todo regado entre Calendly, formularios y hojas de Excel. Con Scale Sales Pro centralicé todo y duplicamos las conversiones."',
-                    },
-                    styles: {
-                      fontSize: 15,
-                      fontFamily: 'Inter',
-                      textColor: '#121111',
-                      isItalic: true,
-                      marginBottom: 8,
-                      marginTop: 0,
-                    },
-                  },
-                  {
-                    id: `el_t2_author_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: '— Andrea Morales, Coach Ejecutiva' },
-                    styles: { fontSize: 13, fontFamily: 'Inter', textColor: '#2848F0', isBold: true },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'offer') {
-      // Direct Response Sales Letter - Offer Presentation Stack
-      newSection = {
-        id: `sec_offer_${Date.now()}`,
-        name: 'Presentación de la Oferta y Stack de Valor',
-        bgColor: '#FFFFFF',
-        paddingY: 52,
-        rows: [
-          {
-            id: `row_off_title_${Date.now()}`,
-            columns: [
-              {
-                id: `col_off_t_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_off_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Todo Lo Que Recibes Al Unirte Hoy', level: 'h2' },
-                    styles: {
-                      fontSize: 30,
-                      fontFamily: 'Poppins',
-                      textColor: '#121111',
-                      isBold: true,
-                      textAlign: 'center',
-                      marginBottom: 8,
-                      marginTop: 0,
-                    },
-                  },
-                  {
-                    id: `el_off_sub_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: 'Un sistema llave en mano probado para captar, calificar y cerrar clientes de alto valor.' },
-                    styles: {
-                      fontSize: 16,
-                      fontFamily: 'Inter',
-                      textColor: '#5B5B66',
-                      textAlign: 'center',
-                      marginBottom: 32,
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `row_off_body_${Date.now()}`,
-            columns: [
-              {
-                id: `col_off_img_${Date.now()}`,
-                widthPercentage: 45,
-                elements: [
-                  {
-                    id: `el_off_img_${Date.now()}`,
-                    type: 'image',
-                    content: {
-                      src: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=80',
-                      alt: 'Stack de la Oferta',
-                    },
-                    styles: { maxWidth: '100%', borderRadius: 12, marginBottom: 12 },
-                  },
-                  {
-                    id: `el_off_caption_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: '✨ Acceso instantáneo a la plataforma y todos los recursos descargables.' },
-                    styles: { fontSize: 13, fontFamily: 'Inter', textColor: '#5B5B66', isItalic: true, textAlign: 'center' },
-                  },
-                ],
-              },
-              {
-                id: `col_off_list_${Date.now()}`,
-                widthPercentage: 55,
-                elements: [
-                  {
-                    id: `el_off_stack_title_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: 'Desglose detallado del paquete:' },
-                    styles: { fontSize: 18, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 12 },
-                  },
-                  {
-                    id: `el_off_bullets_${Date.now()}`,
-                    type: 'bullet_list',
-                    content: {
-                      items: [
-                        '📦 Sistema de Captación High-Ticket Paso a Paso (Valor: $1,497 USD)',
-                        '📋 Plantillas de Cartas de Ventas y Embudos Listos (Valor: $997 USD)',
-                        '⚡ Plataforma Scale Sales Pro con CRM y Calendario (Valor: $1,200 USD)',
-                        '🎯 Sesiones Semanales de Mentoría Estratégica en Vivo (Valor: $2,500 USD)',
-                      ],
-                    },
-                    styles: { marginBottom: 16 },
-                  },
-                  {
-                    id: `el_off_div_${Date.now()}`,
-                    type: 'divider',
-                    content: {},
-                    styles: { marginBottom: 14 },
-                  },
-                  {
-                    id: `el_off_price_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: 'Valor Total Acumulado: $6,194 USD. Tu inversión hoy: Solo una fracción con precio de lanzamiento.',
-                    },
-                    styles: { fontSize: 15, fontFamily: 'Poppins', textColor: '#2848F0', isBold: true, marginBottom: 16 },
-                  },
-                  {
-                    id: `el_off_cta_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: '👉 Quiero Mi Acceso Completo a la Oferta' },
-                    styles: {
-                      fontSize: 16,
-                      fontFamily: 'Poppins',
-                      textColor: '#FFFFFF',
-                      bgColor: '#2848F0',
-                      isBold: true,
-                      paddingTop: 16,
-                      paddingBottom: 16,
-                      paddingLeft: 28,
-                      paddingRight: 28,
-                      borderRadius: 8,
-                      textAlign: 'center',
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'fascinations') {
-      // Fascinations & Benefit Bullets
-      newSection = {
-        id: `sec_fasc_${Date.now()}`,
-        name: 'Bullets de Fascinación y Beneficios',
-        bgColor: '#F8FAFC',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_fasc_title_${Date.now()}`,
-            columns: [
-              {
-                id: `col_fasc_t_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_fasc_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Esto Es Exactamente Lo Que Descubrirás Dentro', level: 'h2' },
-                    styles: {
-                      fontSize: 28,
-                      fontFamily: 'Poppins',
-                      textColor: '#121111',
-                      isBold: true,
-                      textAlign: 'center',
-                      marginBottom: 8,
-                    },
-                  },
-                  {
-                    id: `el_fasc_sub_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Estrategias de respuesta directa probadas para eliminar la fricción y multiplicar prospectos.' },
-                    styles: { fontSize: 15, fontFamily: 'Inter', textColor: '#5B5B66', textAlign: 'center', marginBottom: 30 },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `row_fasc_cols_${Date.now()}`,
-            columns: [
-              {
-                id: `col_fasc_1_${Date.now()}`,
-                widthPercentage: 50,
-                elements: [
-                  {
-                    id: `el_fasc_b1_${Date.now()}`,
-                    type: 'bullet_list',
-                    content: {
-                      items: [
-                        '🎯 El secreto de 3 fases para transformar tráfico frío en prospectos ansiosos por agendar.',
-                        '🎯 Por qué los embudos tradicionales fallan y cómo este modelo duplica la asistencia.',
-                        '🎯 La estructura de guion de 12 minutos que hace que el prospecto se autocalifique solo.',
-                      ],
-                    },
-                    styles: { marginBottom: 16 },
-                  },
-                ],
-              },
-              {
-                id: `col_fasc_2_${Date.now()}`,
-                widthPercentage: 50,
-                elements: [
-                  {
-                    id: `el_fasc_b2_${Date.now()}`,
-                    type: 'bullet_list',
-                    content: {
-                      items: [
-                        '🎯 Cómo filtrar curiosos y hablar exclusivamente con clientes con presupuesto real.',
-                        '🎯 Automatizaciones nativas de seguimiento por WhatsApp para reducir el absentismo al 10%.',
-                        '🎯 El proceso exacto para escalar sin tener que trabajar 14 horas apagando incendios.',
-                      ],
-                    },
-                    styles: { marginBottom: 16 },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'guarantee') {
-      // 100% Risk Reversal Guarantee
-      newSection = {
-        id: `sec_guar_${Date.now()}`,
-        name: 'Garantía 100% Incondicional',
-        bgColor: '#FFFFFF',
-        paddingY: 44,
-        rows: [
-          {
-            id: `row_guar_${Date.now()}`,
-            columns: [
-              {
-                id: `col_guar_badge_${Date.now()}`,
-                widthPercentage: 25,
-                elements: [
-                  {
-                    id: `el_guar_img_${Date.now()}`,
-                    type: 'image',
-                    content: {
-                      src: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
-                      alt: 'Garantía Incondicional',
-                    },
-                    styles: { maxWidth: '170px', borderRadius: 99, textAlign: 'center', marginBottom: 12 },
-                  },
-                ],
-              },
-              {
-                id: `col_guar_text_${Date.now()}`,
-                widthPercentage: 75,
-                elements: [
-                  {
-                    id: `el_guar_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Nuestra Garantía Incondicional de 30 Días: Cero Riesgo Para Ti', level: 'h3' },
-                    styles: { fontSize: 22, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 10 },
-                  },
-                  {
-                    id: `el_guar_p1_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: 'Prueba todo el sistema durante 30 días enteros. Si aplicas los pasos y sientes que no estás consiguiendo prospectos más calificados, o si simplemente no estás 100% fascinado con la experiencia, solo escríbenos y te reembolsaremos la totalidad de tu inversión de inmediato.',
-                    },
-                    styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 10 },
-                  },
-                  {
-                    id: `el_guar_p2_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: '🔒 Sin preguntas incómodas, sin resentimientos. Toda la responsabilidad recae sobre nosotros.' },
-                    styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#059669', isBold: true },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'comparison') {
-      // Comparison: Old Way vs New Way
-      newSection = {
-        id: `sec_comp_${Date.now()}`,
-        name: 'Comparativa: Método Antiguo vs Scale Sales Pro',
-        bgColor: '#F4F4F5',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_comp_title_${Date.now()}`,
-            columns: [
-              {
-                id: `col_comp_t_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_comp_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '¿Por Qué Este Enfoque Es Radicalmente Diferente?', level: 'h2' },
-                    styles: { fontSize: 28, fontFamily: 'Poppins', textColor: '#121111', isBold: true, textAlign: 'center', marginBottom: 32 },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `row_comp_cols_${Date.now()}`,
-            columns: [
-              {
-                id: `col_comp_old_${Date.now()}`,
-                widthPercentage: 50,
-                elements: [
-                  {
-                    id: `el_comp_old_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '❌ El Método Antiguo y Disperso', level: 'h3' },
-                    styles: { fontSize: 18, fontFamily: 'Poppins', textColor: '#DC2626', isBold: true, marginBottom: 12 },
-                  },
-                  {
-                    id: `el_comp_old_b_${Date.now()}`,
-                    type: 'bullet_list',
-                    content: {
-                      items: [
-                        'Múltiples herramientas inconexas (ClickFunnels + Calendly + Zapier + Excel)',
-                        'Leads que se pierden por fallas en webhooks o automatizaciones caídas',
-                        'Llamadas eternas con personas sin presupuesto ni poder de decisión',
-                        'Costos acumulados de cientos de dólares al mes en suscripciones',
-                      ],
-                    },
-                    styles: { marginBottom: 16 },
-                  },
-                ],
-              },
-              {
-                id: `col_comp_new_${Date.now()}`,
-                widthPercentage: 50,
-                elements: [
-                  {
-                    id: `el_comp_new_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '🚀 El Sistema Integrado Scale Sales Pro', level: 'h3' },
-                    styles: { fontSize: 18, fontFamily: 'Poppins', textColor: '#16A34A', isBold: true, marginBottom: 12 },
-                  },
-                  {
-                    id: `el_comp_new_b_${Date.now()}`,
-                    type: 'bullet_list',
-                    content: {
-                      items: [
-                        'Todo en una sola suite centralizada: Embudos, Calificación, CRM y Agenda',
-                        'Lead scoring automático en tiempo real según respuestas clave',
-                        'Solo atiendes reuniones con prospectos calificados con dinero listo',
-                        'Ahorro del 70% en costos de software y cero configuración técnica',
-                      ],
-                    },
-                    styles: { marginBottom: 16 },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'bio') {
-      // Author / Creator Bio
-      newSection = {
-        id: `sec_bio_${Date.now()}`,
-        name: 'Sobre el Autor / Quién Soy',
-        bgColor: '#FFFFFF',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_bio_${Date.now()}`,
-            columns: [
-              {
-                id: `col_bio_img_${Date.now()}`,
-                widthPercentage: 35,
-                elements: [
-                  {
-                    id: `el_bio_img_${Date.now()}`,
-                    type: 'image',
-                    content: {
-                      src: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80',
-                      alt: 'Mentor / Fundador',
-                    },
-                    styles: { maxWidth: '100%', borderRadius: 16, marginBottom: 12 },
-                  },
-                ],
-              },
-              {
-                id: `col_bio_content_${Date.now()}`,
-                widthPercentage: 65,
-                elements: [
-                  {
-                    id: `el_bio_sub_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: 'CONOCE A TU GUÍA ESTRATÉGICO' },
-                    styles: { fontSize: 12, fontFamily: 'Poppins', textColor: '#2848F0', isBold: true, marginBottom: 6 },
-                  },
-                  {
-                    id: `el_bio_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '¿Quién Diseñó Este Sistema Comercial?', level: 'h2' },
-                    styles: { fontSize: 26, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 14 },
-                  },
-                  {
-                    id: `el_bio_p1_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: 'Durante los últimos 6 años he asesorado a más de 300 consultores, agencias y proveedores de servicios B2B, ayudándolos a generar millones de dólares en ventas mediante embudos de respuesta directa.',
-                    },
-                    styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 10 },
-                  },
-                  {
-                    id: `el_bio_p2_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: 'Diseñé Scale Sales Pro porque vi que la gran mayoría de emprendedores no fracasa por su producto, sino por la falta de un sistema predecible que transforme el interés en ventas reales.',
-                    },
-                    styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 18 },
-                  },
-                  {
-                    id: `el_bio_btn_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: 'Conoce Más y Solicita Tu Sesión' },
-                    styles: { fontSize: 14, fontFamily: 'Poppins', textColor: '#FFFFFF', bgColor: '#1C1C1C', borderRadius: 8 },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'bonuses') {
-      // Fast Action Bonus Stack
-      newSection = {
-        id: `sec_bonuses_${Date.now()}`,
-        name: 'Bonos Exclusivos de Acción Rápida',
-        bgColor: '#FAF5FF',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_bon_title_${Date.now()}`,
-            columns: [
-              {
-                id: `col_bon_t_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_bon_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Bonos Exclusivos si Tomas Acción Hoy', level: 'h2' },
-                    styles: { fontSize: 28, fontFamily: 'Poppins', textColor: '#581C87', isBold: true, textAlign: 'center', marginBottom: 8 },
-                  },
-                  {
-                    id: `el_bon_sub_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Aceleradores tácticos para que obtengas resultados aún más rápido sin costo adicional.' },
-                    styles: { fontSize: 15, fontFamily: 'Inter', textColor: '#7E22CE', textAlign: 'center', marginBottom: 32 },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `row_bon_cards_${Date.now()}`,
-            columns: [
-              {
-                id: `col_bon_1_${Date.now()}`,
-                widthPercentage: 33.33,
-                elements: [
-                  {
-                    id: `el_b1_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '🎁 Bono #1: Bóveda de Scripts', level: 'h3' },
-                    styles: { fontSize: 16, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 8 },
-                  },
-                  {
-                    id: `el_b1_p_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Preguntas exactas palabra por palabra para cerrar en llamadas sin sonar invasivo.' },
-                    styles: { fontSize: 13, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 10 },
-                  },
-                  {
-                    id: `el_b1_val_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Valor: $497 USD (¡GRATIS HOY!)' },
-                    styles: { fontSize: 13, fontFamily: 'Poppins', textColor: '#2848F0', isBold: true },
-                  },
-                ],
-              },
-              {
-                id: `col_bon_2_${Date.now()}`,
-                widthPercentage: 33.33,
-                elements: [
-                  {
-                    id: `el_b2_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '🎁 Bono #2: Secuencias WhatsApp', level: 'h3' },
-                    styles: { fontSize: 16, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 8 },
-                  },
-                  {
-                    id: `el_b2_p_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Plantillas de recordatorio automatizado para asegurar una asistencia del 85%.' },
-                    styles: { fontSize: 13, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 10 },
-                  },
-                  {
-                    id: `el_b2_val_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Valor: $297 USD (¡GRATIS HOY!)' },
-                    styles: { fontSize: 13, fontFamily: 'Poppins', textColor: '#2848F0', isBold: true },
-                  },
-                ],
-              },
-              {
-                id: `col_bon_3_${Date.now()}`,
-                widthPercentage: 33.33,
-                elements: [
-                  {
-                    id: `el_b3_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '🎁 Bono #3: Plantillas de Copy', level: 'h3' },
-                    styles: { fontSize: 16, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 8 },
-                  },
-                  {
-                    id: `el_b3_p_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Estructuras de alta conversión para tus titulares, correos y páginas de captura.' },
-                    styles: { fontSize: 13, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 10 },
-                  },
-                  {
-                    id: `el_b3_val_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Valor: $397 USD (¡GRATIS HOY!)' },
-                    styles: { fontSize: 13, fontFamily: 'Poppins', textColor: '#2848F0', isBold: true },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'faq') {
-      // Frequently Asked Questions
-      newSection = {
-        id: `sec_faq_${Date.now()}`,
-        name: 'Preguntas Frecuentes y Objeciones',
-        bgColor: '#FFFFFF',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_faq_title_${Date.now()}`,
-            columns: [
-              {
-                id: `col_faq_t_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_faq_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Preguntas Frecuentes', level: 'h2' },
-                    styles: { fontSize: 28, fontFamily: 'Poppins', textColor: '#121111', isBold: true, textAlign: 'center', marginBottom: 8 },
-                  },
-                  {
-                    id: `el_faq_sub_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Respuestas directas a las dudas más comunes de nuestros miembros.' },
-                    styles: { fontSize: 15, fontFamily: 'Inter', textColor: '#5B5B66', textAlign: 'center', marginBottom: 32 },
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `row_faq_items_${Date.now()}`,
-            columns: [
-              {
-                id: `col_faq_body_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_faq_q1_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '❓ ¿Necesito saber de programación o diseño web?', level: 'h3' },
-                    styles: { fontSize: 16, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 6 },
-                  },
-                  {
-                    id: `el_faq_a1_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Para nada. La plataforma fue creada para que cualquier usuario pueda editar textos, fondos, colores, bloques y formularios simplemente haciendo clic o arrastrando elementos.' },
-                    styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 20 },
-                  },
-                  {
-                    id: `el_faq_d1_${Date.now()}`,
-                    type: 'divider',
-                    content: {},
-                    styles: { marginBottom: 18 },
-                  },
-                  {
-                    id: `el_faq_q2_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '❓ ¿Cómo funciona la calificación automática de prospectos?', level: 'h3' },
-                    styles: { fontSize: 16, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 6 },
-                  },
-                  {
-                    id: `el_faq_a2_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'El cuestionario pondera respuestas de facturación, presupuesto y urgencia. Quienes alcanzan el puntaje mínimo acceden de inmediato a tu calendario; los demás son filtrados con cortesía.' },
-                    styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 20 },
-                  },
-                  {
-                    id: `el_faq_d2_${Date.now()}`,
-                    type: 'divider',
-                    content: {},
-                    styles: { marginBottom: 18 },
-                  },
-                  {
-                    id: `el_faq_q3_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '❓ ¿En cuánto tiempo puedo tener mi embudo al aire?', level: 'h3' },
-                    styles: { fontSize: 16, fontFamily: 'Poppins', textColor: '#121111', isBold: true, marginBottom: 6 },
-                  },
-                  {
-                    id: `el_faq_a3_${Date.now()}`,
-                    type: 'paragraph',
-                    content: { text: 'Con las plantillas y bloques prearmados de Scale Sales Pro, la mayoría de nuestros clientes tienen su embudo completo publicado en menos de una tarde.' },
-                    styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#5B5B66', marginBottom: 24 },
-                  },
-                  {
-                    id: `el_faq_btn_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: '👉 Agendar Mi Sesión Estratégica' },
-                    styles: { fontSize: 15, fontFamily: 'Poppins', textColor: '#FFFFFF', bgColor: '#2848F0', isBold: true, textAlign: 'center' },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else if (blockType === 'urgency') {
-      // Urgency & Limited Capacity
-      newSection = {
-        id: `sec_urg_${Date.now()}`,
-        name: 'Urgencia y Plazas Limitadas',
-        bgColor: '#09090B',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_urg_${Date.now()}`,
-            columns: [
-              {
-                id: `col_urg_1_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_urg_sub_${Date.now()}`,
-                    type: 'subheading',
-                    content: { text: '⚠️ ATENCIÓN: PLAZAS LIMITADAS PARA ESTE MES' },
-                    styles: { fontSize: 12, fontFamily: 'Poppins', textColor: '#F59E0B', isBold: true, textAlign: 'center', marginBottom: 8 },
-                  },
-                  {
-                    id: `el_urg_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: 'Solo Aceptamos 15 Clientes Nuevos Este Mes', level: 'h2' },
-                    styles: { fontSize: 28, fontFamily: 'Poppins', textColor: '#FFFFFF', isBold: true, textAlign: 'center', marginBottom: 14 },
-                  },
-                  {
-                    id: `el_urg_p_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: 'Para asegurar la máxima calidad de atención y acompañamiento personalizado a cada uno de nuestros clientes, cerramos admisiones una vez alcanzado el cupo máximo de 15 nuevas cuentas.',
-                    },
-                    styles: { fontSize: 15, fontFamily: 'Inter', textColor: '#A1A1AA', textAlign: 'center', marginBottom: 24 },
-                  },
-                  {
-                    id: `el_urg_btn_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: '⚡ Asegurar Mi Cupo Antes de que se Agote' },
-                    styles: {
-                      fontSize: 16,
-                      fontFamily: 'Poppins',
-                      textColor: '#09090B',
-                      bgColor: '#F59E0B',
-                      isBold: true,
-                      paddingTop: 16,
-                      paddingBottom: 16,
-                      paddingLeft: 32,
-                      paddingRight: 32,
-                      borderRadius: 8,
-                      textAlign: 'center',
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    } else {
-      // CTA Block
-      newSection = {
-        id: `sec_cta_${Date.now()}`,
-        name: 'Llamada a la Acción de Cierre',
-        bgColor: '#1C1C1C',
-        paddingY: 48,
-        rows: [
-          {
-            id: `row_cta_${Date.now()}`,
-            columns: [
-              {
-                id: `col_cta_${Date.now()}`,
-                widthPercentage: 100,
-                elements: [
-                  {
-                    id: `el_cta_h_${Date.now()}`,
-                    type: 'heading',
-                    content: { text: '¿Listo Para Multiplicar Tus Citas Calificadas?', level: 'h2' },
-                    styles: {
-                      fontSize: 30,
-                      fontFamily: 'Poppins',
-                      textColor: '#FFFFFF',
-                      isBold: true,
-                      textAlign: 'center',
-                      marginBottom: 12,
-                      marginTop: 0,
-                    },
-                  },
-                  {
-                    id: `el_cta_p_${Date.now()}`,
-                    type: 'paragraph',
-                    content: {
-                      text: 'Las plazas para este mes son limitadas. Agenda hoy antes de que se agoten los horarios.',
-                    },
-                    styles: {
-                      fontSize: 16,
-                      fontFamily: 'Inter',
-                      textColor: '#A1A1AA',
-                      textAlign: 'center',
-                      marginBottom: 24,
-                      marginTop: 0,
-                    },
-                  },
-                  {
-                    id: `el_cta_btn_${Date.now()}`,
-                    type: 'button',
-                    content: { buttonText: '⚡ Reservar Mi Espacio Ahora Mismo' },
-                    styles: {
-                      fontSize: 16,
-                      fontFamily: 'Poppins',
-                      textColor: '#FFFFFF',
-                      bgColor: '#2848F0',
-                      isBold: true,
-                      paddingTop: 16,
-                      paddingBottom: 16,
-                      paddingLeft: 32,
-                      paddingRight: 32,
-                      borderRadius: 8,
-                      textAlign: 'center',
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    }
+    const newSection = createPrebuiltBlockSection(blockType);
 
     const newSections = [...sections];
     if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= newSections.length) {
@@ -3754,6 +2494,157 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     }
   };
 
+  // --- BIBLIOTECA HANDLERS (Guardar, Insertar y Edición Aislada) ---
+  const handleOpenSaveSectionToLibrary = (section: PageBlockSection) => {
+    setSaveToLibraryState({
+      isOpen: true,
+      sections: [cloneSectionWithFreshIds(section)],
+      pageSettings,
+      suggestedName: section.name || 'Mi Nuevo Bloque',
+      sourceType: 'section',
+      defaultKind: 'block',
+    });
+  };
+
+  const handleOpenSavePageToLibrary = () => {
+    setSaveToLibraryState({
+      isOpen: true,
+      sections: cloneSectionsWithFreshIds(sections),
+      pageSettings,
+      suggestedName: currentPage.title || 'Mi Nueva Plantilla',
+      sourceType: 'page',
+      defaultKind: 'block',
+    });
+  };
+
+  const handleInsertLibraryBlock = (item: LibraryItem) => {
+    const cloned = cloneSectionsWithFreshIds(item.sections);
+    if (cloned.length === 0) return;
+    const nextSections = [...sections, ...cloned];
+    pushHistory(nextSections);
+    const firstInsertedId = cloned[0].id;
+    setSelectedSectionId(firstInsertedId);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    showToast(`Bloque "${item.name}" agregado al final de la página`);
+    setTimeout(() => {
+      const targetDom = document.getElementById(firstInsertedId);
+      if (targetDom) {
+        targetDom.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 80);
+  };
+
+  const handleInsertLibraryTemplate = (item: LibraryItem) => {
+    const cloned = cloneSectionsWithFreshIds(item.sections);
+    if (cloned.length === 0) return;
+    if (item.pageSettings) {
+      setPageSettings((prev) => ({
+        ...prev,
+        ...JSON.parse(JSON.stringify(item.pageSettings)),
+      }));
+    }
+    pushHistory(cloned);
+    setSelectedSectionId(null);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    showToast(`Plantilla "${item.name}" cargada en el lienzo`);
+  };
+
+  const handleStartEditLibraryItem = (item: LibraryItem) => {
+    setLibraryModalState((prev) => ({ ...prev, isOpen: false }));
+    const clonedItemSections = cloneSectionsWithFreshIds(item.sections);
+
+    setLibraryEditSession((prevSession) => ({
+      itemId: item.id,
+      itemKind: item.kind === 'template' ? 'template' : 'block',
+      itemName: item.name,
+      stashedSections: prevSession
+        ? prevSession.stashedSections
+        : JSON.parse(JSON.stringify(sections)),
+      stashedPageSettings: prevSession
+        ? prevSession.stashedPageSettings
+        : JSON.parse(JSON.stringify(pageSettings)),
+      stashedHistory: prevSession
+        ? prevSession.stashedHistory
+        : JSON.parse(JSON.stringify(history)),
+      stashedHistoryIndex: prevSession
+        ? prevSession.stashedHistoryIndex
+        : historyIndex,
+      stashedHasUnsavedChanges: prevSession
+        ? prevSession.stashedHasUnsavedChanges
+        : hasUnsavedChanges,
+    }));
+
+    if (item.kind === 'template' && item.pageSettings) {
+      setPageSettings((prev) => ({
+        ...prev,
+        ...JSON.parse(JSON.stringify(item.pageSettings)),
+      }));
+    }
+
+    setSections(clonedItemSections);
+    setHistory([JSON.parse(JSON.stringify(clonedItemSections))]);
+    setHistoryIndex(0);
+    setSelectedSectionId(clonedItemSections[0]?.id || null);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    setIsPreviewMode(false);
+    showToast(
+      `Modo Edición de ${item.kind === 'template' ? 'Plantilla' : 'Bloque'}: "${item.name}"`
+    );
+  };
+
+  const handleCancelLibraryEditSession = () => {
+    if (!libraryEditSession) return;
+    const returnTab: LibrarySidebarTab =
+      libraryEditSession.itemKind === 'template' ? 'templates' : 'blocks';
+
+    setSections(libraryEditSession.stashedSections);
+    setPageSettings(libraryEditSession.stashedPageSettings);
+    setHistory(libraryEditSession.stashedHistory);
+    setHistoryIndex(libraryEditSession.stashedHistoryIndex);
+    setHasUnsavedChanges(libraryEditSession.stashedHasUnsavedChanges);
+    setSelectedSectionId(null);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    setLibraryEditSession(null);
+    setLibraryModalState({ isOpen: true, initialTab: returnTab });
+  };
+
+  const handleSaveLibraryEditSession = () => {
+    if (!libraryEditSession) return;
+    const returnTab: LibrarySidebarTab =
+      libraryEditSession.itemKind === 'template' ? 'templates' : 'blocks';
+    const updatedName =
+      libraryEditSession.itemName.trim() ||
+      (libraryEditSession.itemKind === 'template' ? 'Plantilla' : 'Bloque');
+
+    updateLibraryItem(libraryEditSession.itemId, {
+      name: updatedName,
+      sections: cloneSectionsWithFreshIds(sections),
+      pageSettings:
+        libraryEditSession.itemKind === 'template' ? pageSettings : undefined,
+    });
+
+    setSections(libraryEditSession.stashedSections);
+    setPageSettings(libraryEditSession.stashedPageSettings);
+    setHistory(libraryEditSession.stashedHistory);
+    setHistoryIndex(libraryEditSession.stashedHistoryIndex);
+    setHasUnsavedChanges(libraryEditSession.stashedHasUnsavedChanges);
+    setSelectedSectionId(null);
+    setSelectedRowId(null);
+    setSelectedColumnId(null);
+    setSelectedElementId(null);
+    setLibraryEditSession(null);
+    showToast(`Cambios guardados en la Biblioteca: "${updatedName}"`);
+    setLibraryModalState({ isOpen: true, initialTab: returnTab });
+  };
+
   const handleSavePage = () => {
     const targetFunnelId = propFunnelId || currentFunnel?.id || activeFunnel?.id || currentPage.funnel_id;
     const targetPageId = currentPage.id || currentFunnel?.pages?.[0]?.id || 'page_landing_1';
@@ -3776,29 +2667,56 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   return (
     <div className="fixed inset-0 z-50 bg-[#F4F4F5] flex flex-col h-screen overflow-hidden text-[#121111]">
       {/* Top Navbar */}
-      <header className="h-14 bg-white border-b border-zinc-200 px-4 flex items-center justify-between shrink-0 shadow-xs z-30">
+      <header
+        className={`h-14 border-b px-4 flex items-center justify-between shrink-0 shadow-xs z-30 ${
+          libraryEditSession
+            ? 'bg-amber-50/90 border-amber-300'
+            : 'bg-white border-zinc-200'
+        }`}
+      >
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => {
-              if (hasUnsavedChanges) {
-                setShowExitConfirmModal(true);
-              } else {
-                onExit();
-              }
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:text-zinc-950 hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Salir</span>
-            {hasUnsavedChanges && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="Cambios sin guardar" />
-            )}
-          </button>
+          {libraryEditSession ? (
+            <div className="flex items-center gap-2.5">
+              <span className="px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider bg-amber-600 text-white rounded-[4px] font-['Poppins'] shrink-0">
+                {libraryEditSession.itemKind === 'template'
+                  ? 'Edición de Plantilla'
+                  : 'Edición de Bloque'}
+              </span>
+              <input
+                type="text"
+                value={libraryEditSession.itemName}
+                onChange={(e) =>
+                  setLibraryEditSession((prev) =>
+                    prev ? { ...prev, itemName: e.target.value } : null
+                  )
+                }
+                className="px-2.5 py-1 text-xs font-bold text-zinc-900 bg-white border border-amber-300 rounded-[4px] focus:outline-none focus:border-[#2848F0] min-w-[180px]"
+                title="Nombre del elemento en tu Biblioteca"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setShowExitConfirmModal(true);
+                } else {
+                  onExit();
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:text-zinc-950 hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Salir</span>
+              {hasUnsavedChanges && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" title="Cambios sin guardar" />
+              )}
+            </button>
+          )}
 
           <div className="h-4 w-[1px] bg-zinc-200" />
 
           {/* Interactive Breadcrumb path */}
-          <div className="flex items-center text-xs text-[#5B5B66] font-['Inter'] overflow-x-auto max-w-[460px] no-scrollbar">
+          <div className="flex items-center text-xs text-[#5B5B66] font-['Inter'] overflow-x-auto max-w-[380px] no-scrollbar">
             <button
               type="button"
               onClick={() => {
@@ -3960,42 +2878,30 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           </button>
         </div>
 
-        {/* Right Actions: Plantillas, Preview, Estructura & Save */}
+        {/* Right Actions: Biblioteca, Preview, Estructura & Save */}
         <div className="flex items-center gap-2">
-          {!isPreviewMode && (
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  activeTab === 'templates' &&
-                  !selectedElementId &&
-                  !selectedColumnId &&
-                  !selectedRowId &&
-                  !selectedSectionId
-                ) {
-                  setActiveTab('elements');
-                } else {
-                  setActiveTab('templates');
-                  setSelectedElementId(null);
-                  setSelectedColumnId(null);
-                  setSelectedRowId(null);
-                  setSelectedSectionId(null);
+          {!isPreviewMode && !libraryEditSession && (
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() =>
+                  setLibraryModalState({ isOpen: true, initialTab: 'blocks' })
                 }
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
-                activeTab === 'templates' &&
-                !selectedElement &&
-                !activeColForInspector &&
-                !activeRowForInspector &&
-                !activeSectionForInspector
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-1 ring-purple-600'
-                  : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:text-purple-900'
-              }`}
-              title="Explorar y cargar plantillas predefinidas en el lienzo"
-            >
-              <LayoutTemplate className="w-3.5 h-3.5" />
-              <span>Plantillas</span>
-            </button>
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-l-lg border border-blue-200 bg-blue-50 text-[#2848F0] hover:bg-blue-100 transition-all cursor-pointer font-['Poppins']"
+                title="Abrir Biblioteca de Plantillas, Bloques y Favoritos"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Biblioteca</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenSavePageToLibrary}
+                className="flex items-center justify-center px-2 py-1.5 text-xs font-semibold rounded-r-lg border border-l-0 border-blue-200 bg-blue-50/70 text-[#2848F0] hover:bg-blue-100 transition-all cursor-pointer"
+                title="Guardar esta página completa en tu Biblioteca"
+              >
+                <Save className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
 
           <button
@@ -4032,13 +2938,33 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             </button>
           )}
 
-          <button
-            onClick={handleSavePage}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-[#2848F0] hover:bg-[#1f38bf] rounded-lg shadow-sm transition-all cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>Guardar</span>
-          </button>
+          {libraryEditSession ? (
+            <>
+              <button
+                type="button"
+                onClick={handleCancelLibraryEditSession}
+                className="px-3 py-1.5 text-xs font-semibold text-zinc-700 bg-white border border-zinc-300 hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
+              >
+                Volver sin guardar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveLibraryEditSession}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-[#16A34A] hover:bg-[#15803D] rounded-lg shadow-sm transition-all cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Guardar en Biblioteca</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleSavePage}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-[#2848F0] hover:bg-[#1f38bf] rounded-lg shadow-sm transition-all cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Guardar</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -8948,6 +7874,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                       pageTitle={currentPage.title}
                       onUpdate={updatePageSettings}
                       onClose={() => setActiveTab('elements')}
+                      onSavePageToLibrary={
+                        libraryEditSession ? undefined : handleOpenSavePageToLibrary
+                      }
                     />
                   </div>
                 ) : activeTab === 'templates' ? (
@@ -9652,6 +8581,21 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   ) : (
                     /* BLOCKS TAB */
                     <div className="space-y-2.5">
+                      {!libraryEditSession && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLibraryModalState({
+                              isOpen: true,
+                              initialTab: 'blocks',
+                            })
+                          }
+                          className="w-full py-2.5 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#2848F0] text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer font-['Poppins'] mb-2"
+                        >
+                          <BookOpen className="w-4 h-4" />
+                          <span>Abrir Biblioteca de Plantillas y Bloques</span>
+                        </button>
+                      )}
                       <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-['Inter']">
                         Bloques Prearmados de Alta Conversión
                       </div>
@@ -10148,6 +9092,21 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             </span>
                           </div>
                         )}
+
+                      <div className="w-[1px] h-3.5 bg-amber-400 mx-0.5" />
+
+                      {/* Save Outer Section to Library (Disquete antes de la tuerca) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenSaveSectionToLibrary(section);
+                        }}
+                        className="p-1 rounded hover:bg-amber-700 transition-colors cursor-pointer flex items-center justify-center"
+                        title="Guardar sección en tu Biblioteca"
+                      >
+                        <Save className="w-3.5 h-3.5 text-white" />
+                      </button>
 
                       <div className="w-[1px] h-3.5 bg-amber-400 mx-0.5" />
 
@@ -12374,6 +11333,38 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           </div>
         </div>
       )}
+
+      {/* MODAL 1: GUARDAR SECCIÓN O PÁGINA EN LA BIBLIOTECA */}
+      <SaveToLibraryModal
+        isOpen={saveToLibraryState.isOpen}
+        onClose={() =>
+          setSaveToLibraryState((prev) => ({ ...prev, isOpen: false }))
+        }
+        sections={saveToLibraryState.sections}
+        pageSettings={saveToLibraryState.pageSettings}
+        suggestedName={saveToLibraryState.suggestedName}
+        sourceType={saveToLibraryState.sourceType}
+        defaultKind={saveToLibraryState.defaultKind}
+        onOpenLibrary={(tab) =>
+          setLibraryModalState({
+            isOpen: true,
+            initialTab: tab === 'template' ? 'templates' : 'blocks',
+          })
+        }
+      />
+
+      {/* MODAL 2: ALMACÉN PRINCIPAL BIBLIOTECA (Plantillas, Bloques y Favoritos) */}
+      <LibraryManagerModal
+        isOpen={libraryModalState.isOpen}
+        initialTab={libraryModalState.initialTab}
+        isCurrentCanvasEmpty={isCanvasEffectivelyEmpty(sections)}
+        onClose={() =>
+          setLibraryModalState((prev) => ({ ...prev, isOpen: false }))
+        }
+        onInsertBlock={handleInsertLibraryBlock}
+        onInsertTemplate={handleInsertLibraryTemplate}
+        onEditItemInEditor={handleStartEditLibraryItem}
+      />
     </div>
   );
 };
