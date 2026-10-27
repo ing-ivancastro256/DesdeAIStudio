@@ -28,7 +28,9 @@ import * as LucideIcons from 'lucide-react';
 import { RichTextElement } from '../editor/elements/RichTextElement';
 import { AudioPlayerElement } from '../editor/elements/AudioPlayerElement';
 import { IconElement } from '../editor/elements/IconElement';
+import { ConfiguredImage } from '../common/ConfiguredImage';
 import { SimpleFormElement } from '../editor/elements/SimpleFormElement';
+import { InlineFormElement } from '../editor/elements/InlineFormElement';
 import { PopupButtonElement, formatCtaDisplayText } from '../editor/elements/PopupButtonElement';
 import { EmbeddedVideoPlayer } from '../common/EmbeddedVideoPlayer';
 import { DelayedAppearance } from '../common/DelayedAppearance';
@@ -96,6 +98,25 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
   const advanceToNextStep = () => {
     if (currentStepIndex < 4) {
       setCurrentStepIndex((prev) => Math.min(prev + 1, 4));
+    }
+  };
+
+  const goToFunnelPageById = (pageId: string) => {
+    const pages = activeFunnel?.pages || [];
+    const targetPage = pages.find((p) => p.id === pageId);
+    if (!targetPage) {
+      advanceToNextStep();
+      return;
+    }
+    const stepTypes = ['landing', 'vsl', 'qualification', 'calendar', 'thank_you'];
+    const byTypeIdx = stepTypes.indexOf(targetPage.page_type);
+    if (byTypeIdx !== -1) {
+      setCurrentStepIndex(byTypeIdx);
+      return;
+    }
+    const byArrayIdx = pages.findIndex((p) => p.id === pageId);
+    if (byArrayIdx !== -1) {
+      setCurrentStepIndex(Math.min(byArrayIdx, 4));
     }
   };
 
@@ -579,6 +600,23 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           </div>
         );
 
+      case 'inline_form':
+        return (
+          <div key={element.id || eIdx} className="w-full">
+            <InlineFormElement
+              element={element}
+              isEditable={false}
+              defaultPrimaryColor="#F5B056"
+              defaultFontFamily={activePage?.settings?.bodyFontFamily || 'Inter'}
+              onNextFunnelStep={advanceToNextStep}
+              onGoToFunnelPage={goToFunnelPageById}
+              onSubmitSuccess={() => {
+                showToast && showToast('¡Correo registrado con éxito!');
+              }}
+            />
+          </div>
+        );
+
       case 'popup_button':
         return (
           <div key={element.id || eIdx} className="w-full">
@@ -685,6 +723,28 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           element.styles?.textTransform
         );
 
+        const showSubtext =
+          Boolean(element.content.buttonSubtextEnabled) &&
+          Boolean((element.content.buttonSubtext || '').trim());
+        const subtextFontSize = element.content.buttonSubtextFontSize ?? 12;
+        const subtextFontFamily =
+          element.content.buttonSubtextFontFamily ||
+          element.styles?.fontFamily ||
+          activePage?.settings?.bodyFontFamily ||
+          'Poppins';
+        const subtextColor = element.content.buttonSubtextColor || 'rgba(255, 255, 255, 0.85)';
+        const subtextGap = element.content.buttonSubtextGap ?? 4;
+        const subtextTransform = element.content.buttonSubtextTransform || 'none';
+        const displaySubtext = formatCtaDisplayText(
+          element.content.buttonSubtext || '',
+          subtextTransform
+        );
+        const subtextIconName = element.content.buttonSubtextIcon || '';
+        const SubtextIconComp = subtextIconName
+          ? ((LucideIcons as unknown as Record<string, React.ComponentType<{ style?: React.CSSProperties; className?: string }>>)[subtextIconName] || null)
+          : null;
+        const subtextIconSize = Math.max(10, Math.round(subtextFontSize * 1.05));
+
         return (
           <div
             key={element.id || eIdx}
@@ -742,8 +802,6 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                   fontFamily: element.styles?.fontFamily || activePage?.settings?.bodyFontFamily || 'Poppins',
                   fontWeight: element.styles?.isBold ? 700 : 500,
                   fontStyle: element.styles?.isItalic ? 'italic' : 'normal',
-                  textDecoration: element.styles?.isUnderline ? 'underline' : 'none',
-                  textTransform: element.styles?.textTransform || 'none',
                   paddingTop: `${padY}px`,
                   paddingBottom: `${padY}px`,
                   paddingLeft: `${padX}px`,
@@ -751,23 +809,56 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                   borderRadius: `${element.styles?.borderRadius ?? 0}px`,
                   borderWidth: `${bWidth}px`,
                   borderStyle: hasBorder ? (element.styles?.borderStyle || 'solid') : 'none',
-                  gap: IconComp ? `${iconSpacing}px` : '0px',
                 } as React.CSSProperties
               }
-              className="[background-color:var(--cta-bg)] hover:[background-color:var(--cta-hover-bg)] [color:var(--cta-text)] hover:[color:var(--cta-hover-text)] [border-color:var(--cta-border)] hover:[border-color:var(--cta-hover-border)] shadow-sm transition-colors duration-200 inline-flex items-center justify-center cursor-pointer font-semibold"
+              className="[background-color:var(--cta-bg)] hover:[background-color:var(--cta-hover-bg)] [color:var(--cta-text)] hover:[color:var(--cta-hover-text)] [border-color:var(--cta-border)] hover:[border-color:var(--cta-hover-border)] shadow-sm transition-colors duration-200 inline-flex flex-col items-center justify-center cursor-pointer font-semibold text-center"
             >
-              {IconComp && iconPos === 'before' && (
-                <IconComp
-                  style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
-                  className="shrink-0"
-                />
-              )}
-              <span>{displayBtnText}</span>
-              {IconComp && iconPos === 'after' && (
-                <IconComp
-                  style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
-                  className="shrink-0"
-                />
+              <span
+                className="inline-flex items-center justify-center"
+                style={{
+                  gap: IconComp ? `${iconSpacing}px` : '0px',
+                  textDecoration: element.styles?.isUnderline ? 'underline' : 'none',
+                  textTransform: element.styles?.textTransform || 'none',
+                }}
+              >
+                {IconComp && iconPos === 'before' && (
+                  <IconComp
+                    style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                    className="shrink-0"
+                  />
+                )}
+                <span>{displayBtnText}</span>
+                {IconComp && iconPos === 'after' && (
+                  <IconComp
+                    style={{ width: `${iconSize}px`, height: `${iconSize}px` }}
+                    className="shrink-0"
+                  />
+                )}
+              </span>
+
+              {showSubtext && (
+                <span
+                  className="inline-flex items-center justify-center leading-tight"
+                  style={{
+                    marginTop: `${subtextGap}px`,
+                    fontSize: `${subtextFontSize}px`,
+                    fontFamily: subtextFontFamily,
+                    color: subtextColor,
+                    fontWeight: element.content.buttonSubtextBold ? 700 : 400,
+                    fontStyle: element.content.buttonSubtextItalic ? 'italic' : 'normal',
+                    textDecoration: element.content.buttonSubtextUnderline ? 'underline' : 'none',
+                    textTransform: subtextTransform,
+                    gap: '4px',
+                  }}
+                >
+                  {SubtextIconComp && (
+                    <SubtextIconComp
+                      style={{ width: `${subtextIconSize}px`, height: `${subtextIconSize}px` }}
+                      className="shrink-0"
+                    />
+                  )}
+                  <span>{displaySubtext}</span>
+                </span>
               )}
             </button>
           </div>
@@ -833,33 +924,11 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
         const linkUrl = element.styles?.linkUrl || element.content?.linkUrl;
         const linkOpenNewTab = element.styles?.linkOpenNewTab ?? element.content?.linkOpenNewTab ?? true;
         const imgNode = (
-          <img
-            src={element.content.src || 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80'}
-            alt={element.content.alt || ''}
-            style={{
-              width: element.styles?.imageWidth ? `${element.styles.imageWidth}px` : (element.styles?.maxWidth || '100%'),
-              height: element.styles?.imageHeight ? `${element.styles.imageHeight}px` : 'auto',
-              maxWidth: '100%',
-              borderRadius: `${element.styles?.borderRadius ?? 0}px`,
-              opacity: element.styles?.opacity ?? 1,
-              objectFit: element.styles?.imageHeight ? 'cover' : undefined,
-              border: element.styles?.borderWidth
-                ? `${element.styles.borderWidth}px ${element.styles.borderStyle || 'solid'} ${
-                    element.styles.borderColor || '#E4E4E7'
-                  }`
-                : undefined,
-              boxShadow:
-                element.styles?.shadow === 'sm'
-                  ? '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                  : element.styles?.shadow === 'md'
-                  ? '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                  : element.styles?.shadow === 'lg'
-                  ? '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                  : element.styles?.shadow === 'xl'
-                  ? '0 20px 25px -5px rgb(0 0 0 / 0.1)'
-                  : undefined,
-            }}
-            className="transition-all"
+          <ConfiguredImage
+            src={element.content.src}
+            alt={element.content.alt}
+            styles={element.styles}
+            defaultWidth={element.styles?.maxWidth || 450}
           />
         );
 
@@ -868,6 +937,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
             key={element.id || eIdx}
             style={{
               display: 'flex',
+              width: '100%',
               justifyContent:
                 element.styles?.textAlign === 'left'
                   ? 'flex-start'
@@ -876,6 +946,12 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                   : 'center',
               marginTop: `${element.styles?.marginTop || 0}px`,
               marginBottom: `${element.styles?.marginBottom ?? 16}px`,
+              marginLeft: `${element.styles?.marginLeft ?? 0}px`,
+              marginRight: `${element.styles?.marginRight ?? 0}px`,
+              paddingTop: `${element.styles?.paddingTop ?? 0}px`,
+              paddingBottom: `${element.styles?.paddingBottom ?? 0}px`,
+              paddingLeft: `${element.styles?.paddingLeft ?? 0}px`,
+              paddingRight: `${element.styles?.paddingRight ?? 0}px`,
             }}
           >
             {linkUrl ? (
@@ -883,7 +959,8 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
                 href={linkUrl}
                 target={linkOpenNewTab ? '_blank' : '_self'}
                 rel="noreferrer noopener"
-                className="inline-block cursor-pointer hover:opacity-95 transition-opacity"
+                style={{ display: 'inline-flex', maxWidth: '100%' }}
+                className="cursor-pointer hover:opacity-95 transition-opacity"
               >
                 {imgNode}
               </a>

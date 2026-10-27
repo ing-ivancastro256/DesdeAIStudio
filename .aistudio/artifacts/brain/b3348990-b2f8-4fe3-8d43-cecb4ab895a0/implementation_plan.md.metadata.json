@@ -1,6 +1,6 @@
 {
-  "summary":  "Plan de implementación detallado para rediseñar el elemento \"Formulario completo\" en la biblioteca de elementos: contenedor limpio y transparente con bordes rectos (0px por defecto), gestor de campos reordenable con configuración interna desplegable (Texto, Email, Text Area, Teléfono, WhatsApp, Select, Radio, Checkbox), botón con paridad total al botón independiente, checkbox de políticas con formato enriquecido e hipervínculos, acciones post-envío multi-condición (CRM, Email Marketing con selección de listas/etiquetas, redirección URL y siguiente paso del embudo) y controles de disposición.",
-  "updatedAt":  "2026-10-26T17:02:37.750378553Z",
+  "summary":  "Plan de implementación completo para la Biblioteca de Plantillas y Bloques de Scale 6 Pro: botón de disquete en secciones exteriores y en el lienzo completo, ventana de Guardar en Biblioteca (con vista previa escalada y desplazable verticalmente, selector Plantilla/Bloque, creación dinámica de categorías), ventana principal de Biblioteca (buscador, filtros Plantillas / Bloques / Favoritos, tarjetas con vista previa, corazón de favorito, menú de Editar / Clonar / Eliminar y botón inferior derecho Agregar), modo de Edición aislada de Plantilla o Bloque sin afectar páginas ya publicadas, y arquitectura preparada para futuros Pop-ups, Elementos y Páginas Web.",
+  "updatedAt":  "2026-10-27T17:26:21.967700470Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

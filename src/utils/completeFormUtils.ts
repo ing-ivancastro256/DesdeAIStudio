@@ -456,6 +456,61 @@ export function getResolvedFormButtonStyles(
   };
 }
 
+export function createDefaultInlineFieldStyle(
+  defaultFontFamily = 'Inter'
+): CompleteFormGlobalFieldStyle {
+  return {
+    fontFamily: defaultFontFamily || 'Inter',
+    fontSize: 15,
+    isBold: false,
+    isItalic: false,
+    textColor: '#18181B',
+    labelColor: '#27272A',
+    bgColor: '#FFFFFF',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#E4E4E7',
+    borderRadius: 8,
+  };
+}
+
+export function createDefaultInlineButtonStyles(
+  text = 'Comenzar Ahora',
+  subtext = '',
+  defaultPrimaryColor = '#F5B056',
+  defaultFontFamily = 'Poppins'
+): CompleteFormButtonStyles {
+  return {
+    text,
+    subtext,
+    icon: 'ArrowRight',
+    iconPosition: 'after',
+    iconSpacing: 8,
+    iconSize: 18,
+    paddingY: 0,
+    paddingX: 20,
+    fontSize: 15,
+    fontFamily: defaultFontFamily || 'Poppins',
+    textTransform: 'none',
+    isBold: true,
+    isItalic: false,
+    isUnderline: false,
+    align: 'center',
+    fullWidth: true,
+    bgType: 'solid',
+    bgColor: defaultPrimaryColor || '#F5B056',
+    bgColor2: '#D97706',
+    textColor: '#111827',
+    borderColor: '#111827',
+    hoverBgColor: undefined,
+    hoverTextColor: undefined,
+    hoverBorderColor: undefined,
+    borderWidth: 0,
+    borderStyle: 'solid',
+    borderRadius: 8,
+  };
+}
+
 export function getResolvedPostSubmitActions(
   content: PageBlockElement['content']
 ): Required<CompleteFormPostSubmitActions> {
@@ -474,6 +529,8 @@ export function getResolvedPostSubmitActions(
 
   return {
     goToNextStep: Boolean(act.goToNextStep),
+    goToFunnelPage: Boolean(act.goToFunnelPage),
+    targetFunnelPageId: act.targetFunnelPageId ?? '',
     redirectToUrl: act.redirectToUrl ?? Boolean(content.formRedirectUrl),
     redirectUrl: act.redirectUrl ?? content.formRedirectUrl ?? '',
     redirectOpenNewTab: Boolean(act.redirectOpenNewTab),

@@ -1,130 +1,158 @@
-# Rediseño Integral del Elemento "Formulario Completo"
+# Biblioteca de Plantillas y Bloques (Scale 6 Pro)
 
-Transformación del elemento **Formulario completo** dentro del grupo **FORMULARIO** en un constructor modular de captación de leads sin contenedor decorativo, sin título ni subtítulo predefinidos, con radio de esquinas de `0px` por defecto en campos y botón, gestión avanzada de campos arrastrables, personalización completa del botón, casilla de políticas con texto enriquecido y automatizaciones post-envío conectadas al CRM y proveedores de Email Marketing.
+Este módulo incorpora un almacén centralizado e independiente dentro del editor visual para guardar, organizar por categorías, marcar en favoritos, editar de forma aislada, clonar e insertar **Plantillas** (páginas completas) y **Bloques** (secciones exteriores), con una arquitectura ya escalable para incorporar más adelante Pop-ups, Elementos sueltos, Páginas Web e Imágenes.
 
-## Revisión del Usuario y Decisiones Confirmadas
+---
+
+## Decisiones Confirmadas y Reglas Críticas
 
 > [!IMPORTANT]
-> Las siguientes decisiones estratégicas fueron confirmadas directamente y guían el diseño e interacción del componente:
+> **Preferencias confirmadas por ti en la fase de consulta:**
+> - **Punto de acceso principal**: La ventana de **Biblioteca** se abrirá desde la **barra superior del editor visual** (y adicionalmente podrás guardar desde el ícono de disquete en cada sección exterior o desde el botón de guardar lienzo completo).
+> - **Contenido inicial precargado**: Al abrir la Biblioteca por primera vez ya vendrán incluidas las **plantillas de página y bloques prearmados actuales del sistema**, sumados a todas las plantillas y bloques que vayas guardando y creando.
+> - **Pestañas activas en columna TIPO**: Se mostrarán limpiamente las **3 vistas activas hoy** (`Plantillas`, `Bloques` y `Favoritos`), dejando el modelo de datos listo por debajo para activar `Pop-ups`, `Elementos` y `Páginas Web` en siguientes iteraciones sin rehacer nada.
 
-- **Decisión Confirmada 1 — Apariencia del Contenedor en el Lienzo**: El formulario se inserta con un contenedor exterior **limpio y transparente**, mostrando únicamente los campos configurados, la casilla opcional de políticas y el botón de envío (sin tarjeta blanca envolvente, sombras ni título/subtítulo explicativo).
-- **Decisión Confirmada 2 — Alcance del Estilo de Campos**: La tipografía, colores, borde (`1px` por defecto) y redondeo (`0px` por defecto) funcionan de manera **compartida en todos los campos**, incluyendo un interruptor opcional dentro de cada campo para aplicar **ajustes visuales individuales** cuando se requiera destacar o diferenciar un campo específico.
-- **Decisión Confirmada 3 — Proveedores de Email Marketing Post-Envío**: En **Acción Después de Enviar**, se mostrarán **todos los proveedores disponibles** (`GetResponse`, `ActiveCampaign`, `ConvertKit / Kit`, `MailerLite`, `Brevo`) permitiendo activar uno o varios simultáneamente y especificar la **Lista o Etiqueta (Tag)** de destino en cada uno.
+> [!NOTE]
+> **Independencia total entre Biblioteca y Páginas en uso (Clonación Profunda):**
+> Cuando insertas una Plantilla o un Bloque en una página de tu embudo (o cuando guardas una sección/página hacia la Biblioteca), se genera una **copia profunda independiente** con nuevos identificadores internos. Si más adelante entras a la Biblioteca y editas o eliminas esa Plantilla o Bloque, **jamás se modificará ni romperá** ninguna página donde lo hayas insertado anteriormente.
 
 ---
 
 ## 1. Visión General y Concepto Central
 
-- **Qué Hace**: Permite diseñar formularios a medida directamente en el editor visual de páginas y ventanas emergentes, controlando el orden, ancho en columnas, tipos de entrada, estilos tipográficos/bordes, botón de acción, consentimiento legal con enlaces y flujo de conversión posterior al envío.
-- **Audiencia y Contexto**: Creadores de embudos y páginas de captura que necesitan integrar formularios limpios sobre cualquier fondo de sección o columna sin cajas forzadas, manteniendo control quirúrgico sobre cada campo y conectando cada registro con el CRM y herramientas de automatización.
-- **Valor Principal**: Elimina la rigidez del formulario fijo tradicional, unificando en un solo inspector seis bloques ordenados y predecibles con paridad visual respecto al resto del constructor.
+- **Qué hace**: Permite reutilizar tu trabajo de diseño en segundos. Cualquier sección exterior que diseñes con imágenes, formularios, colores y columnas puede guardarse con un clic como **Bloque** (o **Plantilla**), y cualquier página terminada del embudo puede guardarse completa como **Plantilla**.
+- **Para quién y en qué flujo**: Creadores de embudos en Scale 6 Pro que desean construir su propio repositorio de secciones de alta conversión y páginas maestras listas para insertar en nuevos pasos o embudos.
+- **Valor clave**: Elimina rehacer secciones desde cero, mantiene categorías personalizadas ordenadas, permite destacar recursos frecuentes con **Favoritos** (`♥`) y ofrece un **Modo de Edición de Plantilla / Bloque** dedicado dentro del mismo constructor visual.
 
 ---
 
 ## 2. Experiencia de Usuario y Diseño Visual
 
-### Flujo Paso a Paso en el Editor y Lienzo
+### A. Nuevos Puntos de Guardado Rápido (Ícono de Disquete)
+1. **En cada Sección Exterior del lienzo**:
+   - En la barra flotante superior derecha de cada sección exterior, **justo antes de la tuerca de configuración**, aparecerá el nuevo botón con ícono de **Disquete (`Guardar en Biblioteca`)**.
+   - Al hacer clic desde una sección exterior, se abre la **Ventana 1 (Guardar en Biblioteca)** con la vista previa real de esa sección y la opción **Bloque** preseleccionada por defecto (pudiendo cambiar a **Plantilla** si deseas).
+2. **En el Canvas Completo / Barra de Página**:
+   - Junto a los controles superiores del lienzo (y en el panel de Ajustes de Canvas Completo), tendrás un botón con ícono de **Disquete (`Guardar página como Plantilla`)** que abre la **Ventana 1** capturando todas las secciones y estilos globales de la página actual con **Plantilla** seleccionada.
 
-1. **Inserción Limpia en el Lienzo**:
-   - Al arrastrar **Formulario completo** al lienzo, aparecen únicamente sus campos iniciales y el botón de envío sobre fondo transparente, sin encabezados ni subtítulos automáticos.
-   - Tanto los campos como el botón nacen con esquinas rectas (`0px` de radio) y los campos con borde sólido de `1px`.
-2. **Grupo 1 — Nombre del Formulario**:
-   - Primer bloque superior del inspector para asignar el identificador del formulario (usado en registros del CRM, eventos de conversión y trazabilidad de leads).
-3. **Grupo 2 — Campos del Formulario**:
-   - **Lista Vertical Reordenable**: Cada campo se presenta en una fila compacta uno debajo de otro con tirador para **arrastrar y soltar** (con línea azul indicadora de posición), botón de **Duplicar/Copiar** y botón de **Eliminar (`×`)**.
-   - **Botón `+ Añadir campo`**: Agrega instantáneamente un nuevo campo al final de la lista y abre su configuración.
-   - **Configuración Interna Desplegable por Campo** (organizada en pestañas **Contenido** y **Estilo** al hacer clic sobre un campo):
-     - *Pestaña Contenido*:
-       - Selector **Tipo de campo**: `Texto`, `Email`, `Text Area`, `Teléfono`, `WhatsApp`, `Select`, `Radio`, `Checkbox`.
-       - Edición de **Etiqueta (Label)**, **Placeholder** (en campos de entrada de texto), interruptor **Requerido** (`Sí` / `No`) y selector **Ancho de columna** (`100%`, `50%`, `33%`, `25%`, `66%`, `75%`) para distribuir campos en una o varias columnas.
-       - **Configuración de Múltiples Opciones** (exclusiva cuando el tipo es `Select`, `Radio` o `Checkbox`): área de texto multilínea para escribir una opción por línea (soportando tanto texto directo como formato `Etiqueta|valor`).
-     - *Pestaña Estilo*:
-       - Edición directa del estilo global compartido de los campos (familia tipográfica, tamaño de letra, color de texto, color de fondo, espesor de borde con `1px` por defecto, color de borde y radio de esquina con `0px` por defecto) junto con un interruptor **"Personalizar solo este campo"** para sobrescribir cualquiera de esos valores únicamente en el campo seleccionado.
-   - **Controles Globales Inferiores de Campos** (debajo de `+ Añadir campo`):
-     - Selector **Tamaño de campo** (`Extra Pequeño`, `Pequeño`, `Mediano`, `Grande`).
-     - Interruptor **Mostrar / Ocultar Etiquetas (Label)** encima de los campos e interruptor **Marca de requerido (`*`)**.
-4. **Grupo 3 — Botón del Formulario**:
-   - Réplica exacta de todas las capacidades del elemento **Botón** independiente:
-     - **Texto del botón** (texto principal, subtexto opcional, ancho completo o ajustado).
-     - **Icono del botón** (selector visual completo de iconos, posición antes o después del texto, tamaño del icono y separación respecto al texto).
-     - **Tipografía y Formato** (fuente, tamaño, peso negrita, cursiva, subrayado, transformación mayúsculas/minúsculas y alineación).
-     - **Color y Fondo** (color sólido o degradado de 2 colores, color de texto y colores de acento/hover).
-     - **Borde y Redondeo** (activación de borde, grosor, estilo sólido/punteado/discontinuo, color de borde y radio de esquinas con `0px` por defecto).
-5. **Grupo 4 — Checkbox de Políticas**:
-   - Interruptor superior (`No` / `Sí`) para activar o desactivar la casilla de aceptación de políticas encima del botón.
-   - Barra de formato enriquecido en línea (**Negrita `B`**, **Cursiva `I`**, **Subrayado `U`** e **Insertar Enlace / URL**) que permite seleccionar palabras específicas (por ejemplo, *"políticas de privacidad"* o *"términos y condiciones"*) y convertirlas en hipervínculos clicables hacia la URL deseada, además de configurar obligatoriedad y tamaño/color del texto.
-6. **Grupo 5 — Acción Después de Enviar**:
-   - Sistema multi-selección donde el usuario puede combinar simultáneamente una o varias acciones al completar el envío:
-     - **Siguiente página del embudo**: avanza automáticamente al siguiente paso configurado en el embudo.
-     - **Redirección a URL**: redirige a una dirección web externa o interna (misma pestaña o nueva pestaña).
-     - **Añadir al CRM**: crea o actualiza automáticamente el contacto real en el módulo CRM con su nombre, correo, teléfono/WhatsApp, respuestas personalizadas y etiqueta de origen del formulario.
-     - **Email Marketing**: despliega los proveedores (`ActiveCampaign`, `GetResponse`, `ConvertKit / Kit`, `MailerLite`, `Brevo`) con casillas de activación independientes e input de **Lista o Etiqueta (Tag)** para cada proveedor seleccionado.
-7. **Grupo 6 — Disposición**:
-   - Control unificado en una sola línea de 4 lados vinculables para **Margen** y **Relleno (Padding)** (`Superior`, `Inferior`, `Derecha`, `Izquierda`), consistente con el resto de elementos del constructor.
+### B. Ventana 1 — Modal "Guardar en Biblioteca" (Fiel a tu Imagen 1, 100% en Español)
+- **Cabecera limpia**: Título `BIBLIOTECA` a la izquierda y botón cerrar (`×`) a la derecha.
+- **Encabezado central**: Ícono de guardado en bandeja, titular *"Guarda esta Sección en tu biblioteca de Plantillas"* (o *"Guarda esta Página en tu biblioteca de Plantillas"* cuando guardas todo el canvas) y subtítulo explicativo: *"Las plantillas guardadas se pueden cargar fácilmente en tus páginas. Actualizar una plantilla no afectará al contenido publicado."*
+- **Columna Izquierda — Vista Previa Rectangular con Scroll Vertical**:
+  - Contenedor rectangular gris claro con el lienzo escalado proporcionalmente al 100% del ancho del recuadro para que se vea nítido tal como luce la sección o página real.
+  - Si la sección o página es alta, el recuadro mantiene una altura fija cómoda y habilita **desplazamiento vertical interno suave** para inspeccionar todo el diseño de arriba a abajo.
+- **Columna Derecha — Formulario de Guardado**:
+  - **Guardar Como**: Selector segmentado de dos botones claros: `Plantilla` | `Bloque`.
+    - Si eliges `Plantilla`, la etiqueta inferior cambia dinámicamente a **Nombre de Plantilla** y el botón principal dice **Guardar nueva plantilla**.
+    - Si eliges `Bloque`, cambia dinámicamente a **Nombre de Bloque** y el botón principal dice **Guardar nuevo bloque**.
+  - **Buscador / Validación en vivo de nombre**: Muestra debajo del input si ya existe algún elemento guardado con nombre similar en tu biblioteca para evitar duplicados accidentales.
+  - **Categoría inteligente (Seleccionar o Crear al vuelo)**:
+    - Por defecto muestra `Sin categoría`.
+    - Al desplegar, lista todas tus categorías existentes (ej. `Sin categoría`, `Cabeceras`, `Formularios`, `Testimonios`, `Carta de Ventas`, etc.).
+    - Permite **escribir directamente una categoría nueva** en un campo rápido con botón **`+ Agregar nueva categoría`**, dejándola creada y seleccionada al instante.
 
-### Identidad Visual, Tipografía y Micro-interacciones
-- **Dirección Estética**: Inspector técnico de alta densidad estilo SaaS profesional, con jerarquía clara de tarjetas limpias, bordes sutiles (`--border` / `slate-200`), acentos precisos en índigo/azul (`indigo-600` / `blue-600`) y superficies de lienzo 100% fieles al diseño final del usuario.
-- **Tipografía y Ritmo Espacial**: Etiquetas de control legibles (`11px–12px` semibold), controles numéricos alineados horizontalmente con deslizadores y flechas de incremento, y grilla flexible de 12 columnas internas en el formulario para soportar combinaciones de campos al `100%`, `50%` o `33%` sin desbordes.
-- **Feedback Interactivo**: Indicador lineal azul limpio durante el reordenamiento por arrastrar y soltar de campos, validación en vivo de campos requeridos y casilla de políticas al probar en Vista Previa o Embudo Público, y notificación de confirmación al registrar el lead en el CRM.
+### C. Ventana 2 — Almacén Principal "BIBLIOTECA" (Fiel a tu Imagen 2 + Mejoras de Usabilidad)
+- **Acceso desde la barra superior del Editor Visual**: El botón `Biblioteca` abre la ventana amplia de gestión e inserción.
+- **Barra Lateral Izquierda de la Biblioteca**:
+  - **Buscador instantáneo (`Buscar...`)** con filtrado en tiempo real por nombre o categoría (ubicado arriba para acceso inmediato, complementado con filtro rápido por categoría en la cabecera del listado).
+  - **Sección `TIPO` con contadores numéricos tabulares**:
+    - `Plantillas` *(contador total)*
+    - `Bloques` *(contador total)*
+    - `Favoritos` *(contador de marcados con corazón ♥)*
+- **Área Principal de Tarjetas (Grid de 3 columnas en escritorio)**:
+  - Cabecera con el título de la vista activa (`Plantillas`, `Bloques` o `Favoritos`) + filtro desplegable por **Categoría** (`Todas las categorías`, `Sin categoría`, o cualquiera creada por ti) para encontrar recursos rápido cuando tengas muchos.
+  - **Cada tarjeta muestra**:
+    1. **Fila superior de tarjeta**: Nombre de la plantilla/bloque a la izquierda; a la derecha el **botón de Corazón (`♥`)** para marcar/desmarcar **Favorito** con un clic (permanece visible en su pestaña original y aparece también en `Favoritos`) seguido del **botón de tres puntitos (`⋮`)**.
+    2. **Menú de tres puntitos (`⋮`)**:
+       - `Editar`: Abre el **Modo Edición de Plantilla / Bloque** en el constructor visual.
+       - `Clonar / Duplicar`: Crea inmediatamente una copia exacta (`Nombre (Copia)`) dentro de la Biblioteca.
+       - `Renombrar / Cambiar categoría` *(mejora práctica rápida sin tener que entrar al editor completo)*.
+       - `Eliminar`: Pide confirmación breve y la retira de la Biblioteca sin afectar páginas donde ya fue usada.
+    3. **Recuadro rectangular de Vista Previa**: Miniatura fiel en vivo de la sección o página (con scroll vertical al pasar el cursor si es larga, y borde resaltado cuando seleccionas la tarjeta para insertarla).
+- **Barra Inferior con Botón `Agregar` (Esquina Inferior Derecha)**:
+  - Al hacer clic sobre una tarjeta queda seleccionada (con marco azul nítido y resumen del ítem elegido en el pie del modal), habilitando abajo a la derecha el botón principal **`Agregar`** (además de permitir doble clic rápido si lo prefieres).
+  - **Comportamiento al hacer clic en `Agregar`**:
+    - **Si es un Bloque**: Inserta la sección clonada **al final de la página actual** donde estás trabajando y hace scroll suave hacia ella.
+    - **Si es una Plantilla**:
+      - Si el lienzo actual está vacío (sin secciones o sin elementos), **carga toda la plantilla directamente sin preguntar**.
+      - Si el lienzo actual ya tiene contenido trabajado, muestra un **aviso claro de confirmación** indicando que la plantilla sustituirá el contenido actual del lienzo antes de aplicarla.
+
+### D. Modo Dedicado de "Edición de Plantilla / Bloque"
+- Cuando eliges **`Editar`** en el menú de tres puntitos (`⋮`) de cualquier Plantilla o Bloque de la Biblioteca:
+  - El editor visual entra en un modo claramente identificado en la barra superior con un distintivo ámbar/azul: **`Edición de Plantilla: [Nombre]`** o **`Edición de Bloque: [Nombre]`**.
+  - Dispones de todas las herramientas del constructor (inspector lateral, estilos, columnas, formularios, imágenes, deshacer/rehacer).
+  - En la esquina superior derecha aparecen dos botones claros: **`Volver sin guardar`** y **`Guardar cambios en Biblioteca`**.
+  - Al guardar, se actualiza únicamente el registro maestro dentro de la Biblioteca y regresas intacto a la página del embudo en la que estabas trabajando antes.
+
+### E. Identidad Visual y Tipografía
+- **Estética**: Superficies limpias de SaaS profesional en blanco puro (`#FFFFFF`), grises neutros estructurales (`#F4F4F5` / `#E4E4E7`), acento primario azul Scale 6 Pro (`#2848F0`) para selección activa y verde esmeralda (`#16A34A` / `#4CAF50`) en la confirmación de guardado fiel a tus capturas de referencia.
+- **Tipografía**: `Poppins` en cabeceras y títulos de sección; textos limpios de alta legibilidad y numerales tabulares (`tabular-nums`) en los contadores laterales de la Biblioteca.
 
 ---
 
-## 3. Decisiones de Producto y Equilibrios Técnicos
+## 3. Decisiones Clave de Producto y Arquitectura
 
-- **Decisión 1 — Herencia Inteligente de Estilo con Sobrescritura Opcional por Campo**
-  - *Enfoque Elegido*: Mantener tokens base de estilo de campo a nivel de formulario (editables desde la pestaña de estilo de cualquier campo) con un conmutador opcional para personalizar un campo individual.
-  - *Por Qué*: Evita tener que repetir cambios de fuente, color o borde 6 veces cuando el usuario quiere cambiar la estética del formulario entero, pero conserva total libertad si desea resaltar un campo concreto.
-  - *Alternativas Descartadas*: Estilos exclusivamente individuales por campo (tedioso y propenso a inconsistencias visuales) o exclusivamente globales (impide excepciones puntuales).
-
-- **Decisión 2 — Editor Ligero de Texto Enriquecido y Enlaces para Políticas**
-  - *Enfoque Elegido*: Editor interactivo con selección de texto y aplicación directa de **Negrita**, **Cursiva**, **Subrayado** e **Hipervínculo (`URL`)** sanitizado, renderizado fielmente junto al checkbox.
-  - *Por Qué*: Permite enlazar múltiples documentos legales dentro de una misma oración (*"Acepto los Términos de Uso y la Política de Privacidad"*) sin obligar al usuario a escribir código HTML manual.
-
-- **Decisión 3 — Retrocompatibilidad Transparente con Formularios Existentes**
-  - *Enfoque Elegido*: Si una plantilla previa contiene la estructura antigua de campos básicos, se convierte automáticamente en la lista ordenada de campos editables sin perder etiquetas ni textos configurados; mientras que todo nuevo **Formulario completo** insertado nace limpio, sin títulos y con radios en `0px`.
+- **Escalabilidad preparada para los 6 tipos planeados**:
+  - *Enfoque elegido*: Definir desde hoy la entidad universal de Biblioteca soportando el campo `kind: 'template' | 'block' | 'popup' | 'element' | 'webpage' | 'image'` junto con `isFavorite: boolean` y `category: string`, mostrando en la interfaz actual únicamente `Plantillas`, `Bloques` y `Favoritos`.
+  - *Por qué*: Cuando en las próximas fases activemos Pop-ups, Elementos con estilo propio, Páginas Web e Imágenes, se conectarán sobre el mismo motor de almacenamiento, buscador, categorías y favoritos sin migraciones ni retrabajo.
+- **Vista Previa Real Escalada en Rectángulo (con Scroll Vertical)**:
+  - *Enfoque elegido*: Renderizar una vista previa en miniatura real y escalada por proporción CSS del árbol de secciones/elementos dentro de un marco rectangular de ancho fijo y `overflow-y: auto`.
+  - *Por qué*: A diferencia de íconos genéricos estáticos, ves los colores, textos, botones y formularios reales que diseñaste, y si una plantilla completa tiene 5 o 6 secciones puedes recorrerla verticalmente antes de guardarla o insertarla.
+- **Persistencia Local Automática + Semilla del Sistema**:
+  - *Enfoque elegido*: Sincronizar la Biblioteca y las Categorías personalizadas en `localStorage` combinadas en el primer arranque con las plantillas y bloques prearmados actuales del sistema.
+  - *Por qué*: Tus bloques, plantillas nuevas, ediciones, nombres y favoritos persisten aunque recargues el navegador, y nunca pierdes tus recursos guardados.
 
 ---
 
-## 4. Arquitectura Técnica y Estrategia de Datos
-
-### Diagrama de Arquitectura y Flujo de Componentes
+## 4. Arquitectura Técnica y Flujo de Datos
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                      EDITOR VISUAL & VISTA PÚBLICA                         │
-├───────────────────────────────────┬────────────────────────────────────────┤
-│   INSPECTOR FORMULARIO COMPLETO   │     LIENZO / RENDERIZADOR DE FORM      │
-│                                   │                                        │
-│  1. Nombre del Formulario         │  ┌──────────────────────────────────┐  │
-│  2. Campos del Formulario         │  │ Grilla Dinámica (100% / 50% /33%)│  │
-│     ├─ Lista Drag & Drop + Copy/× │  │  ├─ Texto / Email / Text Area    │  │
-│     ├─ Config Interna (Tabs):     │  │  ├─ Teléfono / WhatsApp          │  │
-│     │   • Contenido (Tipo/Opciones│  │  └─ Select / Radio / Checkbox    │  │
-│     │   • Estilo Global/Individual│  ├──────────────────────────────────┤  │
-│     └─ Tamaño + Switch Labels     │  │ [✓] Checkbox Políticas (Rich URL)│  │
-│  3. Botón del Formulario          │  ├──────────────────────────────────┤  │
-│     └─ Texto/Icono/Fuente/Fondo/  │  │ [ Icono  Botón Envío (0px rad) ] │  │
-│        Borde & Radio (0px def.)   │  └────────────────┬─────────────────┘  │
-│  4. Checkbox de Políticas         │                   │ Al Enviar (Submit) │
-│  5. Acción Después de Enviar      │                   ▼                    │
-│  6. Disposición (Margen/Relleno)  │  ┌──────────────────────────────────┐  │
-└─────────────────┬─────────────────┘  │   MOTOR DE ACCIONES POST-ENVÍO   │  │
-                  │                    │  ├─ Añadir Contacto + Evento CRM │  │
-                  ▼                    │  ├─ Sincronizar Email Marketing  │  │
-┌───────────────────────────────────┐  │  │   (Proveedor + Lista/Etiqueta)│  │
-│   ESTADO DEL ELEMENTO (JSON)      │  │  ├─ Avanzar Paso del Embudo      │  │
-│   Campos, Estilos, Botón, Reglas  │──┼─►└─ Redirigir a URL Personalizada│  │
-└───────────────────────────────────┘  └──────────────────────────────────┘  │
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                     ESTADO GLOBAL DE BIBLIOTECA (AppContext)                 │
+│  • libraryItems[] (id, kind: 'template'|'block'|..., name, category,         │
+│                    isFavorite, sections[], pageSettings?, updatedAt)         │
+│  • libraryCategories[] ('Sin categoría', 'Cabeceras', 'Ventas', + creadas)   │
+│  • Acciones: saveItem, updateItem, duplicateItem, deleteItem, toggleFavorite │
+└───────────────────┬──────────────────────────────────────┬───────────────────┘
+                    │                                      │
+        ┌───────────▼───────────┐              ┌───────────▼───────────┐
+        │   DISPARADORES SAVE   │              │  BARRA SUPERIOR EDITOR│
+        │ • Disquete en Sección │              │ • Botón "Biblioteca"  │
+        │   Exterior (->Bloque) │              │ • Disquete de Página  │
+        └───────────┬───────────┘              └───────────┬───────────┘
+                    │                                      │
+        ┌───────────▼───────────┐              ┌───────────▼───────────┐
+        │  MODAL 1: GUARDAR EN  │              │  MODAL 2: BIBLIOTECA  │
+        │      BIBLIOTECA       │              │  • Buscador + Categoría│
+        │ • Preview Rectangular │              │  • Tipo: Plantillas / │
+        │   con scroll vertical │              │    Bloques / Favoritos│
+        │ • Selector Plantilla  │              │  • Tarjetas: ♥ y (⋮)  │
+        │   o Bloque            │              │    Editar|Clonar|Elim │
+        │ • Categoría + Crear   │              │  • Botón inf-der:     │
+        │   nueva categoría     │              │    [ Agregar ]        │
+        └───────────────────────┘              └─────┬───────────┬─────┘
+                                                     │           │
+                              ┌──────────────────────┘           └─────────────────────┐
+                              ▼                                                        ▼
+             ┌─────────────────────────────────┐                      ┌─────────────────────────────────┐
+             │     INSERCIÓN POR CLONACIÓN     │                      │   MODO EDICIÓN AISLADA EN VIVO  │
+             │ • Bloque -> Clona e inserta al  │                      │ • Carga copia del ítem en el    │
+             │   final de la página actual     │                      │   lienzo con barra "Edición de  │
+             │ • Plantilla -> Directo si lienzo│                      │   Plantilla / Bloque"           │
+             │   vacío; pide confirmación si   │                      │ • Guarda solo en Biblioteca sin │
+             │   ya existen elementos          │                      │   alterar páginas ya publicadas │
+             └─────────────────────────────────┘                      └─────────────────────────────────┘
 ```
 
-### Modelo de Datos y Estado
-
-- **Entidad de Campo de Formulario**: Identificador único, tipo (`text`, `email`, `textarea`, `tel`, `whatsapp`, `select`, `radio`, `checkbox`), etiqueta, placeholder, indicador de requerido, ancho porcentual de columna, lista de opciones multilínea (`Etiqueta|valor`) y objeto opcional de sobrescritura de estilo individual (`fuente`, `tamaño`, `colorTexto`, `colorFondo`, `grosorBorde`, `colorBorde`, `radioEsquina`).
-- **Configuración Global de Campos**: Visibilidad de etiquetas (`showLabels`), indicador de asterisco requerido (`showRequiredMark`), escala de altura/relleno (`inputSize`) y estilo base compartido (`borderWidth: 1`, `borderRadius: 0`, colores y tipografía).
-- **Configuración Completa del Botón**: Propiedades unificadas con el botón estándar (texto, icono, posición/tamaño/espaciado de icono, familia/tamaño/formato tipográfico, fondo sólido o degradado de 2 colores, borde configurable y `borderRadius: 0` por defecto).
-- **Configuración de Políticas y Post-Envío**: Estado activo e HTML enriquecido seguro para la casilla de políticas; banderas independientes de acciones post-envío (`irSiguientePaso`, `redirigirUrl`, `agregarCrm`, `emailMarketing`) junto con el arreglo de destinos de Email Marketing (`proveedor`, `activo`, `listaOEtiqueta`).
-
-### Mapeo Interactivo de Eventos y Validaciones
-
-- **Reordenamiento, Copia y Eliminación de Campos**: Arrastrar una fila actualiza el índice del arreglo en tiempo real mostrando una línea divisoria azul; duplicar clona el campo con un nuevo identificador justo debajo del original; eliminar remueve el campo cerrando su panel interno si estaba activo.
-- **Validación y Envío Real en Vista Previa y Embudo Público**: Al enviar el formulario, se validan los campos marcados como requeridos, formato de correo/teléfono y la casilla obligatoria de políticas; luego se ejecutan en secuencia las acciones activadas: creación del contacto con historial detallado en el CRM, registro de listas/etiquetas de Email Marketing seleccionadas y navegación automática al siguiente paso del embudo o URL configurada.
+### Mapeo Interactivo de Componentes y Estados
+1. **Guardado desde Sección o Página**:
+   - Al pulsar el disquete de una sección exterior, se clona esa sección en memoria y se abre el Modal 1 con `Guardar Como = Bloque` y el nombre sugerido de la sección.
+   - Al pulsar el disquete de página completa, se clonan todas las secciones + ajustes globales de página y se abre el Modal 1 con `Guardar Como = Plantilla`.
+   - Al crear una nueva categoría desde el selector, se valida que no esté vacía ni repetida, se añade a `libraryCategories` y queda asignada automáticamente.
+2. **Exploración, Favoritos y Gestión en Biblioteca**:
+   - El buscador y el selector de categoría filtran instantáneamente la pestaña activa (`Plantillas`, `Bloques` o `Favoritos`).
+   - El clic en el corazón (`♥`) alterna `isFavorite` sin sacar el elemento de su categoría original y actualiza en vivo el contador de `Favoritos`.
+   - El menú contextual (`⋮`) ejecuta `Clonar` (copia profunda inmediata), `Renombrar / Categoría` (edición rápida en tarjeta), `Eliminar` (con confirmación segura) o `Editar` (abre el modo aislado).
+3. **Inserción Segura y Modo Edición Aislada**:
+   - `Agregar` genera nuevos IDs únicos para cada sección, fila, columna y elemento insertado para garantizar aislamiento absoluto frente a futuras ediciones.
+   - En **Modo Edición de Plantilla / Bloque**, el editor guarda temporalmente el estado de la página del embudo en segundo plano; al pulsar `Guardar cambios en Biblioteca`, actualiza únicamente el ítem de la Biblioteca y restaura tu página del embudo exactamente donde la dejaste.

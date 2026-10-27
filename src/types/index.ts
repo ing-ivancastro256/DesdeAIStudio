@@ -121,6 +121,9 @@ export interface ElementStyles {
   imageWidthUnit?: 'px' | '%';
   imageHeightUnit?: 'px' | '%';
   aspectRatioLocked?: boolean;
+  imageFit?: 'contain' | 'cover' | 'stretch' | 'auto';
+  imagePosition?: 'center' | 'top' | 'bottom' | 'left' | 'right';
+  imageRepeat?: 'no-repeat' | 'repeat' | 'repeat-x' | 'repeat-y';
   linkUrl?: string;
   linkOpenNewTab?: boolean;
   aspectRatio?: '16/9' | '4/3' | '9/16' | '1/1' | 'auto';
@@ -151,6 +154,7 @@ export type ElementType =
   | 'audio'
   | 'icon'
   | 'simple_form'
+  | 'inline_form'
   | 'popup_button'
   | 'form'
   | 'calendar'
@@ -269,6 +273,8 @@ export interface CompleteFormEmailTarget {
 
 export interface CompleteFormPostSubmitActions {
   goToNextStep?: boolean;
+  goToFunnelPage?: boolean;
+  targetFunnelPageId?: string;
   redirectToUrl?: boolean;
   redirectUrl?: string;
   redirectOpenNewTab?: boolean;
@@ -328,7 +334,17 @@ export interface PageBlockElement {
     videoCoverBgColor2?: string;
     videoCoverBgOpacity?: number;
     buttonText?: string;
+    buttonSubtextEnabled?: boolean;
     buttonSubtext?: string;
+    buttonSubtextColor?: string;
+    buttonSubtextFontSize?: number;
+    buttonSubtextFontFamily?: string;
+    buttonSubtextBold?: boolean;
+    buttonSubtextItalic?: boolean;
+    buttonSubtextUnderline?: boolean;
+    buttonSubtextTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+    buttonSubtextGap?: number;
+    buttonSubtextIcon?: string;
     buttonIcon?: string;
     buttonIconPosition?: 'before' | 'after';
     buttonIconSpacing?: number;
@@ -365,7 +381,7 @@ export interface PageBlockElement {
     iconColor?: string;
     iconBgColor?: string;
     iconShape?: 'none' | 'circle' | 'square' | 'rounded';
-    // Complete Form (simple_form)
+    // Complete Form (simple_form) & Inline Form (inline_form)
     formName?: string;
     formFields?: CompleteFormFieldItem[];
     formInputSize?: CompleteFormInputSize;
@@ -374,6 +390,12 @@ export interface PageBlockElement {
     formShowRequiredMark?: boolean;
     formFieldStyles?: CompleteFormGlobalFieldStyle;
     formButtonStyles?: CompleteFormButtonStyles;
+    inlineFormHeight?: number;
+    inlineFormButtonWidthPercent?: number;
+    inlineFormGap?: number;
+    inlineEmailPlaceholder?: string;
+    inlineEmailLabel?: string;
+    inlineShowLabel?: boolean;
     policyCheckboxEnabled?: boolean;
     policyCheckboxHtml?: string;
     policyCheckboxFontSize?: number;

@@ -9,12 +9,19 @@ import {
   CheckCircle,
   CreditCard,
   ClipboardList,
+  TextCursorInput,
   Save,
   Sparkles,
 } from 'lucide-react';
 import { PopupModal, PageBlockElement, ElementType } from '../../../types';
 import { SimpleFormElement } from './SimpleFormElement';
-import { createDefaultCompleteFormFields } from '../../../utils/completeFormUtils';
+import { InlineFormElement } from './InlineFormElement';
+import {
+  createDefaultCompleteFormFields,
+  createDefaultInlineButtonStyles,
+  createDefaultInlineFieldStyle,
+  DEFAULT_EMAIL_PLACEHOLDER,
+} from '../../../utils/completeFormUtils';
 
 interface PopupEditorModalProps {
   popup: PopupModal;
@@ -106,6 +113,17 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
           fullWidth: true,
         },
         submitButtonText: 'Quiero la Oferta',
+      };
+    } else if (type === 'inline_form') {
+      newEl.content = {
+        formName: 'Formulario Inline Pop-up',
+        inlineFormHeight: 52,
+        inlineFormButtonWidthPercent: 30,
+        inlineFormGap: 0,
+        inlineEmailPlaceholder: DEFAULT_EMAIL_PLACEHOLDER,
+        inlineShowLabel: false,
+        formFieldStyles: createDefaultInlineFieldStyle('Inter'),
+        formButtonStyles: createDefaultInlineButtonStyles('Comenzar Ahora', '', '#F5B056', 'Poppins'),
       };
     } else if (type === 'button') {
       newEl.content = { buttonText: '👉 Acceder Ahora' };
@@ -244,7 +262,15 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
             className="px-2.5 py-1 bg-white hover:bg-blue-50 border border-zinc-200 hover:border-blue-300 rounded-lg text-xs font-medium text-zinc-700 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs shrink-0"
           >
             <ClipboardList className="w-3.5 h-3.5 text-purple-600" />
-            <span>Formulario</span>
+            <span>Formulario Completo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => addElementToPopup('inline_form')}
+            className="px-2.5 py-1 bg-white hover:bg-blue-50 border border-zinc-200 hover:border-blue-300 rounded-lg text-xs font-medium text-zinc-700 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs shrink-0"
+          >
+            <TextCursorInput className="w-3.5 h-3.5 text-amber-500" />
+            <span>Formulario Inline</span>
           </button>
           <button
             type="button"
@@ -404,6 +430,10 @@ export const PopupEditorModal: React.FC<PopupEditorModalProps> = ({
 
                   {el.type === 'simple_form' && (
                     <SimpleFormElement element={el} isEditable={true} />
+                  )}
+
+                  {el.type === 'inline_form' && (
+                    <InlineFormElement element={el} isEditable={true} />
                   )}
 
                   {el.type === 'button' && (

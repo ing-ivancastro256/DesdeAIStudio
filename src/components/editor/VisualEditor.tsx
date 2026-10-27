@@ -113,9 +113,14 @@ import { WordPressWysiwygEditor } from './elements/WordPressWysiwygEditor';
 import { AudioPlayerElement } from './elements/AudioPlayerElement';
 import { IconElement, POPULAR_ICONS } from './elements/IconElement';
 import { SimpleFormElement } from './elements/SimpleFormElement';
+import { InlineFormElement } from './elements/InlineFormElement';
 import { CompleteFormInspector } from './CompleteFormInspector';
+import { InlineFormInspector } from './InlineFormInspector';
 import {
   createDefaultCompleteFormFields,
+  createDefaultInlineButtonStyles,
+  createDefaultInlineFieldStyle,
+  DEFAULT_EMAIL_PLACEHOLDER,
   DEFAULT_POLICY_ERROR_TEXT,
   DEFAULT_POLICY_HTML,
 } from '../../utils/completeFormUtils';
@@ -123,6 +128,7 @@ import { PopupButtonElement, formatCtaDisplayText } from './elements/PopupButton
 import { PopupEditorModal } from './elements/PopupEditorModal';
 import { PAGE_TEMPLATES, PageTemplate } from '../../data/pageTemplates';
 import { EmbeddedVideoPlayer } from '../common/EmbeddedVideoPlayer';
+import { ConfiguredImage } from '../common/ConfiguredImage';
 import { getEmbedVideoInfo, getEmbedVideoUrl } from '../../utils/videoUtils';
 import { InlineEditableText } from './elements/InlineEditableText';
 import { NumberControl, InlineSliderInput, FreeNumberInput } from '../common/NumberControl';
@@ -1771,6 +1777,12 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
       case 'button':
         newElement.content = {
           buttonText: 'Quiero Agendar Mi Sesión Estratégica',
+          buttonSubtextEnabled: false,
+          buttonSubtext: '',
+          buttonSubtextColor: 'rgba(255, 255, 255, 0.85)',
+          buttonSubtextFontSize: 12,
+          buttonSubtextGap: 4,
+          buttonSubtextIcon: '',
           buttonIcon: '',
           buttonIconPosition: 'before',
           buttonIconSpacing: 8,
@@ -1810,7 +1822,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         newElement.styles = {
           borderRadius: 0,
           imageWidth: 450,
-          aspectRatioLocked: true,
+          imageFit: 'contain',
+          imagePosition: 'center',
+          imageRepeat: 'no-repeat',
+          textAlign: 'center',
           opacity: 1,
           marginTop: 0,
           marginBottom: 20,
@@ -1977,6 +1992,59 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           paddingRight: 0,
         };
         break;
+      case 'inline_form': {
+        const inlineFieldDefaults = createDefaultInlineFieldStyle(
+          pageSettings.bodyFontFamily || 'Inter'
+        );
+        const inlineBtnDefaults = createDefaultInlineButtonStyles(
+          'Comenzar Ahora',
+          '',
+          '#F5B056',
+          pageSettings.bodyFontFamily || 'Poppins'
+        );
+        newElement.content = {
+          formName: 'Formulario Inline',
+          inlineFormHeight: 52,
+          inlineFormButtonWidthPercent: 30,
+          inlineFormGap: 0,
+          inlineEmailPlaceholder: DEFAULT_EMAIL_PLACEHOLDER,
+          inlineEmailLabel: 'Tu mejor email',
+          inlineShowLabel: false,
+          formShowRequiredMark: true,
+          formFieldStyles: inlineFieldDefaults,
+          formButtonStyles: inlineBtnDefaults,
+          submitButtonText: inlineBtnDefaults.text,
+          submitButtonBg: inlineBtnDefaults.bgColor,
+          submitButtonTextColor: inlineBtnDefaults.textColor,
+          policyCheckboxEnabled: false,
+          policyCheckboxHtml: DEFAULT_POLICY_HTML,
+          policyCheckboxFontSize: 12,
+          policyCheckboxTextColor: '#3F3F46',
+          policyCheckboxErrorText: DEFAULT_POLICY_ERROR_TEXT,
+          formPostSubmitActions: {
+            goToNextStep: true,
+            goToFunnelPage: false,
+            targetFunnelPageId: '',
+            redirectToUrl: false,
+            redirectUrl: '',
+            redirectOpenNewTab: false,
+            addToCrm: true,
+            sendToEmailMarketing: false,
+          },
+          formSuccessMessage: '¡Gracias! Hemos recibido tu correo correctamente.',
+        };
+        newElement.styles = {
+          marginTop: 0,
+          marginBottom: 20,
+          marginLeft: 0,
+          marginRight: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
+        };
+        break;
+      }
       case 'popup_button':
         newElement.content = {
           popupButtonText: 'Abrir Oferta en Pop-up',
@@ -4048,7 +4116,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         reader.onload = (uploadEv) => {
                           const base64 = uploadEv.target?.result as string;
                           if (base64) {
-                            updateSelectedElement({}, { src: base64, alt: '' });
+                            updateSelectedElement(
+                              { imageHeight: undefined },
+                              { src: base64, alt: '' }
+                            );
                             showToast('Imagen cargada correctamente desde tu explorador');
                           }
                         };
@@ -4328,6 +4399,285 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             className="w-full mt-1 p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
                           />
                         </div>
+
+                        {/* SUBTEXTO DEL BOTÓN (DESPLAZABLE SÍ / NO — POR DEFECTO EN NO) */}
+                        {(() => {
+                          const subtextEnabled = Boolean(selectedElement.content.buttonSubtextEnabled);
+                          const subtextIcons = [
+                            { id: '', label: 'Ninguno', Icon: X },
+                            { id: 'Lock', label: 'Seguro', Icon: Lock },
+                            { id: 'ShieldCheck', label: 'Garantía', Icon: (LucideIcons as any).ShieldCheck || CheckCircle2 },
+                            { id: 'Clock', label: 'Tiempo', Icon: Clock },
+                            { id: 'CheckCircle2', label: 'Check', Icon: CheckCircle2 },
+                            { id: 'Sparkles', label: 'Destello', Icon: Sparkles },
+                            { id: 'Zap', label: 'Rápido', Icon: Zap },
+                            { id: 'Flame', label: 'Oferta', Icon: Flame },
+                          ];
+
+                          return (
+                            <div className="p-2.5 bg-zinc-50/80 border border-zinc-200 rounded-xl space-y-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <span className="font-semibold text-zinc-800 block text-xs">Agregar subtexto:</span>
+                                  <span className="text-[10px] text-zinc-500">Línea secundaria debajo del texto principal</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={subtextEnabled}
+                                  onClick={() => {
+                                    const nextState = !subtextEnabled;
+                                    const updates: Record<string, any> = {
+                                      buttonSubtextEnabled: nextState,
+                                    };
+                                    if (nextState && !selectedElement.content.buttonSubtext) {
+                                      updates.buttonSubtext = 'Cupos limitados · 100% sin compromiso';
+                                    }
+                                    updateSelectedElement({}, updates);
+                                  }}
+                                  className={`relative inline-flex items-center h-6 w-14 rounded-full transition-colors cursor-pointer shrink-0 px-1 ${
+                                    subtextEnabled ? 'bg-[#2848F0]' : 'bg-zinc-300'
+                                  }`}
+                                  title={subtextEnabled ? 'Desactivar subtexto' : 'Activar subtexto'}
+                                >
+                                  <span
+                                    className={`text-[10px] font-bold select-none transition-opacity ${
+                                      subtextEnabled
+                                        ? 'text-white pl-1.5 opacity-100'
+                                        : 'opacity-0 w-0 overflow-hidden'
+                                    }`}
+                                  >
+                                    Sí
+                                  </span>
+                                  <span
+                                    className={`inline-block w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${
+                                      subtextEnabled ? 'translate-x-2.5' : 'translate-x-0'
+                                    }`}
+                                  />
+                                  <span
+                                    className={`text-[10px] font-bold text-zinc-700 select-none transition-opacity ${
+                                      !subtextEnabled
+                                        ? 'pl-1.5 opacity-100'
+                                        : 'opacity-0 w-0 overflow-hidden'
+                                    }`}
+                                  >
+                                    No
+                                  </span>
+                                </button>
+                              </div>
+
+                              {subtextEnabled && (
+                                <div className="pt-2 border-t border-zinc-200/80 space-y-2.5">
+                                  {/* Input del subtexto */}
+                                  <div>
+                                    <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                      Texto del subtexto:
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={selectedElement.content.buttonSubtext ?? ''}
+                                      onChange={(e) =>
+                                        updateSelectedElement({}, { buttonSubtext: e.target.value })
+                                      }
+                                      placeholder="Ej: 100% gratis · Sin tarjeta de crédito"
+                                      className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
+                                    />
+                                  </div>
+
+                                  {/* Color del subtexto */}
+                                  <HexColorPicker
+                                    label="Color del subtexto:"
+                                    value={
+                                      selectedElement.content.buttonSubtextColor ||
+                                      'rgba(255, 255, 255, 0.85)'
+                                    }
+                                    onChange={(val) =>
+                                      updateSelectedElement({}, { buttonSubtextColor: val })
+                                    }
+                                  />
+
+                                  {/* Tamaño del subtexto */}
+                                  <InlineSliderInput
+                                    label="Tamaño del subtexto:"
+                                    value={selectedElement.content.buttonSubtextFontSize ?? 12}
+                                    min={9}
+                                    max={28}
+                                    inputMin={6}
+                                    unit="px"
+                                    onChange={(val) =>
+                                      updateSelectedElement({}, { buttonSubtextFontSize: val })
+                                    }
+                                  />
+
+                                  {/* Fuente del subtexto */}
+                                  <div>
+                                    <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                      Fuente del subtexto:
+                                    </label>
+                                    <select
+                                      value={selectedElement.content.buttonSubtextFontFamily || ''}
+                                      onChange={(e) =>
+                                        updateSelectedElement(
+                                          {},
+                                          { buttonSubtextFontFamily: e.target.value || undefined }
+                                        )
+                                      }
+                                      className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white font-medium focus:outline-[#2848F0]"
+                                    >
+                                      <option value="">
+                                        Misma fuente del botón ({selectedElement.styles.fontFamily || pageSettings.bodyFontFamily || 'Poppins'})
+                                      </option>
+                                      {AVAILABLE_FONTS.map((font) => (
+                                        <option
+                                          key={font.value}
+                                          value={font.value}
+                                          style={{ fontFamily: font.value }}
+                                        >
+                                          {font.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {/* Formato y Transformación del subtexto */}
+                                  <div className="grid grid-cols-2 gap-2 items-end">
+                                    <div>
+                                      <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                        Estilo:
+                                      </label>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            updateSelectedElement(
+                                              {},
+                                              {
+                                                buttonSubtextBold:
+                                                  !selectedElement.content.buttonSubtextBold,
+                                              }
+                                            )
+                                          }
+                                          className={`flex-1 py-1.5 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                                            selectedElement.content.buttonSubtextBold
+                                              ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                                          }`}
+                                          title="Negrita en subtexto"
+                                        >
+                                          <BoldIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            updateSelectedElement(
+                                              {},
+                                              {
+                                                buttonSubtextItalic:
+                                                  !selectedElement.content.buttonSubtextItalic,
+                                              }
+                                            )
+                                          }
+                                          className={`flex-1 py-1.5 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                                            selectedElement.content.buttonSubtextItalic
+                                              ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                                          }`}
+                                          title="Cursiva en subtexto"
+                                        >
+                                          <ItalicIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            updateSelectedElement(
+                                              {},
+                                              {
+                                                buttonSubtextUnderline:
+                                                  !selectedElement.content.buttonSubtextUnderline,
+                                              }
+                                            )
+                                          }
+                                          className={`flex-1 py-1.5 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                                            selectedElement.content.buttonSubtextUnderline
+                                              ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                              : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                                          }`}
+                                          title="Subrayado en subtexto"
+                                        >
+                                          <UnderlineIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                        Transformación:
+                                      </label>
+                                      <select
+                                        value={selectedElement.content.buttonSubtextTransform || 'none'}
+                                        onChange={(e) =>
+                                          updateSelectedElement(
+                                            {},
+                                            { buttonSubtextTransform: e.target.value as any }
+                                          )
+                                        }
+                                        className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white font-medium focus:outline-[#2848F0]"
+                                      >
+                                        <option value="none">Normal</option>
+                                        <option value="uppercase">Mayúsculas</option>
+                                        <option value="lowercase">Minúsculas</option>
+                                        <option value="capitalize">Iniciales</option>
+                                      </select>
+                                    </div>
+                                  </div>
+
+                                  {/* Separación con el texto principal */}
+                                  <InlineSliderInput
+                                    label="Separación con el texto:"
+                                    value={selectedElement.content.buttonSubtextGap ?? 4}
+                                    min={0}
+                                    max={24}
+                                    unit="px"
+                                    onChange={(val) =>
+                                      updateSelectedElement({}, { buttonSubtextGap: val })
+                                    }
+                                  />
+
+                                  {/* Mini icono de confianza opcional en el subtexto */}
+                                  <div>
+                                    <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                      Icono en subtexto (opcional):
+                                    </label>
+                                    <div className="grid grid-cols-4 gap-1">
+                                      {subtextIcons.map(({ id, label, Icon: SubIc }) => {
+                                        const isCurrent =
+                                          (selectedElement.content.buttonSubtextIcon || '') === id;
+                                        return (
+                                          <button
+                                            key={id || 'none'}
+                                            type="button"
+                                            onClick={() =>
+                                              updateSelectedElement({}, { buttonSubtextIcon: id })
+                                            }
+                                            className={`py-1.5 px-1 rounded-lg border text-[10px] font-medium flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
+                                              isCurrent
+                                                ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                                : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                                            }`}
+                                            title={label}
+                                          >
+                                            <SubIc className="w-3.5 h-3.5 shrink-0" />
+                                            <span className="truncate max-w-full">{label}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         <div>
                           <label className="font-semibold text-zinc-700">Destino después de hacer clic:</label>
@@ -4660,105 +5010,234 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         </button>
 
                         {openSections.imageAdjustments && (() => {
-                          const isLocked = selectedElement.styles.aspectRatioLocked ?? true;
                           const curWidth = selectedElement.styles.imageWidth || 450;
-                          const curHeight = selectedElement.styles.imageHeight || Math.round(curWidth / 1.5);
-                          const ratio = (selectedElement.styles.imageWidth && selectedElement.styles.imageHeight)
-                            ? selectedElement.styles.imageWidth / selectedElement.styles.imageHeight
-                            : 1.5;
+                          const curFit = selectedElement.styles.imageFit || 'contain';
+                          const curPosition = selectedElement.styles.imagePosition || 'center';
+                          const curRepeat = selectedElement.styles.imageRepeat || 'no-repeat';
 
                           const handleWidthChange = (val: number) => {
                             const clampedWidth = Math.max(20, Math.min(2400, val));
-                            if (isLocked) {
-                              const calculatedHeight = Math.round(clampedWidth / ratio);
-                              updateSelectedElement({
-                                imageWidth: clampedWidth,
-                                imageHeight: calculatedHeight,
-                              });
-                            } else {
-                              updateSelectedElement({ imageWidth: clampedWidth });
-                            }
-                          };
-
-                          const handleHeightChange = (val: number) => {
-                            const clampedHeight = Math.max(20, Math.min(2400, val));
-                            if (isLocked) {
-                              const calculatedWidth = Math.round(clampedHeight * ratio);
-                              updateSelectedElement({
-                                imageWidth: calculatedWidth,
-                                imageHeight: clampedHeight,
-                              });
-                            } else {
-                              updateSelectedElement({ imageHeight: clampedHeight });
-                            }
+                            updateSelectedElement({
+                              imageWidth: clampedWidth,
+                              imageHeight: undefined,
+                            });
                           };
 
                           const handleResetSize = () => {
-                            updateSelectedElement({
-                              imageWidth: 450,
-                              imageHeight: undefined,
-                              aspectRatioLocked: true,
-                            });
+                            const currentSrc = selectedElement.content.src;
+                            if (currentSrc) {
+                              const probe = new window.Image();
+                              probe.onload = () => {
+                                const naturalW =
+                                  probe.naturalWidth > 0
+                                    ? Math.min(probe.naturalWidth, 1200)
+                                    : 450;
+                                updateSelectedElement({
+                                  imageWidth: naturalW,
+                                  imageHeight: undefined,
+                                  imageFit: 'contain',
+                                  imagePosition: 'center',
+                                  imageRepeat: 'no-repeat',
+                                });
+                              };
+                              probe.onerror = () => {
+                                updateSelectedElement({
+                                  imageWidth: 450,
+                                  imageHeight: undefined,
+                                  imageFit: 'contain',
+                                  imagePosition: 'center',
+                                  imageRepeat: 'no-repeat',
+                                });
+                              };
+                              probe.src = currentSrc;
+                            } else {
+                              updateSelectedElement({
+                                imageWidth: 450,
+                                imageHeight: undefined,
+                                imageFit: 'contain',
+                                imagePosition: 'center',
+                                imageRepeat: 'no-repeat',
+                              });
+                            }
                           };
 
                           return (
                             <div className="p-3 space-y-4 bg-white">
-                              {/* CONTROLES DE ANCHO Y ALTO CONECTADOS (IMAGEN 1) */}
+                              {/* ANCHO ÚNICO + RESTAURAR TAMAÑO ORIGINAL (ESCALADO PROPORCIONAL SIN RECORTES) */}
                               <div className="space-y-3 p-3 bg-zinc-50/70 border border-zinc-200 rounded-xl">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold text-zinc-800">Dimensiones de la imagen</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateSelectedElement({ aspectRatioLocked: !isLocked })}
-                                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border cursor-pointer transition-colors ${
-                                      isLocked
-                                        ? 'bg-blue-50 text-[#2848F0] border-blue-200'
-                                        : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
-                                    }`}
-                                    title={isLocked ? 'Proporción vinculada (clic para desbloquear dimensiones)' : 'Dimensiones libres (clic para bloquear proporción)'}
-                                  >
-                                    {isLocked ? <Lock className="w-3 h-3 text-[#2848F0]" /> : <Unlock className="w-3 h-3 text-zinc-400" />}
-                                    <span>{isLocked ? 'Proporción vinculada' : 'Libre'}</span>
-                                  </button>
-                                </div>
+                                <span className="text-xs font-bold text-zinc-800 block">
+                                  Tamaño de la imagen
+                                </span>
 
-                                {/* ANCHO */}
                                 <InlineSliderInput
                                   label="Ancho"
                                   value={curWidth}
-                                  min={50}
+                                  min={40}
                                   max={1200}
                                   inputMin={20}
-                                  step={5}
+                                  step={1}
                                   unit="px"
                                   onChange={handleWidthChange}
                                 />
 
-                                {/* ALTO */}
-                                <InlineSliderInput
-                                  label="Alto"
-                                  value={curHeight}
-                                  min={30}
-                                  max={1200}
-                                  inputMin={20}
-                                  step={5}
-                                  unit="px"
-                                  onChange={handleHeightChange}
-                                />
-
-                                {/* BOTÓN RESTAURAR TAMAÑO ORIGINAL (IMAGEN 1) */}
                                 <button
                                   type="button"
                                   onClick={handleResetSize}
                                   className="w-full py-1.5 px-2 bg-white border border-zinc-200 hover:border-[#2848F0] hover:text-[#2848F0] rounded-lg text-[11px] font-semibold text-zinc-700 flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
                                 >
                                   <RotateCcw className="w-3 h-3 text-[#2848F0]" />
-                                  <span>↺ Restaurar tamaño original</span>
+                                  <span>Restaurar tamaño original</span>
                                 </button>
                               </div>
 
+                              {/* ALINEACIÓN / CENTRADO EN LA COLUMNA */}
+                              <div>
+                                <label className="font-semibold text-zinc-700 block mb-1.5">
+                                  Alineación de la imagen:
+                                </label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ textAlign: 'left' })}
+                                    className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold cursor-pointer transition-all ${
+                                      selectedElement.styles.textAlign === 'left'
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0] shadow-2xs'
+                                        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                    }`}
+                                  >
+                                    Izquierda
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ textAlign: 'center' })}
+                                    className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold cursor-pointer transition-all ${
+                                      !selectedElement.styles.textAlign ||
+                                      selectedElement.styles.textAlign === 'center'
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0] shadow-2xs'
+                                        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                    }`}
+                                  >
+                                    Centrado
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateSelectedElement({ textAlign: 'right' })}
+                                    className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold cursor-pointer transition-all ${
+                                      selectedElement.styles.textAlign === 'right'
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0] shadow-2xs'
+                                        : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50'
+                                    }`}
+                                  >
+                                    Derecha
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* AJUSTE DE TAMAÑO (COMPLETO/CONTENER, CUBRIR, ALARGADO, ORIGINAL) */}
+                              <div>
+                                <label className="font-semibold text-zinc-700 block mb-1.5">
+                                  Ajuste de tamaño:
+                                </label>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {[
+                                    { val: 'contain' as const, label: 'Completo (Contener)' },
+                                    { val: 'cover' as const, label: 'Cubrir (Rellenar)' },
+                                    { val: 'stretch' as const, label: 'Alargado (Estirar)' },
+                                    { val: 'auto' as const, label: 'Tamaño Original' },
+                                  ].map((opt) => (
+                                    <button
+                                      key={opt.val}
+                                      type="button"
+                                      onClick={() =>
+                                        updateSelectedElement({
+                                          imageFit: opt.val,
+                                          imageHeight: undefined,
+                                        })
+                                      }
+                                      className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+                                        curFit === opt.val
+                                          ? 'bg-[#2848F0] text-white border-[#2848F0] shadow-2xs'
+                                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                                      }`}
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* POSICIÓN DE LA IMAGEN (CENTRADO, ARRIBA, ABAJO, IZQUIERDA, DERECHA) */}
+                              <div>
+                                <label className="font-semibold text-zinc-700 block mb-1.5">
+                                  Posición del encuadre:
+                                </label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  {[
+                                    { val: 'center' as const, label: 'Centrado' },
+                                    { val: 'top' as const, label: 'Arriba' },
+                                    { val: 'bottom' as const, label: 'Abajo' },
+                                    { val: 'left' as const, label: 'Izquierda' },
+                                    { val: 'right' as const, label: 'Derecha' },
+                                  ].map((pos) => (
+                                    <button
+                                      key={pos.val}
+                                      type="button"
+                                      onClick={() =>
+                                        updateSelectedElement({ imagePosition: pos.val })
+                                      }
+                                      className={`py-1.5 px-1.5 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+                                        curPosition === pos.val
+                                          ? 'bg-[#2848F0] text-white border-[#2848F0] shadow-2xs'
+                                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                                      }`}
+                                    >
+                                      {pos.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* REPETICIÓN / PATRÓN */}
+                              <div>
+                                <label className="font-semibold text-zinc-700 block mb-1.5">
+                                  Repetir patrón:
+                                </label>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {[
+                                    { val: 'no-repeat' as const, label: 'Sin repetir' },
+                                    { val: 'repeat' as const, label: 'En patrón (Mosaico)' },
+                                    { val: 'repeat-x' as const, label: 'Repetir horizontal' },
+                                    { val: 'repeat-y' as const, label: 'Repetir vertical' },
+                                  ].map((rep) => (
+                                    <button
+                                      key={rep.val}
+                                      type="button"
+                                      onClick={() => {
+                                        const patch: Record<string, any> = {
+                                          imageRepeat: rep.val,
+                                          imageHeight: undefined,
+                                        };
+                                        if (rep.val !== 'no-repeat' && curFit !== 'auto') {
+                                          patch.imageFit = 'auto';
+                                        } else if (rep.val === 'no-repeat' && curFit === 'auto') {
+                                          patch.imageFit = 'contain';
+                                        }
+                                        updateSelectedElement(patch);
+                                      }}
+                                      className={`py-1.5 px-2 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
+                                        curRepeat === rep.val
+                                          ? 'bg-[#2848F0] text-white border-[#2848F0] shadow-2xs'
+                                          : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50'
+                                      }`}
+                                    >
+                                      {rep.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
                               {/* BORDES REDONDEADOS (RADIO) */}
-                              <div className="space-y-2">
+                              <div className="space-y-2 pt-1 border-t border-zinc-100">
                                 <NumberControl
                                   label="Bordes redondeados (Radio)"
                                   value={selectedElement.styles.borderRadius || 0}
@@ -4769,27 +5248,54 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 <div className="flex items-center gap-1.5 pt-1">
                                   <button
                                     type="button"
-                                    onClick={() => updateSelectedElement({ borderRadius: 0 })}
+                                    onClick={() =>
+                                      updateSelectedElement({
+                                        borderRadius: 0,
+                                        ...(curFit === 'cover' &&
+                                        (selectedElement.styles.borderRadius || 0) >= 150
+                                          ? { imageFit: 'contain' }
+                                          : {}),
+                                      })
+                                    }
                                     className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
-                                      (selectedElement.styles.borderRadius || 0) === 0 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                      (selectedElement.styles.borderRadius || 0) === 0
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                        : 'border-zinc-200 bg-white text-zinc-700'
                                     }`}
                                   >
                                     Cuadrado (0)
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => updateSelectedElement({ borderRadius: 16 })}
+                                    onClick={() =>
+                                      updateSelectedElement({
+                                        borderRadius: 16,
+                                        ...(curFit === 'cover' &&
+                                        (selectedElement.styles.borderRadius || 0) >= 150
+                                          ? { imageFit: 'contain' }
+                                          : {}),
+                                      })
+                                    }
                                     className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
-                                      selectedElement.styles.borderRadius === 16 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                      selectedElement.styles.borderRadius === 16
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                        : 'border-zinc-200 bg-white text-zinc-700'
                                     }`}
                                   >
                                     Suave (16px)
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => updateSelectedElement({ borderRadius: 999 })}
+                                    onClick={() =>
+                                      updateSelectedElement({
+                                        borderRadius: 999,
+                                        imageFit: 'cover',
+                                      })
+                                    }
                                     className={`flex-1 py-1 px-1.5 border rounded text-[11px] font-semibold cursor-pointer ${
-                                      (selectedElement.styles.borderRadius || 0) >= 150 ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
+                                      (selectedElement.styles.borderRadius || 0) >= 150
+                                        ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                        : 'border-zinc-200 bg-white text-zinc-700'
                                     }`}
                                   >
                                     Círculo (Avatar)
@@ -4797,47 +5303,17 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 </div>
                               </div>
 
-                              {/* ALINEACIÓN DE LA IMAGEN */}
-                              <div>
-                                <label className="font-semibold text-zinc-700 block mb-1">Alineación de la imagen:</label>
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => updateSelectedElement({ textAlign: 'left' })}
-                                    className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                      selectedElement.styles.textAlign === 'left' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                    }`}
-                                  >
-                                    Izquierda
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateSelectedElement({ textAlign: 'center' })}
-                                    className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                      (!selectedElement.styles.textAlign || selectedElement.styles.textAlign === 'center') ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                    }`}
-                                  >
-                                    Centrado
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateSelectedElement({ textAlign: 'right' })}
-                                    className={`flex-1 py-1.5 px-2 rounded border text-[11px] font-semibold cursor-pointer ${
-                                      selectedElement.styles.textAlign === 'right' ? 'bg-[#2848F0] text-white border-[#2848F0]' : 'border-zinc-200 bg-white text-zinc-700'
-                                    }`}
-                                  >
-                                    Derecha
-                                  </button>
-                                </div>
-                              </div>
-
                               {/* SOMBRA Y OPACIDAD */}
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                  <label className="font-semibold text-zinc-700 block mb-1">Sombra:</label>
+                                  <label className="font-semibold text-zinc-700 block mb-1">
+                                    Sombra:
+                                  </label>
                                   <select
                                     value={selectedElement.styles.shadow || 'none'}
-                                    onChange={(e) => updateSelectedElement({ shadow: e.target.value as any })}
+                                    onChange={(e) =>
+                                      updateSelectedElement({ shadow: e.target.value as any })
+                                    }
                                     className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
                                   >
                                     <option value="none">Sin sombra</option>
@@ -4848,14 +5324,20 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                   </select>
                                 </div>
                                 <div>
-                                  <label className="font-semibold text-zinc-700 block mb-1">Opacidad:</label>
+                                  <label className="font-semibold text-zinc-700 block mb-1">
+                                    Opacidad:
+                                  </label>
                                   <select
                                     value={String(
-                                      [1, 0.9, 0.8, 0.7, 0.5, 0.4, 0.2].includes(Number(selectedElement.styles.opacity ?? 1))
+                                      [1, 0.9, 0.8, 0.7, 0.5, 0.4, 0.2].includes(
+                                        Number(selectedElement.styles.opacity ?? 1)
+                                      )
                                         ? Number(selectedElement.styles.opacity ?? 1)
                                         : 1
                                     )}
-                                    onChange={(e) => updateSelectedElement({ opacity: parseFloat(e.target.value) })}
+                                    onChange={(e) =>
+                                      updateSelectedElement({ opacity: parseFloat(e.target.value) })
+                                    }
                                     className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white"
                                   >
                                     <option value="1">100% (Normal)</option>
@@ -7060,6 +7542,17 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                     />
                   )}
 
+                  {/* 13B. CONTENT FOR INLINE FORM (FORMULARIO INLINE) */}
+                  {selectedElement.type === 'inline_form' && (
+                    <InlineFormInspector
+                      element={selectedElement}
+                      pageSettings={pageSettings}
+                      funnelPages={currentFunnel?.pages || []}
+                      currentPageId={currentPage?.id}
+                      onUpdate={updateSelectedElement}
+                    />
+                  )}
+
                   {/* 14. CONTENT FOR POPUP BUTTON */}
                   {selectedElement.type === 'popup_button' && (() => {
                     const currentBtnIcon = selectedElement.content.buttonIcon || '';
@@ -8259,7 +8752,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   {/* ============================================================== */}
                   {/* ACCORDION: ESPACIADO (MARGEN Y RELLENO - AGRUPADOS EN 1 LÍNEA) */}
                   {/* ============================================================== */}
-                  {selectedElement.type !== 'simple_form' && (
+                  {selectedElement.type !== 'simple_form' &&
+                    selectedElement.type !== 'inline_form' && (
                     <div className="border border-zinc-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => toggleAccordion('spacing')}
@@ -8894,49 +9388,19 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                             <span className="text-[11px] font-medium leading-tight">Formulario Completo</span>
                           </button>
 
-                          {/* 2. Campo de Formulario */}
+                          {/* 2. Formulario Inline */}
                           <button
                             draggable
                             onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'input_field');
+                              e.dataTransfer.setData('application/ssp-element-type', 'inline_form');
                               e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            onClick={() => addElement('input_field')}
+                            onClick={() => addElement('inline_form')}
                             className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs text-center min-h-[76px]"
-                            title="Campo de Formulario"
+                            title="Formulario Inline (Correo + Botón en línea)"
                           >
-                            <TextCursorInput className="w-5 h-5 text-blue-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium leading-tight">Campo de Formulario</span>
-                          </button>
-
-                          {/* 3. Casilla de Verificación */}
-                          <button
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'checkbox');
-                              e.dataTransfer.effectAllowed = 'copy';
-                            }}
-                            onClick={() => addElement('checkbox')}
-                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs text-center min-h-[76px]"
-                            title="Casilla de Verificación"
-                          >
-                            <CheckSquare className="w-5 h-5 text-emerald-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium leading-tight">Casilla de Verificación</span>
-                          </button>
-
-                          {/* 4. Botón de Formulario */}
-                          <button
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData('application/ssp-element-type', 'form_button');
-                              e.dataTransfer.effectAllowed = 'copy';
-                            }}
-                            onClick={() => addElement('form_button')}
-                            className="p-2.5 border border-zinc-200 rounded-xl hover:border-[#2848F0] hover:bg-blue-50/50 flex flex-col items-center justify-center gap-1.5 transition-all text-zinc-700 cursor-grab active:cursor-grabbing group shadow-2xs text-center min-h-[76px]"
-                            title="Botón de Formulario"
-                          >
-                            <MousePointerClick className="w-5 h-5 text-indigo-600 group-hover:scale-110 transition-transform" />
-                            <span className="text-[11px] font-medium leading-tight">Botón de Formulario</span>
+                            <TextCursorInput className="w-5 h-5 text-amber-500 group-hover:scale-110 transition-transform" />
+                            <span className="text-[11px] font-medium leading-tight">Formulario Inline</span>
                           </button>
                         </div>
                       </div>
@@ -10845,112 +11309,171 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                       const iconSpacing = element.content.buttonIconSpacing ?? 8;
                                       const iconSize = element.content.buttonIconSize ?? Math.max(14, Math.round(fontSize * 1.05));
 
-                                      const rawBtnText = element.content.buttonText || 'Botón de Acción';
-                                      const displayBtnText =
-                                        editingCanvasButtonId === element.id
-                                          ? rawBtnText
-                                          : formatCtaDisplayText(rawBtnText, element.styles.textTransform);
+                                        const rawBtnText = element.content.buttonText || 'Botón de Acción';
+                                        const displayBtnText =
+                                          editingCanvasButtonId === element.id
+                                            ? rawBtnText
+                                            : formatCtaDisplayText(rawBtnText, element.styles.textTransform);
 
-                                      return (
-                                        <div
-                                          style={{
-                                            display: 'flex',
-                                            justifyContent: isFullWidth
-                                              ? 'center'
-                                              : align === 'left'
-                                              ? 'flex-start'
-                                              : align === 'right'
-                                              ? 'flex-end'
-                                              : 'center',
-                                            width: '100%',
-                                          }}
-                                        >
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              if (isPreviewMode && element.styles.buttonDestination === 'url' && element.styles.buttonUrl) {
-                                                const link = document.createElement('a');
-                                                link.href = element.styles.buttonUrl;
-                                                if (element.styles.buttonOpenNewTab) {
-                                                  link.target = '_blank';
-                                                  link.rel = 'noopener noreferrer';
-                                                } else {
-                                                  link.target = '_self';
-                                                }
-                                                link.click();
-                                              }
+                                        const showSubtext =
+                                          Boolean(element.content.buttonSubtextEnabled) &&
+                                          Boolean((element.content.buttonSubtext || '').trim());
+                                        const subtextFontSize = element.content.buttonSubtextFontSize ?? 12;
+                                        const subtextFontFamily =
+                                          element.content.buttonSubtextFontFamily ||
+                                          element.styles.fontFamily ||
+                                          pageSettings.bodyFontFamily ||
+                                          'Poppins';
+                                        const subtextColor =
+                                          element.content.buttonSubtextColor || 'rgba(255, 255, 255, 0.85)';
+                                        const subtextGap = element.content.buttonSubtextGap ?? 4;
+                                        const subtextTransform = element.content.buttonSubtextTransform || 'none';
+                                        const displaySubtext = formatCtaDisplayText(
+                                          element.content.buttonSubtext || '',
+                                          subtextTransform
+                                        );
+                                        const subtextIconName = element.content.buttonSubtextIcon || '';
+                                        const SubtextIconComp = subtextIconName
+                                          ? (LucideIcons as any)[subtextIconName]
+                                          : null;
+                                        const subtextIconSize = Math.max(10, Math.round(subtextFontSize * 1.05));
+
+                                        return (
+                                          <div
+                                            style={{
+                                              display: 'flex',
+                                              justifyContent: isFullWidth
+                                                ? 'center'
+                                                : align === 'left'
+                                                ? 'flex-start'
+                                                : align === 'right'
+                                                ? 'flex-end'
+                                                : 'center',
+                                              width: '100%',
                                             }}
-                                            style={
-                                              {
-                                                '--cta-bg': normalBg,
-                                                '--cta-hover-bg': hoverBg,
-                                                '--cta-text': normalText,
-                                                '--cta-hover-text': hoverText,
-                                                '--cta-border': hasBorder ? normalBorder : 'transparent',
-                                                '--cta-hover-border': hoverBorder,
-                                                width: isFullWidth ? '100%' : 'auto',
-                                                fontSize: `${fontSize}px`,
-                                                fontFamily: element.styles.fontFamily || pageSettings.bodyFontFamily || 'Poppins',
-                                                fontWeight: element.styles.isBold ? 700 : 500,
-                                                fontStyle: element.styles.isItalic ? 'italic' : 'normal',
-                                                textDecoration: element.styles.isUnderline ? 'underline' : 'none',
-                                                textTransform: element.styles.textTransform || 'none',
-                                                paddingTop: `${padY}px`,
-                                                paddingBottom: `${padY}px`,
-                                                paddingLeft: `${padX}px`,
-                                                paddingRight: `${padX}px`,
-                                                borderRadius: `${element.styles.borderRadius ?? 0}px`,
-                                                borderWidth: `${bWidth}px`,
-                                                borderStyle: hasBorder ? (element.styles.borderStyle || 'solid') : 'none',
-                                                gap: IconComp ? `${iconSpacing}px` : '0px',
-                                                outline: isSelected ? 'none' : undefined,
-                                              } as React.CSSProperties
-                                            }
-                                            className="[background-color:var(--cta-bg)] hover:[background-color:var(--cta-hover-bg)] [color:var(--cta-text)] hover:[color:var(--cta-hover-text)] [border-color:var(--cta-border)] hover:[border-color:var(--cta-hover-border)] shadow-sm transition-colors duration-200 inline-flex items-center justify-center font-semibold cursor-pointer"
                                           >
-                                            {IconComp && iconPos === 'before' && (
-                                              <IconComp
-                                                style={{
-                                                  width: `${iconSize}px`,
-                                                  height: `${iconSize}px`,
-                                                }}
-                                                className="shrink-0"
-                                              />
-                                            )}
-                                            <span
-                                              contentEditable={!isPreviewMode && isSelected}
-                                              suppressContentEditableWarning={true}
-                                              onFocus={() => {
-                                                setEditingCanvasButtonId(element.id);
-                                                dirtyCanvasButtonTextRef.current = null;
-                                              }}
-                                              onInput={(e) => {
-                                                dirtyCanvasButtonTextRef.current = e.currentTarget.textContent || '';
-                                              }}
-                                              onBlur={() => {
-                                                setEditingCanvasButtonId(null);
-                                                if (dirtyCanvasButtonTextRef.current !== null) {
-                                                  updateSelectedElement({}, { buttonText: dirtyCanvasButtonTextRef.current });
-                                                  dirtyCanvasButtonTextRef.current = null;
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                if (isPreviewMode && element.styles.buttonDestination === 'url' && element.styles.buttonUrl) {
+                                                  const link = document.createElement('a');
+                                                  link.href = element.styles.buttonUrl;
+                                                  if (element.styles.buttonOpenNewTab) {
+                                                    link.target = '_blank';
+                                                    link.rel = 'noopener noreferrer';
+                                                  } else {
+                                                    link.target = '_self';
+                                                  }
+                                                  link.click();
                                                 }
                                               }}
-                                              className="outline-none"
+                                              style={
+                                                {
+                                                  '--cta-bg': normalBg,
+                                                  '--cta-hover-bg': hoverBg,
+                                                  '--cta-text': normalText,
+                                                  '--cta-hover-text': hoverText,
+                                                  '--cta-border': hasBorder ? normalBorder : 'transparent',
+                                                  '--cta-hover-border': hoverBorder,
+                                                  width: isFullWidth ? '100%' : 'auto',
+                                                  fontSize: `${fontSize}px`,
+                                                  fontFamily: element.styles.fontFamily || pageSettings.bodyFontFamily || 'Poppins',
+                                                  fontWeight: element.styles.isBold ? 700 : 500,
+                                                  fontStyle: element.styles.isItalic ? 'italic' : 'normal',
+                                                  paddingTop: `${padY}px`,
+                                                  paddingBottom: `${padY}px`,
+                                                  paddingLeft: `${padX}px`,
+                                                  paddingRight: `${padX}px`,
+                                                  borderRadius: `${element.styles.borderRadius ?? 0}px`,
+                                                  borderWidth: `${bWidth}px`,
+                                                  borderStyle: hasBorder ? (element.styles.borderStyle || 'solid') : 'none',
+                                                  outline: isSelected ? 'none' : undefined,
+                                                } as React.CSSProperties
+                                              }
+                                              className="[background-color:var(--cta-bg)] hover:[background-color:var(--cta-hover-bg)] [color:var(--cta-text)] hover:[color:var(--cta-hover-text)] [border-color:var(--cta-border)] hover:[border-color:var(--cta-hover-border)] shadow-sm transition-colors duration-200 inline-flex flex-col items-center justify-center font-semibold cursor-pointer text-center"
                                             >
-                                              {displayBtnText}
-                                            </span>
-                                            {IconComp && iconPos === 'after' && (
-                                              <IconComp
+                                              <span
+                                                className="inline-flex items-center justify-center"
                                                 style={{
-                                                  width: `${iconSize}px`,
-                                                  height: `${iconSize}px`,
+                                                  gap: IconComp ? `${iconSpacing}px` : '0px',
+                                                  textDecoration: element.styles.isUnderline ? 'underline' : 'none',
+                                                  textTransform: element.styles.textTransform || 'none',
                                                 }}
-                                                className="shrink-0"
-                                              />
-                                            )}
-                                          </button>
-                                        </div>
-                                      );
-                                    })()}
+                                              >
+                                                {IconComp && iconPos === 'before' && (
+                                                  <IconComp
+                                                    style={{
+                                                      width: `${iconSize}px`,
+                                                      height: `${iconSize}px`,
+                                                    }}
+                                                    className="shrink-0"
+                                                  />
+                                                )}
+                                                <span
+                                                  contentEditable={!isPreviewMode && isSelected}
+                                                  suppressContentEditableWarning={true}
+                                                  onFocus={() => {
+                                                    setEditingCanvasButtonId(element.id);
+                                                    dirtyCanvasButtonTextRef.current = null;
+                                                  }}
+                                                  onInput={(e) => {
+                                                    dirtyCanvasButtonTextRef.current = e.currentTarget.textContent || '';
+                                                  }}
+                                                  onBlur={() => {
+                                                    setEditingCanvasButtonId(null);
+                                                    if (dirtyCanvasButtonTextRef.current !== null) {
+                                                      updateSelectedElement({}, { buttonText: dirtyCanvasButtonTextRef.current });
+                                                      dirtyCanvasButtonTextRef.current = null;
+                                                    }
+                                                  }}
+                                                  className="outline-none"
+                                                >
+                                                  {displayBtnText}
+                                                </span>
+                                                {IconComp && iconPos === 'after' && (
+                                                  <IconComp
+                                                    style={{
+                                                      width: `${iconSize}px`,
+                                                      height: `${iconSize}px`,
+                                                    }}
+                                                    className="shrink-0"
+                                                  />
+                                                )}
+                                              </span>
+
+                                              {showSubtext && (
+                                                <span
+                                                  className="inline-flex items-center justify-center leading-tight"
+                                                  style={{
+                                                    marginTop: `${subtextGap}px`,
+                                                    fontSize: `${subtextFontSize}px`,
+                                                    fontFamily: subtextFontFamily,
+                                                    color: subtextColor,
+                                                    fontWeight: element.content.buttonSubtextBold ? 700 : 400,
+                                                    fontStyle: element.content.buttonSubtextItalic ? 'italic' : 'normal',
+                                                    textDecoration: element.content.buttonSubtextUnderline
+                                                      ? 'underline'
+                                                      : 'none',
+                                                    textTransform: subtextTransform,
+                                                    gap: '4px',
+                                                  }}
+                                                >
+                                                  {SubtextIconComp && (
+                                                    <SubtextIconComp
+                                                      style={{
+                                                        width: `${subtextIconSize}px`,
+                                                        height: `${subtextIconSize}px`,
+                                                      }}
+                                                      className="shrink-0"
+                                                    />
+                                                  )}
+                                                  <span>{displaySubtext}</span>
+                                                </span>
+                                              )}
+                                            </button>
+                                          </div>
+                                        );
+                                      })()}
 
                                     {element.type === 'video' && (
                                       <div
@@ -11021,36 +11544,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                       const linkUrl = element.styles.linkUrl || element.content.linkUrl;
                                       const linkOpenNewTab = element.styles.linkOpenNewTab ?? element.content.linkOpenNewTab ?? true;
                                       const imgNode = (
-                                        <img
-                                          src={
-                                            element.content.src ||
-                                            'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&auto=format&fit=crop&q=80'
-                                          }
-                                          alt={element.content.alt || ''}
-                                          style={{
-                                            borderRadius: `${element.styles.borderRadius ?? 0}px`,
-                                            width: element.styles.imageWidth ? `${element.styles.imageWidth}px` : '450px',
-                                            height: element.styles.imageHeight ? `${element.styles.imageHeight}px` : 'auto',
-                                            maxWidth: '100%',
-                                            objectFit: element.styles.imageHeight ? 'cover' : undefined,
-                                            opacity: element.styles.opacity ?? 1,
-                                            border: element.styles.borderWidth
-                                              ? `${element.styles.borderWidth}px ${element.styles.borderStyle || 'solid'} ${
-                                                  element.styles.borderColor || '#E4E4E7'
-                                                }`
-                                              : undefined,
-                                            boxShadow:
-                                              element.styles.shadow === 'sm'
-                                                ? '0 1px 2px 0 rgb(0 0 0 / 0.05)'
-                                                : element.styles.shadow === 'md'
-                                                ? '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                                                : element.styles.shadow === 'lg'
-                                                ? '0 10px 15px -3px rgb(0 0 0 / 0.1)'
-                                                : element.styles.shadow === 'xl'
-                                                ? '0 20px 25px -5px rgb(0 0 0 / 0.1)'
-                                                : undefined,
-                                          }}
-                                          className="select-none transition-all"
+                                        <ConfiguredImage
+                                          src={element.content.src}
+                                          alt={element.content.alt}
+                                          styles={element.styles}
+                                          defaultWidth={450}
                                         />
                                       );
 
@@ -11058,6 +11556,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                         <div
                                           style={{
                                             display: 'flex',
+                                            width: '100%',
                                             justifyContent:
                                               element.styles.textAlign === 'left'
                                                 ? 'flex-start'
@@ -11066,23 +11565,22 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                                 : 'center',
                                           }}
                                         >
-                                          <div style={{ display: 'inline-block', maxWidth: '100%' }}>
-                                            {linkUrl ? (
-                                              <a
-                                                href={isPreviewMode ? linkUrl : undefined}
-                                                target={linkOpenNewTab ? '_blank' : '_self'}
-                                                rel="noopener noreferrer"
-                                                onClick={(e) => {
-                                                  if (!isPreviewMode) e.preventDefault();
-                                                }}
-                                                className="cursor-pointer inline-block"
-                                              >
-                                                {imgNode}
-                                              </a>
-                                            ) : (
-                                              imgNode
-                                            )}
-                                          </div>
+                                          {linkUrl ? (
+                                            <a
+                                              href={isPreviewMode ? linkUrl : undefined}
+                                              target={linkOpenNewTab ? '_blank' : '_self'}
+                                              rel="noopener noreferrer"
+                                              onClick={(e) => {
+                                                if (!isPreviewMode) e.preventDefault();
+                                              }}
+                                              style={{ display: 'inline-flex', maxWidth: '100%' }}
+                                              className="cursor-pointer"
+                                            >
+                                              {imgNode}
+                                            </a>
+                                          ) : (
+                                            imgNode
+                                          )}
                                         </div>
                                       );
                                     })()}
@@ -11148,6 +11646,20 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                           defaultFontFamily={pageSettings.bodyFontFamily}
                                           onSubmitSuccess={() => {
                                             showToast('¡Información enviada con éxito!');
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {element.type === 'inline_form' && (
+                                      <div className="w-full">
+                                        <InlineFormElement
+                                          element={element}
+                                          isEditable={!isPreviewMode}
+                                          defaultPrimaryColor="#F5B056"
+                                          defaultFontFamily={pageSettings.bodyFontFamily}
+                                          onSubmitSuccess={() => {
+                                            showToast('¡Correo registrado con éxito!');
                                           }}
                                         />
                                       </div>
@@ -11756,15 +12268,11 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                 )}
                                 {el.type === 'image' && el.content.src && (
                                   <div className="w-full flex justify-center py-2">
-                                    <img
+                                    <ConfiguredImage
                                       src={el.content.src}
-                                      alt={el.content.alt || ''}
-                                      style={{
-                                        borderRadius: `${el.styles?.borderRadius ?? 0}px`,
-                                        maxWidth: '100%',
-                                        opacity: el.styles?.opacity ?? 1,
-                                      }}
-                                      className="object-cover"
+                                      alt={el.content.alt}
+                                      styles={el.styles}
+                                      defaultWidth={450}
                                     />
                                   </div>
                                 )}
@@ -11820,14 +12328,36 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                       padding: `${el.styles?.paddingTop || 14}px ${el.styles?.paddingLeft || 28}px`,
                                       fontWeight: 'bold',
                                     }}
-                                    className="shadow-md text-sm font-bold uppercase tracking-wider cursor-default w-full sm:w-auto text-center"
+                                    className="shadow-md text-sm font-bold uppercase tracking-wider cursor-default w-full sm:w-auto text-center inline-flex flex-col items-center justify-center"
                                   >
-                                    {el.content.buttonText || 'Botón de Acción'}
+                                    <span>{el.content.buttonText || 'Botón de Acción'}</span>
+                                    {el.content.buttonSubtextEnabled && el.content.buttonSubtext && (
+                                      <span
+                                        style={{
+                                          marginTop: `${el.content.buttonSubtextGap ?? 4}px`,
+                                          fontSize: `${el.content.buttonSubtextFontSize ?? 12}px`,
+                                          fontFamily: el.content.buttonSubtextFontFamily || undefined,
+                                          color: el.content.buttonSubtextColor || 'rgba(255, 255, 255, 0.85)',
+                                          fontWeight: el.content.buttonSubtextBold ? 700 : 400,
+                                          fontStyle: el.content.buttonSubtextItalic ? 'italic' : 'normal',
+                                          textDecoration: el.content.buttonSubtextUnderline ? 'underline' : 'none',
+                                          textTransform: el.content.buttonSubtextTransform || 'none',
+                                        }}
+                                        className="leading-tight tracking-normal"
+                                      >
+                                        {el.content.buttonSubtext}
+                                      </span>
+                                    )}
                                   </button>
                                 )}
                                 {el.type === 'simple_form' && (
                                   <div className="p-4 border border-zinc-200 rounded-lg bg-zinc-50 text-xs text-zinc-600">
                                     [Formulario de Captura de Prospectos]
+                                  </div>
+                                )}
+                                {el.type === 'inline_form' && (
+                                  <div className="p-4 border border-zinc-200 rounded-lg bg-zinc-50 text-xs text-zinc-600">
+                                    [Formulario Inline: Correo + Botón]
                                   </div>
                                 )}
                               </div>

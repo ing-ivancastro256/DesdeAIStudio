@@ -161,6 +161,8 @@ const getElementIcon = (type: ElementType) => {
     case 'form':
     case 'simple_form':
       return <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />;
+    case 'inline_form':
+      return <TextCursorInput className="w-3.5 h-3.5 text-emerald-600 shrink-0" />;
     case 'calendar':
       return <Calendar className="w-3.5 h-3.5 text-teal-600 shrink-0" />;
     case 'divider':
@@ -224,6 +226,8 @@ const getElementName = (el: PageBlockElement) => {
       return 'Formulario Completo';
     case 'simple_form':
       return el.content?.formName?.trim() || 'Formulario Completo';
+    case 'inline_form':
+      return el.content?.formName?.trim() || 'Formulario Inline';
     case 'form_button':
       return 'Botón de Formulario';
     case 'popup_button':
