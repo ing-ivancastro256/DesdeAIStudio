@@ -423,21 +423,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return buildInitialLibrarySeed();
   });
 
+  const normalizeUniqueCategories = (rawList: unknown[]): string[] => {
+    const seen = new Set<string>();
+    const result: string[] = [DEFAULT_LIBRARY_CATEGORY];
+    seen.add(DEFAULT_LIBRARY_CATEGORY.toLowerCase());
+
+    rawList.forEach((entry) => {
+      if (typeof entry !== 'string') return;
+      const trimmed = entry.trim();
+      if (!trimmed) return;
+      const lower = trimmed.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        result.push(trimmed);
+      }
+    });
+
+    return result;
+  };
+
   const [libraryCategories, setLibraryCategories] = useState<string[]>(() => {
     const saved = localStorage.getItem('ssp_library_categories_v1');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.includes(DEFAULT_LIBRARY_CATEGORY)
-            ? parsed
-            : [DEFAULT_LIBRARY_CATEGORY, ...parsed];
+          return normalizeUniqueCategories(parsed);
         }
       } catch {
         // fallback
       }
     }
-    return INITIAL_LIBRARY_CATEGORIES;
+    return normalizeUniqueCategories(INITIAL_LIBRARY_CATEGORIES);
   });
 
   // Sync to LocalStorage
@@ -1169,7 +1186,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return existing;
     }
 
-    setLibraryCategories((prev) => [...prev, cleaned]);
+    setLibraryCategories((prev) => {
+      if (prev.some((cat) => cat.toLowerCase() === cleaned.toLowerCase())) {
+        return prev;
+      }
+      return [...prev, cleaned];
+    });
     return cleaned;
   };
 

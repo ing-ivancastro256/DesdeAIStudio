@@ -93,6 +93,16 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
     ).length;
   }, [libraryItems, kind, name]);
 
+  const uniqueCategories = useMemo(() => {
+    const seen = new Set<string>();
+    return libraryCategories.filter((cat) => {
+      const key = cat.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [libraryCategories]);
+
   if (!isOpen) return null;
 
   const handleCreateCategory = () => {
@@ -154,8 +164,8 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
           </button>
         </div>
 
-        {/* Body */}
-        <form onSubmit={handleSave} className="px-6 sm:px-12 py-8 sm:py-10">
+        {/* Body (div instead of form so preview forms inside LibraryScaledPreview are never nested inside a form) */}
+        <div className="px-6 sm:px-12 py-8 sm:py-10">
           {/* Center Save Tray Icon + Heading + Subtitle */}
           <div className="flex flex-col items-center text-center mb-9">
             <div className="w-24 h-24 bg-[#F7F7F8] border border-zinc-100 flex items-center justify-center mb-4">
@@ -203,8 +213,11 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
               </div>
             </div>
 
-            {/* Right Column: Save Options */}
-            <div className="md:col-span-6 flex flex-col justify-between space-y-6 pt-1">
+            {/* Right Column: Save Options Form */}
+            <form
+              onSubmit={handleSave}
+              className="md:col-span-6 flex flex-col justify-between space-y-6 pt-1"
+            >
               {/* Guardar Como: Plantilla | Bloque (Bloque default) */}
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 mb-2">
@@ -309,7 +322,7 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                 {isCategoryMenuOpen && (
                   <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-md shadow-xl z-30 overflow-hidden">
                     <div className="max-h-44 overflow-y-auto py-1">
-                      {libraryCategories.map((cat) => {
+                      {uniqueCategories.map((cat) => {
                         const isSelected = cat === selectedCategory;
                         return (
                           <button
@@ -352,6 +365,7 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
+                                e.stopPropagation();
                                 handleCreateCategory();
                               }
                             }}
@@ -384,9 +398,9 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                     : 'Guardar nuevo bloque'}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

@@ -106,11 +106,20 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
   }, [libraryItems]);
 
   const allAvailableCategories = useMemo(() => {
-    const set = new Set<string>(libraryCategories);
-    libraryItems.forEach((item) => {
-      if (item.category) set.add(item.category);
-    });
-    return Array.from(set);
+    const seen = new Set<string>();
+    const result: string[] = [];
+    const pushUnique = (raw?: string) => {
+      const cleaned = (raw || '').trim();
+      if (!cleaned) return;
+      const lower = cleaned.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        result.push(cleaned);
+      }
+    };
+    libraryCategories.forEach(pushUnique);
+    libraryItems.forEach((item) => pushUnique(item.category));
+    return result;
   }, [libraryCategories, libraryItems]);
 
   const filteredItems = useMemo(() => {
@@ -124,8 +133,8 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
       }
 
       if (categoryFilter !== 'ALL') {
-        const cat = item.category || DEFAULT_LIBRARY_CATEGORY;
-        if (cat !== categoryFilter) return false;
+        const cat = (item.category || DEFAULT_LIBRARY_CATEGORY).trim().toLowerCase();
+        if (cat !== categoryFilter.trim().toLowerCase()) return false;
       }
 
       if (q) {
