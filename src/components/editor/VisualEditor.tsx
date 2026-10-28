@@ -14,6 +14,7 @@ import {
   FaqItem,
   SocialLinkItem,
   LibraryItem,
+  PopupWindowSettings,
 } from '../../types';
 import {
   Type,
@@ -127,7 +128,6 @@ import {
   DEFAULT_POLICY_HTML,
 } from '../../utils/completeFormUtils';
 import { PopupButtonElement, formatCtaDisplayText } from './elements/PopupButtonElement';
-import { PopupEditorModal } from './elements/PopupEditorModal';
 import { PAGE_TEMPLATES, PageTemplate } from '../../data/pageTemplates';
 import { EmbeddedVideoPlayer } from '../common/EmbeddedVideoPlayer';
 import { ConfiguredImage } from '../common/ConfiguredImage';
@@ -177,12 +177,17 @@ import {
   cloneSectionWithFreshIds,
   cloneSectionsWithFreshIds,
   isCanvasEffectivelyEmpty,
+  DEFAULT_LIBRARY_CATEGORY,
+  resolvePopupSettings,
+  computePopupCloseButtonStyle,
 } from '../../utils/libraryUtils';
 import { SaveToLibraryModal } from './library/SaveToLibraryModal';
 import {
   LibraryManagerModal,
   LibrarySidebarTab,
 } from './library/LibraryManagerModal';
+import { CreatePopupQuickModal } from './library/CreatePopupQuickModal';
+import { PopupRuntimeModal } from './library/PopupRuntimeModal';
 
 interface VisualEditorProps {
   initialPage?: FunnelPage;
@@ -233,7 +238,15 @@ import { BULLET_ICON_OPTIONS, renderBulletIcon } from '../../utils/bulletIcons';
 export { BULLET_ICON_OPTIONS, renderBulletIcon };
 
 export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelId: propFunnelId, onExit }) => {
-  const { funnels, activeFunnel, updateFunnelPage, updateLibraryItem, showToast } = useApp();
+  const {
+    funnels,
+    activeFunnel,
+    updateFunnelPage,
+    updateLibraryItem,
+    libraryItems,
+    libraryCategories,
+    showToast,
+  } = useApp();
 
   const currentFunnel =
     (propFunnelId ? funnels.find((f) => f.id === propFunnelId) : null) ||
@@ -245,7 +258,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     initialPage ||
     (currentFunnel?.pages && currentFunnel.pages.length > 0 ? currentFunnel.pages[0] : ({} as FunnelPage));
 
-  const [activeTab, setActiveTab] = useState<'page' | 'elements' | 'blocks' | 'templates'>('page');
+  const [activeTab, setActiveTab] = useState<'page' | 'elements' | 'templates'>('page');
   const [viewportMode, setViewportMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
   const [previewResetCount, setPreviewResetCount] = useState<number>(0);
@@ -258,14 +271,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
   const [showTemplateConfirmModal, setShowTemplateConfirmModal] = useState<boolean>(false);
   const [templatePreviewModal, setTemplatePreviewModal] = useState<PageTemplate | null>(null);
 
-  // Biblioteca de Plantillas y Bloques (Scale Sales Pro)
+  // Biblioteca de Plantillas, Bloques y Pop-ups (Scale Sales Pro)
   const [saveToLibraryState, setSaveToLibraryState] = useState<{
     isOpen: boolean;
     sections: PageBlockSection[];
     pageSettings?: Partial<FunnelPageGlobalSettings>;
     suggestedName: string;
     sourceType: 'section' | 'page';
-    defaultKind: 'template' | 'block';
+    defaultKind: 'template' | 'block' | 'popup';
   }>({
     isOpen: false,
     sections: [],
@@ -284,14 +297,21 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
   const [libraryEditSession, setLibraryEditSession] = useState<{
     itemId: string;
-    itemKind: 'template' | 'block';
+    itemKind: 'template' | 'block' | 'popup';
     itemName: string;
+    popupSettings?: PopupWindowSettings;
+    returnTarget: 'library' | 'canvas';
     stashedSections: PageBlockSection[];
     stashedPageSettings: FunnelPageGlobalSettings;
     stashedHistory: PageBlockSection[][];
     stashedHistoryIndex: number;
     stashedHasUnsavedChanges: boolean;
   } | null>(null);
+
+  const [popupInspectorSearch, setPopupInspectorSearch] = useState<string>('');
+  const [popupInspectorCategory, setPopupInspectorCategory] = useState<string>('ALL');
+  const [createPopupFromButtonElId, setCreatePopupFromButtonElId] = useState<string | null>(null);
+  const [previewAutoPopupOpen, setPreviewAutoPopupOpen] = useState<boolean>(false);
 
   // Global Page settings (Canvas width, Google Fonts, default H1-H4 sizes, colors, background image, 4-side padding)
   const [pageSettings, setPageSettings] = useState<FunnelPageGlobalSettings>(() => ({
@@ -325,6 +345,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     pagePaddingLeft: currentPage.settings?.pagePaddingLeft ?? 0,
     seo_title: currentPage.settings?.seo_title || '',
     seo_description: currentPage.settings?.seo_description || '',
+    autoPopupTrigger: currentPage.settings?.autoPopupTrigger || 'none',
+    autoPopupId: currentPage.settings?.autoPopupId || '',
+    autoPopupDelaySeconds: currentPage.settings?.autoPopupDelaySeconds ?? 8,
   }));
 
   // Page sections state with history for Undo/Redo
@@ -498,9 +521,50 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           },
         ],
       },
-    ];
+  ];
   });
-  const [editingPopupModal, setEditingPopupModal] = useState<PopupModal | null>(null);
+
+  // Trigger automatic page Pop-up (Exit-Intent or Delay) during Preview Mode
+  useEffect(() => {
+    setPreviewAutoPopupOpen(false);
+    if (!isPreviewMode || libraryEditSession) return;
+    const trigger = pageSettings.autoPopupTrigger || 'none';
+    const targetPopId = pageSettings.autoPopupId;
+    if (trigger === 'none' || !targetPopId) return;
+    const hasPopup = libraryItems.some((item) => item.kind === 'popup' && item.id === targetPopId);
+    if (!hasPopup) return;
+
+    let fired = false;
+    if (trigger === 'delay') {
+      const delayMs = Math.max(1, pageSettings.autoPopupDelaySeconds ?? 8) * 1000;
+      const timer = setTimeout(() => {
+        if (!fired) {
+          fired = true;
+          setPreviewAutoPopupOpen(true);
+        }
+      }, delayMs);
+      return () => clearTimeout(timer);
+    }
+
+    if (trigger === 'exit_intent') {
+      const handleMouseLeave = (e: MouseEvent) => {
+        if (!fired && e.clientY <= 12) {
+          fired = true;
+          setPreviewAutoPopupOpen(true);
+        }
+      };
+      document.addEventListener('mouseleave', handleMouseLeave);
+      return () => document.removeEventListener('mouseleave', handleMouseLeave);
+    }
+  }, [
+    isPreviewMode,
+    previewResetCount,
+    libraryEditSession,
+    pageSettings.autoPopupTrigger,
+    pageSettings.autoPopupId,
+    pageSettings.autoPopupDelaySeconds,
+    libraryItems,
+  ]);
 
   // Unsaved changes tracking & confirmation modal (Req 3)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -541,10 +605,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     pageSettings.pageContentMaxWidth,
     showStructurePanel,
     isPreviewMode,
+    libraryEditSession?.itemKind,
+    libraryEditSession?.popupSettings?.maxWidth,
   ]);
 
   const effectiveCanvasMaxWidth =
-    pageSettings.pageWidthType === 'full'
+    libraryEditSession?.itemKind === 'popup'
+      ? Math.max(320, resolvePopupSettings(libraryEditSession.popupSettings).maxWidth)
+      : pageSettings.pageWidthType === 'full'
       ? Math.max(320, measuredCanvasWidth || 1200)
       : Math.max(320, pageSettings.pageContentMaxWidth || 1200);
 
@@ -2000,12 +2068,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         };
         break;
       }
-      case 'popup_button':
+      case 'popup_button': {
+        const firstLibPopup = libraryItems.find((i) => i.kind === 'popup');
         newElement.content = {
-          popupButtonText: 'Abrir Oferta en Pop-up',
-          popupId: 'popup_1',
-          buttonIcon: '',
-          buttonIconPosition: 'before',
+          popupButtonText: 'Quiero Acceder Ahora',
+          popupId: firstLibPopup?.id || 'lib_pop_lead_2step',
+          buttonIcon: 'ArrowRight',
+          buttonIconPosition: 'after',
           buttonIconSpacing: 8,
           buttonIconSize: 18,
         };
@@ -2033,6 +2102,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           marginRight: 0,
         };
         break;
+      }
       case 'form':
         newElement.content = { formId: 'form_qualification_1' };
         newElement.styles = {
@@ -2553,14 +2623,101 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     showToast(`Plantilla "${item.name}" cargada en el lienzo`);
   };
 
-  const handleStartEditLibraryItem = (item: LibraryItem) => {
+  const handleInsertLibraryPopupButton = (popupItem: LibraryItem) => {
+    const baseBtn = createNewElement('popup_button');
+    const linkedElement: PageBlockElement = {
+      ...baseBtn,
+      content: {
+        ...baseBtn.content,
+        popupId: popupItem.id,
+        popupButtonText: 'Quiero Acceder Ahora',
+      },
+    };
+
+    const targetSection = sections[0];
+    if (!targetSection) {
+      const brandNewSection: PageBlockSection = {
+        id: `sec_${Date.now()}`,
+        name: 'Sección Pop-up CTA',
+        bgType: 'solid',
+        bgColor: '#FFFFFF',
+        paddingTop: 48,
+        paddingBottom: 48,
+        paddingLeft: 24,
+        paddingRight: 24,
+        rows: [
+          {
+            id: `row_${Date.now()}`,
+            name: 'Contenedor',
+            widthType: 'boxed',
+            maxWidth: Math.min(1200, effectiveCanvasMaxWidth),
+            columns: [
+              {
+                id: `col_${Date.now()}`,
+                widthPercentage: 100,
+                elements: [linkedElement],
+              },
+            ],
+          },
+        ],
+      };
+      pushHistory([brandNewSection]);
+      setSelectedSectionId(brandNewSection.id);
+      setSelectedRowId(null);
+      setSelectedColumnId(null);
+      setSelectedElementId(linkedElement.id);
+      showToast(`Botón Pop-up vinculado a "${popupItem.name}" añadido al lienzo`);
+      return;
+    }
+
+    let targetColId: string | null = null;
+    let targetIndex = 0;
+
+    if (selectionCtx.selectedElement && selectionCtx.selectedCol) {
+      targetColId = selectionCtx.selectedCol.id;
+      const foundIdx = selectionCtx.selectedCol.elements.findIndex(
+        (el) => el.id === selectionCtx.selectedElement!.id
+      );
+      targetIndex = foundIdx !== -1 ? foundIdx + 1 : selectionCtx.selectedCol.elements.length;
+    } else if (selectionCtx.selectedCol) {
+      targetColId = selectionCtx.selectedCol.id;
+      targetIndex = selectionCtx.selectedCol.elements.length;
+    } else if (selectionCtx.selectedRow && selectionCtx.selectedRow.columns.length > 0) {
+      targetColId = selectionCtx.selectedRow.columns[0].id;
+      targetIndex = selectionCtx.selectedRow.columns[0].elements.length;
+    } else if (selectionCtx.selectedSec && selectionCtx.selectedSec.rows[0]?.columns[0]) {
+      targetColId = selectionCtx.selectedSec.rows[0].columns[0].id;
+      targetIndex = selectionCtx.selectedSec.rows[0].columns[0].elements.length;
+    } else if (sections[0]?.rows[0]?.columns[0]) {
+      targetColId = sections[0].rows[0].columns[0].id;
+      targetIndex = sections[0].rows[0].columns[0].elements.length;
+    }
+
+    if (!targetColId) return;
+
+    const nextSections = insertElementIntoColumn(sections, targetColId, targetIndex, linkedElement);
+    pushHistory(nextSections);
+    setSelectedColumnId(null);
+    setSelectedElementId(linkedElement.id);
+    showToast(`Botón Pop-up vinculado a "${popupItem.name}" añadido a la página`);
+  };
+
+  const handleStartEditLibraryItem = (
+    item: LibraryItem,
+    returnTarget: 'library' | 'canvas' = 'library'
+  ) => {
     setLibraryModalState((prev) => ({ ...prev, isOpen: false }));
     const clonedItemSections = cloneSectionsWithFreshIds(item.sections);
+    const resolvedKind: 'template' | 'block' | 'popup' =
+      item.kind === 'template' ? 'template' : item.kind === 'popup' ? 'popup' : 'block';
 
     setLibraryEditSession((prevSession) => ({
       itemId: item.id,
-      itemKind: item.kind === 'template' ? 'template' : 'block',
+      itemKind: resolvedKind,
       itemName: item.name,
+      popupSettings:
+        resolvedKind === 'popup' ? resolvePopupSettings(item.popupSettings) : undefined,
+      returnTarget: prevSession ? prevSession.returnTarget : returnTarget,
       stashedSections: prevSession
         ? prevSession.stashedSections
         : JSON.parse(JSON.stringify(sections)),
@@ -2578,30 +2735,64 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         : hasUnsavedChanges,
     }));
 
-    if (item.kind === 'template' && item.pageSettings) {
+    if (resolvedKind === 'template' && item.pageSettings) {
       setPageSettings((prev) => ({
         ...prev,
         ...JSON.parse(JSON.stringify(item.pageSettings)),
+      }));
+    } else if (resolvedKind === 'popup') {
+      const popMaxW = resolvePopupSettings(item.popupSettings).maxWidth;
+      setPageSettings((prev) => ({
+        ...prev,
+        pageWidthType: 'boxed',
+        pageContentMaxWidth: popMaxW,
+        pageBgColor: item.pageSettings?.pageBgColor || '#FFFFFF',
+        pageBorderRadius: item.pageSettings?.pageBorderRadius ?? 16,
+        pageBgImageUrl: item.pageSettings?.pageBgImageUrl || '',
+        pageBgImageOpacity: item.pageSettings?.pageBgImageOpacity ?? 100,
+        pageBgImageSize: item.pageSettings?.pageBgImageSize || 'cover',
+        pageBgImagePosition: item.pageSettings?.pageBgImagePosition || 'center',
+        pageBgImageRepeat: item.pageSettings?.pageBgImageRepeat || 'no-repeat',
+        pagePaddingTop: item.pageSettings?.pagePaddingTop ?? 0,
+        pagePaddingRight: item.pageSettings?.pagePaddingRight ?? 0,
+        pagePaddingBottom: item.pageSettings?.pagePaddingBottom ?? 0,
+        pagePaddingLeft: item.pageSettings?.pagePaddingLeft ?? 0,
       }));
     }
 
     setSections(clonedItemSections);
     setHistory([JSON.parse(JSON.stringify(clonedItemSections))]);
     setHistoryIndex(0);
-    setSelectedSectionId(clonedItemSections[0]?.id || null);
+    if (resolvedKind === 'popup') {
+      setSelectedSectionId(null);
+      setActiveTab('page');
+    } else {
+      setSelectedSectionId(clonedItemSections[0]?.id || null);
+    }
     setSelectedRowId(null);
     setSelectedColumnId(null);
     setSelectedElementId(null);
     setIsPreviewMode(false);
     showToast(
-      `Modo Edición de ${item.kind === 'template' ? 'Plantilla' : 'Bloque'}: "${item.name}"`
+      `Modo Edición de ${
+        resolvedKind === 'template'
+          ? 'Plantilla'
+          : resolvedKind === 'popup'
+          ? 'Pop-up'
+          : 'Bloque'
+      }: "${item.name}"`
     );
   };
 
   const handleCancelLibraryEditSession = () => {
     if (!libraryEditSession) return;
     const returnTab: LibrarySidebarTab =
-      libraryEditSession.itemKind === 'template' ? 'templates' : 'blocks';
+      libraryEditSession.itemKind === 'template'
+        ? 'templates'
+        : libraryEditSession.itemKind === 'popup'
+        ? 'popups'
+        : 'blocks';
+    const shouldReopenLibrary = libraryEditSession.returnTarget === 'library';
 
     setSections(libraryEditSession.stashedSections);
     setPageSettings(libraryEditSession.stashedPageSettings);
@@ -2613,22 +2804,39 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     setSelectedColumnId(null);
     setSelectedElementId(null);
     setLibraryEditSession(null);
-    setLibraryModalState({ isOpen: true, initialTab: returnTab });
+    if (shouldReopenLibrary) {
+      setLibraryModalState({ isOpen: true, initialTab: returnTab });
+    }
   };
 
   const handleSaveLibraryEditSession = () => {
     if (!libraryEditSession) return;
     const returnTab: LibrarySidebarTab =
-      libraryEditSession.itemKind === 'template' ? 'templates' : 'blocks';
+      libraryEditSession.itemKind === 'template'
+        ? 'templates'
+        : libraryEditSession.itemKind === 'popup'
+        ? 'popups'
+        : 'blocks';
+    const shouldReopenLibrary = libraryEditSession.returnTarget === 'library';
     const updatedName =
       libraryEditSession.itemName.trim() ||
-      (libraryEditSession.itemKind === 'template' ? 'Plantilla' : 'Bloque');
+      (libraryEditSession.itemKind === 'template'
+        ? 'Plantilla'
+        : libraryEditSession.itemKind === 'popup'
+        ? 'Pop-up'
+        : 'Bloque');
 
     updateLibraryItem(libraryEditSession.itemId, {
       name: updatedName,
       sections: cloneSectionsWithFreshIds(sections),
       pageSettings:
-        libraryEditSession.itemKind === 'template' ? pageSettings : undefined,
+        libraryEditSession.itemKind === 'template' || libraryEditSession.itemKind === 'popup'
+          ? pageSettings
+          : undefined,
+      popupSettings:
+        libraryEditSession.itemKind === 'popup'
+          ? resolvePopupSettings(libraryEditSession.popupSettings)
+          : undefined,
     });
 
     setSections(libraryEditSession.stashedSections);
@@ -2641,8 +2849,14 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
     setSelectedColumnId(null);
     setSelectedElementId(null);
     setLibraryEditSession(null);
-    showToast(`Cambios guardados en la Biblioteca: "${updatedName}"`);
-    setLibraryModalState({ isOpen: true, initialTab: returnTab });
+    showToast(
+      libraryEditSession.itemKind === 'popup'
+        ? `Pop-up "${updatedName}" actualizado en vivo en todos los embudos vinculados`
+        : `Cambios guardados en la Biblioteca: "${updatedName}"`
+    );
+    if (shouldReopenLibrary) {
+      setLibraryModalState({ isOpen: true, initialTab: returnTab });
+    }
   };
 
   const handleSavePage = () => {
@@ -2680,6 +2894,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
               <span className="px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider bg-amber-600 text-white rounded-[4px] font-['Poppins'] shrink-0">
                 {libraryEditSession.itemKind === 'template'
                   ? 'Edición de Plantilla'
+                  : libraryEditSession.itemKind === 'popup'
+                  ? 'Edición de Pop-up'
                   : 'Edición de Bloque'}
               </span>
               <input
@@ -2727,9 +2943,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                 setActiveTab('page');
               }}
               className="font-semibold text-zinc-900 hover:text-[#2848F0] hover:underline cursor-pointer flex items-center gap-1 shrink-0"
-              title="Configuración Global de la Página (Lienzo)"
+              title="Configuración Global del Lienzo"
             >
-              <span>{currentPage.title || 'Página'}</span>
+              <span>
+                {libraryEditSession?.itemKind === 'popup'
+                  ? libraryEditSession.itemName || 'Pop-up'
+                  : currentPage.title || 'Página'}
+              </span>
             </button>
             <ChevronRight className="w-3.5 h-3.5 mx-1 text-zinc-400 shrink-0" />
 
@@ -2888,7 +3108,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   setLibraryModalState({ isOpen: true, initialTab: 'blocks' })
                 }
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-l-lg border border-blue-200 bg-blue-50 text-[#2848F0] hover:bg-blue-100 transition-all cursor-pointer font-['Poppins']"
-                title="Abrir Biblioteca de Plantillas, Bloques y Favoritos"
+                title="Abrir Biblioteca de Plantillas, Bloques, Pop-ups y Favoritos"
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>Biblioteca</span>
@@ -6483,6 +6703,48 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   {selectedElement.type === 'popup_button' && (() => {
                     const currentBtnIcon = selectedElement.content.buttonIcon || '';
                     const CurrentBtnIconComp = currentBtnIcon ? (LucideIcons as any)[currentBtnIcon] : null;
+                    const popItems = libraryItems.filter((item) => item.kind === 'popup');
+                    const linkedPopupId = selectedElement.content.popupId || popItems[0]?.id || '';
+                    const linkedPopupItem =
+                      popItems.find((p) => p.id === linkedPopupId) || popItems[0] || null;
+
+                    const categoryOptions = Array.from(
+                      new Set([
+                        DEFAULT_LIBRARY_CATEGORY,
+                        ...libraryCategories,
+                        ...popItems.map((p) => p.category || DEFAULT_LIBRARY_CATEGORY),
+                      ])
+                    );
+
+                    const searchLower = popupInspectorSearch.trim().toLowerCase();
+                    const filteredPopups = popItems.filter((pop) => {
+                      const popCat = pop.category || DEFAULT_LIBRARY_CATEGORY;
+                      if (
+                        popupInspectorCategory !== 'ALL' &&
+                        popCat !== popupInspectorCategory &&
+                        pop.id !== linkedPopupId
+                      ) {
+                        return false;
+                      }
+                      if (
+                        searchLower &&
+                        !pop.name.toLowerCase().includes(searchLower) &&
+                        !popCat.toLowerCase().includes(searchLower) &&
+                        pop.id !== linkedPopupId
+                      ) {
+                        return false;
+                      }
+                      return true;
+                    });
+
+                    const subtextEnabled = Boolean(selectedElement.content.buttonSubtextEnabled);
+                    const popupSubtextIcons = [
+                      { id: '', label: 'Ninguno', Icon: X },
+                      { id: 'Lock', label: 'Seguro', Icon: Lock },
+                      { id: 'CheckCircle2', label: 'Garantía', Icon: CheckCircle2 },
+                      { id: 'Flame', label: 'Oferta', Icon: Flame },
+                    ];
+
                     return (
                       <div className="space-y-3">
                         <div className="space-y-3 border border-blue-200 rounded-xl p-3 bg-blue-50/20">
@@ -6491,6 +6753,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               <Layers className="w-4 h-4 text-[#2848F0]" />
                               <span>Botón Pop-up</span>
                             </label>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-[#2848F0]">
+                              Biblioteca en vivo
+                            </span>
                           </div>
 
                           <div>
@@ -6499,88 +6764,369 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                               type="text"
                               value={selectedElement.content.popupButtonText || ''}
                               onChange={(e) => updateSelectedElement({}, { popupButtonText: e.target.value })}
-                              placeholder="Abrir Oferta en Pop-up"
+                              placeholder="Quiero Acceder Ahora"
                               className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
                             />
                           </div>
 
-                          <div>
-                            <label className="font-semibold text-zinc-700 block mb-1">Pop-up vinculado:</label>
-                            <select
-                              value={selectedElement.content.popupId || funnelPopups[0]?.id || 'popup_1'}
-                              onChange={(e) => updateSelectedElement({}, { popupId: e.target.value })}
-                              className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-medium"
-                            >
-                              {funnelPopups.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name} ({p.id})
-                                </option>
-                              ))}
-                            </select>
+                          {/* SUBTEXTO DESPLAZABLE EN EL BOTÓN POP-UP */}
+                          <div className="p-2.5 bg-white border border-zinc-200 rounded-xl space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <span className="font-semibold text-zinc-800 block text-xs">Agregar subtexto:</span>
+                                <span className="text-[10px] text-zinc-500">Línea secundaria debajo del texto principal</span>
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={subtextEnabled}
+                                onClick={() => {
+                                  const nextState = !subtextEnabled;
+                                  const updates: Record<string, any> = {
+                                    buttonSubtextEnabled: nextState,
+                                  };
+                                  if (nextState && !selectedElement.content.buttonSubtext) {
+                                    updates.buttonSubtext = 'Cupos limitados · 100% sin compromiso';
+                                  }
+                                  updateSelectedElement({}, updates);
+                                }}
+                                className={`relative inline-flex items-center h-6 w-14 rounded-full transition-colors cursor-pointer shrink-0 px-1 ${
+                                  subtextEnabled ? 'bg-[#2848F0]' : 'bg-zinc-300'
+                                }`}
+                                title={subtextEnabled ? 'Desactivar subtexto' : 'Activar subtexto'}
+                              >
+                                <span
+                                  className={`text-[10px] font-bold select-none transition-opacity ${
+                                    subtextEnabled
+                                      ? 'text-white pl-1.5 opacity-100'
+                                      : 'opacity-0 w-0 overflow-hidden'
+                                  }`}
+                                >
+                                  Sí
+                                </span>
+                                <span
+                                  className={`inline-block w-4 h-4 rounded-full bg-white shadow-xs transition-transform ${
+                                    subtextEnabled ? 'translate-x-2.5' : 'translate-x-0'
+                                  }`}
+                                />
+                                <span
+                                  className={`text-[10px] font-bold text-zinc-700 select-none transition-opacity ${
+                                    !subtextEnabled
+                                      ? 'pl-1.5 opacity-100'
+                                      : 'opacity-0 w-0 overflow-hidden'
+                                  }`}
+                                >
+                                  No
+                                </span>
+                              </button>
+                            </div>
+
+                            {subtextEnabled && (
+                              <div className="pt-2 border-t border-zinc-200/80 space-y-2.5">
+                                <div>
+                                  <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                    Texto del subtexto:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={selectedElement.content.buttonSubtext ?? ''}
+                                    onChange={(e) =>
+                                      updateSelectedElement({}, { buttonSubtext: e.target.value })
+                                    }
+                                    placeholder="Ej: 100% gratis · Sin tarjeta de crédito"
+                                    className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white"
+                                  />
+                                </div>
+
+                                <HexColorPicker
+                                  label="Color del subtexto:"
+                                  value={
+                                    selectedElement.content.buttonSubtextColor ||
+                                    'rgba(255, 255, 255, 0.85)'
+                                  }
+                                  onChange={(val) =>
+                                    updateSelectedElement({}, { buttonSubtextColor: val })
+                                  }
+                                />
+
+                                <InlineSliderInput
+                                  label="Tamaño del subtexto:"
+                                  value={selectedElement.content.buttonSubtextFontSize ?? 12}
+                                  min={9}
+                                  max={28}
+                                  inputMin={6}
+                                  unit="px"
+                                  onChange={(val) =>
+                                    updateSelectedElement({}, { buttonSubtextFontSize: val })
+                                  }
+                                />
+
+                                <div>
+                                  <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                    Fuente del subtexto:
+                                  </label>
+                                  <select
+                                    value={selectedElement.content.buttonSubtextFontFamily || ''}
+                                    onChange={(e) =>
+                                      updateSelectedElement(
+                                        {},
+                                        { buttonSubtextFontFamily: e.target.value || undefined }
+                                      )
+                                    }
+                                    className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white font-medium focus:outline-[#2848F0]"
+                                  >
+                                    <option value="">
+                                      Misma fuente del botón ({selectedElement.styles.fontFamily || pageSettings.bodyFontFamily || 'Poppins'})
+                                    </option>
+                                    {AVAILABLE_FONTS.map((font) => (
+                                      <option
+                                        key={font.value}
+                                        value={font.value}
+                                        style={{ fontFamily: font.value }}
+                                      >
+                                        {font.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 items-end">
+                                  <div>
+                                    <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                      Estilo:
+                                    </label>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateSelectedElement(
+                                            {},
+                                            {
+                                              buttonSubtextBold:
+                                                !selectedElement.content.buttonSubtextBold,
+                                            }
+                                          )
+                                        }
+                                        className={`flex-1 py-1.5 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                                          selectedElement.content.buttonSubtextBold
+                                            ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                                        }`}
+                                        title="Negrita en subtexto"
+                                      >
+                                        <BoldIcon className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateSelectedElement(
+                                            {},
+                                            {
+                                              buttonSubtextItalic:
+                                                !selectedElement.content.buttonSubtextItalic,
+                                            }
+                                          )
+                                        }
+                                        className={`flex-1 py-1.5 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                                          selectedElement.content.buttonSubtextItalic
+                                            ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                                        }`}
+                                        title="Cursiva en subtexto"
+                                      >
+                                        <ItalicIcon className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateSelectedElement(
+                                            {},
+                                            {
+                                              buttonSubtextUnderline:
+                                                !selectedElement.content.buttonSubtextUnderline,
+                                            }
+                                          )
+                                        }
+                                        className={`flex-1 py-1.5 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                                          selectedElement.content.buttonSubtextUnderline
+                                            ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                            : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                                        }`}
+                                        title="Subrayado en subtexto"
+                                      >
+                                        <UnderlineIcon className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                      Transformación:
+                                    </label>
+                                    <select
+                                      value={selectedElement.content.buttonSubtextTransform || 'none'}
+                                      onChange={(e) =>
+                                        updateSelectedElement(
+                                          {},
+                                          { buttonSubtextTransform: e.target.value as any }
+                                        )
+                                      }
+                                      className="w-full p-1.5 text-xs border border-zinc-200 rounded-lg bg-white font-medium focus:outline-[#2848F0]"
+                                    >
+                                      <option value="none">Normal</option>
+                                      <option value="uppercase">Mayúsculas</option>
+                                      <option value="lowercase">Minúsculas</option>
+                                      <option value="capitalize">Iniciales</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <InlineSliderInput
+                                  label="Separación con el texto:"
+                                  value={selectedElement.content.buttonSubtextGap ?? 4}
+                                  min={0}
+                                  max={24}
+                                  unit="px"
+                                  onChange={(val) =>
+                                    updateSelectedElement({}, { buttonSubtextGap: val })
+                                  }
+                                />
+
+                                <div>
+                                  <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                    Icono en subtexto (opcional):
+                                  </label>
+                                  <div className="grid grid-cols-4 gap-1">
+                                    {popupSubtextIcons.map(({ id, label, Icon: SubIc }) => {
+                                      const isCurrent =
+                                        (selectedElement.content.buttonSubtextIcon || '') === id;
+                                      return (
+                                        <button
+                                          key={id || 'none'}
+                                          type="button"
+                                          onClick={() =>
+                                            updateSelectedElement({}, { buttonSubtextIcon: id })
+                                          }
+                                          className={`py-1.5 px-1 rounded-lg border text-[10px] font-medium flex flex-col items-center justify-center gap-0.5 cursor-pointer transition-colors ${
+                                            isCurrent
+                                              ? 'bg-[#2848F0] text-white border-[#2848F0]'
+                                              : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+                                          }`}
+                                          title={label}
+                                        >
+                                          <SubIc className="w-3.5 h-3.5 shrink-0" />
+                                          <span className="truncate max-w-full">{label}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Action buttons: Edit popup & create new */}
-                          <div className="grid grid-cols-2 gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const target =
-                                  funnelPopups.find((p) => p.id === (selectedElement.content.popupId || 'popup_1')) ||
-                                  funnelPopups[0];
-                                setEditingPopupModal(target);
-                              }}
-                              className="py-2 px-3 bg-[#2848F0] hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
-                            >
-                              <Sparkles className="w-3.5 h-3.5" />
-                              <span>Editar Pop-up</span>
-                            </button>
+                          {/* VINCULAR POP-UP DESDE LA BIBLIOTECA (BÚSQUEDA + CATEGORÍA + POP-UP) */}
+                          <div className="p-2.5 bg-white border border-blue-200 rounded-xl space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-zinc-800 text-xs">
+                                Pop-up vinculado (Biblioteca):
+                              </span>
+                            </div>
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newId = `popup_${Date.now()}`;
-                                const newPop: PopupModal = {
-                                  id: newId,
-                                  name: `Pop-up ${funnelPopups.length + 1}`,
-                                  title: '¡Nueva Oferta Exclusiva!',
-                                  subtitle: 'Ingresa tus datos para acceder inmediatamente:',
-                                  width: 'md',
-                                  elements: [
-                                    {
-                                      id: `el_h_${Date.now()}`,
-                                      type: 'heading',
-                                      content: { text: '¡Oferta Exclusiva!', level: 'h2' },
-                                      styles: { fontSize: 24, fontFamily: 'Poppins', textColor: '#18181b', isBold: true, textAlign: 'center', marginBottom: 8 },
-                                    },
-                                    {
-                                      id: `el_p_${Date.now()}`,
-                                      type: 'paragraph',
-                                      content: { text: 'Completa este formulario rápido para obtener acceso prioritario.' },
-                                      styles: { fontSize: 14, fontFamily: 'Inter', textColor: '#52525b', textAlign: 'center', marginBottom: 16 },
-                                    },
-                                    {
-                                      id: `el_f_${Date.now()}`,
-                                      type: 'simple_form',
-                                      content: {
-                                        formTitle: 'Regístrate aquí',
-                                        showNameField: true,
-                                        emailRequired: true,
-                                        submitButtonText: 'Acceder Ahora',
-                                      },
-                                      styles: { marginTop: 0, marginBottom: 0 },
-                                    },
-                                  ],
-                                };
-                                setFunnelPopups((prev) => [...prev, newPop]);
-                                updateSelectedElement({}, { popupId: newId });
-                                setEditingPopupModal(newPop);
-                                showToast(`Nuevo Pop-up creado y vinculado`);
-                              }}
-                              className="py-2 px-3 bg-white hover:bg-blue-50 border border-blue-200 text-[#2848F0] rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-2xs cursor-pointer transition-colors"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Crear Nuevo</span>
-                            </button>
+                            <input
+                              type="text"
+                              value={popupInspectorSearch}
+                              onChange={(e) => setPopupInspectorSearch(e.target.value)}
+                              placeholder="Buscar pop-up por nombre..."
+                              className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-zinc-50 focus:bg-white"
+                            />
+
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                1. Categoría:
+                              </label>
+                              <select
+                                value={popupInspectorCategory}
+                                onChange={(e) => {
+                                  const nextCat = e.target.value;
+                                  setPopupInspectorCategory(nextCat);
+                                  if (nextCat !== 'ALL') {
+                                    const firstInCat = popItems.find(
+                                      (p) => (p.category || DEFAULT_LIBRARY_CATEGORY) === nextCat
+                                    );
+                                    if (firstInCat) {
+                                      updateSelectedElement({}, { popupId: firstInCat.id });
+                                    }
+                                  }
+                                }}
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-medium"
+                              >
+                                <option value="ALL">Todas las categorías ({popItems.length})</option>
+                                {categoryOptions.map((cat) => {
+                                  const count = popItems.filter(
+                                    (p) => (p.category || DEFAULT_LIBRARY_CATEGORY) === cat
+                                  ).length;
+                                  return (
+                                    <option key={cat} value={cat}>
+                                      {cat} ({count})
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="font-semibold text-zinc-700 block mb-1 text-[11px]">
+                                2. Seleccionar Pop-up:
+                              </label>
+                              <select
+                                value={linkedPopupId}
+                                onChange={(e) =>
+                                  updateSelectedElement({}, { popupId: e.target.value })
+                                }
+                                className="w-full p-2 text-xs border border-zinc-200 rounded-lg focus:outline-[#2848F0] bg-white font-semibold text-zinc-900"
+                              >
+                                {filteredPopups.length === 0 ? (
+                                  <option value="">Sin pop-ups en este filtro</option>
+                                ) : (
+                                  filteredPopups.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} ({p.category || DEFAULT_LIBRARY_CATEGORY})
+                                    </option>
+                                  ))
+                                )}
+                              </select>
+                            </div>
+
+                            <p className="text-[10px] text-zinc-500 leading-snug bg-blue-50/60 border border-blue-100 rounded-lg p-2">
+                              Vínculo único en vivo: si editas este Pop-up, los cambios se actualizarán automáticamente en todas las páginas donde sea llamado.
+                            </p>
+
+                            {/* Action buttons: Edit popup & create new */}
+                            <div className="grid grid-cols-2 gap-2 pt-0.5">
+                              <button
+                                type="button"
+                                disabled={!linkedPopupItem}
+                                onClick={() => {
+                                  if (linkedPopupItem) {
+                                    handleStartEditLibraryItem(linkedPopupItem, 'canvas');
+                                  }
+                                }}
+                                className="py-2 px-2.5 bg-[#2848F0] hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer transition-colors"
+                              >
+                                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                                <span>Editar Pop-up</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setCreatePopupFromButtonElId(selectedElement.id)}
+                                className="py-2 px-2.5 bg-white hover:bg-blue-50 border border-blue-200 text-[#2848F0] rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-2xs cursor-pointer transition-colors"
+                              >
+                                <Plus className="w-3.5 h-3.5 shrink-0" />
+                                <span>Crear Nuevo</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -7810,9 +8356,9 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                 }
               />
             ) : (
-              /* TABBED LIBRARY: ELEMENTS, BLOCKS & PAGE SETTINGS */
+              /* TABBED LIBRARY: PAGE / POP-UP SETTINGS & ELEMENTS */
               <div className="flex-1 flex flex-col h-full overflow-hidden">
-                {/* Tabs Header - Order: Página, Elementos, Bloques */}
+                {/* Tabs Header - Order: Página (o Pop-up), Elementos */}
                 <div className="flex border-b border-zinc-200 bg-zinc-50 shrink-0">
                   <button
                     type="button"
@@ -7829,7 +8375,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         : 'border-transparent text-zinc-500 hover:text-zinc-800'
                     }`}
                   >
-                    Página
+                    {libraryEditSession?.itemKind === 'popup' ? 'Pop-up' : 'Página'}
                   </button>
                   <button
                     type="button"
@@ -7848,35 +8394,41 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                   >
                     Elementos
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab('blocks');
-                      setSelectedElementId(null);
-                      setSelectedColumnId(null);
-                      setSelectedRowId(null);
-                      setSelectedSectionId(null);
-                    }}
-                    className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-colors cursor-pointer ${
-                      activeTab === 'blocks'
-                        ? 'border-[#2848F0] text-[#2848F0] bg-white'
-                        : 'border-transparent text-zinc-500 hover:text-zinc-800'
-                    }`}
-                  >
-                    Bloques
-                  </button>
                 </div>
 
                 {activeTab === 'page' ? (
                   <div className="flex-1 overflow-y-auto">
                     <PageSettingsInspector
                       settings={pageSettings}
-                      pageTitle={currentPage.title}
+                      pageTitle={
+                        libraryEditSession?.itemKind === 'popup'
+                          ? libraryEditSession.itemName
+                          : currentPage.title
+                      }
                       onUpdate={updatePageSettings}
                       onClose={() => setActiveTab('elements')}
                       onSavePageToLibrary={
                         libraryEditSession ? undefined : handleOpenSavePageToLibrary
                       }
+                      isPopupMode={libraryEditSession?.itemKind === 'popup'}
+                      popupSettings={libraryEditSession?.popupSettings}
+                      onUpdatePopupSettings={(patch) => {
+                        setLibraryEditSession((prev) => {
+                          if (!prev) return null;
+                          const nextPopup = {
+                            ...resolvePopupSettings(prev.popupSettings),
+                            ...patch,
+                          };
+                          if (patch.maxWidth !== undefined) {
+                            setPageSettings((ps) => ({
+                              ...ps,
+                              pageWidthType: 'boxed',
+                              pageContentMaxWidth: patch.maxWidth,
+                            }));
+                          }
+                          return { ...prev, popupSettings: nextPopup };
+                        });
+                      }}
                     />
                   </div>
                 ) : activeTab === 'templates' ? (
@@ -8578,63 +9130,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                         </div>
                       </div>
                     </>
-                  ) : (
-                    /* BLOCKS TAB */
-                    <div className="space-y-2.5">
-                      {!libraryEditSession && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setLibraryModalState({
-                              isOpen: true,
-                              initialTab: 'blocks',
-                            })
-                          }
-                          className="w-full py-2.5 px-3 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#2848F0] text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer font-['Poppins'] mb-2"
-                        >
-                          <BookOpen className="w-4 h-4" />
-                          <span>Abrir Biblioteca de Plantillas y Bloques</span>
-                        </button>
-                      )}
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-['Inter']">
-                        Bloques Prearmados de Alta Conversión
-                      </div>
-
-                      {PREBUILT_BLOCK_DEFS.map((block) => (
-                        <div
-                          key={block.type}
-                          draggable
-                          onDragStart={(e) => {
-                            setDraggingBlockType(block.type);
-                            e.dataTransfer.setData('application/ssp-prebuilt-block', block.type);
-                            e.dataTransfer.effectAllowed = 'copy';
-                          }}
-                          onDragEnd={() => {
-                            setDraggingBlockType(null);
-                            setSectionDropIndicator(null);
-                          }}
-                          onClick={() => insertPrebuiltBlock(block.type)}
-                          className="p-3 rounded-xl border border-zinc-200 hover:border-[#2848F0] hover:shadow-xs transition-all cursor-grab active:cursor-grabbing bg-white group shadow-2xs select-none"
-                          title="Haz clic para añadir al final o arrastra para soltar en cualquier posición del lienzo"
-                        >
-                          <div className="flex items-center justify-between gap-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <GripVertical className="w-3.5 h-3.5 text-zinc-400 group-hover:text-[#2848F0] shrink-0" />
-                              <span className="font-semibold text-xs text-zinc-900 group-hover:text-[#2848F0] truncate">
-                                {block.title}
-                              </span>
-                            </div>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${block.badgeColor}`}>
-                              {block.badge}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-zinc-500 mt-1 pl-5">
-                            {block.desc}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               )}
             </div>
@@ -8644,10 +9140,18 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
 
         {/* Central Live Canvas Area with robust vertical scrolling & drop zones */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 md:p-10 flex flex-col items-center bg-[#F4F4F5] relative scrollbar-thin scrollbar-thumb-zinc-400 scrollbar-track-zinc-100"
-          style={{ scrollBehavior: 'smooth' }}
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 md:p-10 flex flex-col items-center relative scrollbar-thin scrollbar-thumb-zinc-400 scrollbar-track-zinc-100 transition-colors"
+          style={{
+            scrollBehavior: 'smooth',
+            backgroundColor:
+              libraryEditSession?.itemKind === 'popup'
+                ? `rgba(24, 24, 27, ${
+                    resolvePopupSettings(libraryEditSession.popupSettings).overlayOpacity / 100
+                  })`
+                : '#F4F4F5',
+          }}
           onClick={(e) => {
-            // Unselect when clicking background outside elements and open Page settings
+            // Unselect when clicking background outside elements and open Page / Pop-up settings
             if (e.target === e.currentTarget && !isPreviewMode) {
               setSelectedElementId(null);
               setSelectedColumnId(null);
@@ -8658,126 +9162,215 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
           }}
         >
           <div
-            ref={canvasContainerRef}
-            className={`transition-all duration-300 shadow-xl border flex flex-col relative w-full h-auto shrink-0 min-h-[480px] ${
-              isPreviewMode
-                ? 'mb-16 shadow-2xl overflow-hidden'
-                : 'mb-24 overflow-visible'
-            } ${viewportMode === 'mobile' ? 'max-w-[390px] my-4' : ''}`}
+            className={`relative w-full flex justify-center overflow-visible ${
+              libraryEditSession?.itemKind === 'popup' ? 'my-auto py-8' : ''
+            }`}
             style={{
               maxWidth:
-                viewportMode === 'mobile'
+                libraryEditSession?.itemKind === 'popup'
+                  ? viewportMode === 'mobile'
+                    ? '390px'
+                    : `${resolvePopupSettings(libraryEditSession.popupSettings).maxWidth}px`
+                  : viewportMode === 'mobile'
                   ? '390px'
                   : pageSettings.pageWidthType === 'full'
                   ? '100%'
                   : `${pageSettings.pageContentMaxWidth || 1200}px`,
-              borderRadius: `${pageSettings.pageBorderRadius ?? 0}px`,
-              backgroundColor: pageSettings.pageBgColor || '#FFFFFF',
-              fontFamily: pageSettings.bodyFontFamily || 'Inter',
-              color: pageSettings.textColor || '#121111',
-              borderColor: '#E4E4E7',
-              paddingTop: `${pageSettings.pagePaddingTop ?? 0}px`,
-              paddingRight: `${pageSettings.pagePaddingRight ?? 0}px`,
-              paddingBottom: `${pageSettings.pagePaddingBottom ?? 0}px`,
-              paddingLeft: `${pageSettings.pagePaddingLeft ?? 0}px`,
-            }}
-            onClick={(e) => {
-              if (e.target === e.currentTarget && !isPreviewMode) {
-                setSelectedElementId(null);
-                setSelectedColumnId(null);
-                setSelectedRowId(null);
-                setSelectedSectionId(null);
-                setActiveTab('page');
-              }
             }}
           >
-            {/* Optional Canvas Background Image Layer (supports opacity, fit, position, repeat, attachment) */}
-            {pageSettings.pageBgImageEnabled !== false &&
-              pageSettings.pageBgImageUrl &&
-              pageSettings.pageBgImageUrl.trim() !== '' && (
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  borderRadius: `${pageSettings.pageBorderRadius ?? 0}px`,
-                  backgroundImage: `url("${pageSettings.pageBgImageUrl}")`,
-                  backgroundSize:
-                    pageSettings.pageBgImageSize === 'stretch'
-                      ? '100% 100%'
-                      : pageSettings.pageBgImageSize || 'cover',
-                  backgroundPosition: pageSettings.pageBgImagePosition || 'center',
-                  backgroundRepeat: pageSettings.pageBgImageRepeat || 'no-repeat',
-                  backgroundAttachment:
-                    pageSettings.pageBgImageAttachment === 'fixed' ? 'fixed' : 'scroll',
-                  opacity: (pageSettings.pageBgImageOpacity ?? 100) / 100,
-                }}
-              />
-            )}
-
-            {sections.length === 0 ? (
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'copy';
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const prebuiltType = e.dataTransfer.getData('application/ssp-prebuilt-block') || draggingBlockType;
-                  const elType = e.dataTransfer.getData('application/ssp-element-type') as ElementType;
-                  const layout = (e.dataTransfer.getData('application/ssp-section-layout') || draggingSectionLayout) as '1col' | '2col' | '3col' | '4col' | undefined;
-                  const innerCols = e.dataTransfer.getData('application/ssp-inner-columns') || (draggingInnerCols !== null ? String(draggingInnerCols) : '');
-                  clearAllDragStates();
-                  if (prebuiltType) {
-                    insertPrebuiltBlock(prebuiltType);
-                  } else if (layout) {
-                    insertNewSection(layout);
-                  } else if (innerCols) {
-                    addColumnsLayout(parseInt(innerCols, 10) || 1);
-                  } else if (elType) {
-                    addElement(elType);
+            {/* Corner X Close Button when editing/previewing a Pop-up */}
+            {libraryEditSession?.itemKind === 'popup' && (() => {
+              const resolvedPop = resolvePopupSettings(libraryEditSession.popupSettings);
+              const closeBtnStyle = computePopupCloseButtonStyle(resolvedPop);
+              const closeIconSize = Math.max(14, Math.round(resolvedPop.closeBtnSize * 0.52));
+              const closeStrokeW = Math.max(2, Math.round(closeIconSize / 8));
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isPreviewMode) {
+                      showToast('Así cerrará el visitante este Pop-up');
+                    } else {
+                      setSelectedElementId(null);
+                      setSelectedColumnId(null);
+                      setSelectedRowId(null);
+                      setSelectedSectionId(null);
+                      setActiveTab('page');
+                    }
+                  }}
+                  title={
+                    isPreviewMode
+                      ? 'Cerrar Pop-up (Vista Previa)'
+                      : 'Botón X de cierre del Pop-up (Haz clic para personalizar posición, tamaño y colores)'
                   }
-                }}
-                className="relative min-h-[460px] flex flex-col items-center justify-center p-8 text-center"
-              >
-                <div className="w-full max-w-lg p-8 border-2 border-dashed border-zinc-300 rounded-2xl bg-zinc-50/50 hover:bg-zinc-50 hover:border-[#2848F0]/40 transition-all flex flex-col items-center justify-center shadow-xs">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2848F0] flex items-center justify-center mb-3.5 shadow-2xs">
-                    <Plus className="w-7 h-7" />
-                  </div>
-                  <h3 className="text-base font-bold text-zinc-900 mb-1 font-['Poppins']">
-                    Agrega tu primer elemento o bloque
-                  </h3>
-                  <p className="text-xs text-zinc-500 max-w-sm mb-5 font-['Inter'] leading-relaxed">
-                    El lienzo está completamente en blanco. Arrastra cualquier elemento o bloque aquí, o selecciona una opción para comenzar:
-                  </p>
-                  <div className="flex flex-wrap items-center justify-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => insertNewSection('1col')}
-                      className="px-3.5 py-2 rounded-lg bg-[#2848F0] hover:bg-[#1E36B9] text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>+ Nueva Sección</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('blocks')}
-                      className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 text-xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <Layout className="w-3.5 h-3.5 text-zinc-500" />
-                      <span>Explorar Bloques</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('templates')}
-                      className="px-3.5 py-2 rounded-lg bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-800 text-xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                    >
-                      <LayoutTemplate className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Cargar Plantilla VSL</span>
-                    </button>
+                  style={{
+                    position: 'absolute',
+                    ...closeBtnStyle,
+                    zIndex: 60,
+                  }}
+                  className="flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform cursor-pointer border border-white/15"
+                >
+                  <X
+                    style={{
+                      width: `${closeIconSize}px`,
+                      height: `${closeIconSize}px`,
+                    }}
+                    strokeWidth={closeStrokeW}
+                  />
+                </button>
+              );
+            })()}
+
+            <div
+              ref={canvasContainerRef}
+              className={`transition-all duration-300 shadow-xl border flex flex-col relative w-full h-auto shrink-0 ${
+                libraryEditSession?.itemKind === 'popup' ? 'min-h-[240px]' : 'min-h-[480px]'
+              } ${
+                isPreviewMode
+                  ? 'mb-16 shadow-2xl overflow-hidden'
+                  : 'mb-24 overflow-visible'
+              } ${viewportMode === 'mobile' ? 'max-w-[390px] my-4' : ''}`}
+              style={{
+                maxWidth: '100%',
+                borderRadius: `${
+                  pageSettings.pageBorderRadius ??
+                  (libraryEditSession?.itemKind === 'popup' ? 16 : 0)
+                }px`,
+                backgroundColor: pageSettings.pageBgColor || '#FFFFFF',
+                fontFamily: pageSettings.bodyFontFamily || 'Inter',
+                color: pageSettings.textColor || '#121111',
+                borderColor: '#E4E4E7',
+                paddingTop: `${pageSettings.pagePaddingTop ?? 0}px`,
+                paddingRight: `${pageSettings.pagePaddingRight ?? 0}px`,
+                paddingBottom: `${pageSettings.pagePaddingBottom ?? 0}px`,
+                paddingLeft: `${pageSettings.pagePaddingLeft ?? 0}px`,
+              }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget && !isPreviewMode) {
+                  setSelectedElementId(null);
+                  setSelectedColumnId(null);
+                  setSelectedRowId(null);
+                  setSelectedSectionId(null);
+                  setActiveTab('page');
+                }
+              }}
+            >
+              {/* Optional 2-Step Conversion Progress Bar at top of Pop-up */}
+              {libraryEditSession?.itemKind === 'popup' &&
+                resolvePopupSettings(libraryEditSession.popupSettings).showTopProgressBar && (() => {
+                  const popCfg = resolvePopupSettings(libraryEditSession.popupSettings);
+                  return (
+                    <div className="w-full px-5 pt-4 pb-2.5 bg-zinc-50 border-b border-zinc-200/80 shrink-0 rounded-t-[inherit] z-10">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700 mb-1.5 font-['Inter']">
+                        <span>{popCfg.progressBarText || 'Paso 1 de 2: Casi listo...'}</span>
+                        <span style={{ color: popCfg.progressBarColor || '#2848F0' }}>50%</span>
+                      </div>
+                      <div className="w-full h-2.5 bg-zinc-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full w-1/2 rounded-full transition-all duration-300"
+                          style={{ backgroundColor: popCfg.progressBarColor || '#2848F0' }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              {/* Optional Canvas Background Image Layer (supports opacity, fit, position, repeat, attachment) */}
+              {pageSettings.pageBgImageEnabled !== false &&
+                pageSettings.pageBgImageUrl &&
+                pageSettings.pageBgImageUrl.trim() !== '' && (
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    borderRadius: `${pageSettings.pageBorderRadius ?? 0}px`,
+                    backgroundImage: `url("${pageSettings.pageBgImageUrl}")`,
+                    backgroundSize:
+                      pageSettings.pageBgImageSize === 'stretch'
+                        ? '100% 100%'
+                        : pageSettings.pageBgImageSize || 'cover',
+                    backgroundPosition: pageSettings.pageBgImagePosition || 'center',
+                    backgroundRepeat: pageSettings.pageBgImageRepeat || 'no-repeat',
+                    backgroundAttachment:
+                      pageSettings.pageBgImageAttachment === 'fixed' ? 'fixed' : 'scroll',
+                    opacity: (pageSettings.pageBgImageOpacity ?? 100) / 100,
+                  }}
+                />
+              )}
+
+              {sections.length === 0 ? (
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'copy';
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const prebuiltType = e.dataTransfer.getData('application/ssp-prebuilt-block') || draggingBlockType;
+                    const elType = e.dataTransfer.getData('application/ssp-element-type') as ElementType;
+                    const layout = (e.dataTransfer.getData('application/ssp-section-layout') || draggingSectionLayout) as '1col' | '2col' | '3col' | '4col' | undefined;
+                    const innerCols = e.dataTransfer.getData('application/ssp-inner-columns') || (draggingInnerCols !== null ? String(draggingInnerCols) : '');
+                    clearAllDragStates();
+                    if (prebuiltType) {
+                      insertPrebuiltBlock(prebuiltType);
+                    } else if (layout) {
+                      insertNewSection(layout);
+                    } else if (innerCols) {
+                      addColumnsLayout(parseInt(innerCols, 10) || 1);
+                    } else if (elType) {
+                      addElement(elType);
+                    }
+                  }}
+                  className="relative min-h-[360px] flex flex-col items-center justify-center p-8 text-center"
+                >
+                  <div className="w-full max-w-lg p-8 border-2 border-dashed border-zinc-300 rounded-2xl bg-zinc-50/50 hover:bg-zinc-50 hover:border-[#2848F0]/40 transition-all flex flex-col items-center justify-center shadow-xs">
+                    <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2848F0] flex items-center justify-center mb-3.5 shadow-2xs">
+                      <Plus className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-base font-bold text-zinc-900 mb-1 font-['Poppins']">
+                      Agrega tu primer elemento o sección
+                    </h3>
+                    <p className="text-xs text-zinc-500 max-w-sm mb-5 font-['Inter'] leading-relaxed">
+                      El lienzo está en blanco. Arrastra cualquier elemento desde la pestaña Elementos o comienza agregando una sección:
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => insertNewSection('1col')}
+                        className="px-3.5 py-2 rounded-lg bg-[#2848F0] hover:bg-[#1E36B9] text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Nueva Sección</span>
+                      </button>
+                      {!libraryEditSession && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLibraryModalState({ isOpen: true, initialTab: 'blocks' })
+                            }
+                            className="px-3.5 py-2 rounded-lg bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-700 text-xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <Layout className="w-3.5 h-3.5 text-zinc-500" />
+                            <span>Explorar Bloques</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLibraryModalState({ isOpen: true, initialTab: 'templates' })
+                            }
+                            className="px-3.5 py-2 rounded-lg bg-purple-50 border border-purple-200 hover:bg-purple-100 text-purple-800 text-xs font-semibold shadow-2xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <LayoutTemplate className="w-3.5 h-3.5 text-purple-600" />
+                            <span>Cargar Plantilla</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
+              ) : (
               sections.map((section, secIdx) => {
               const isSectionSelected = !isPreviewMode && selectedSectionId === section.id && !selectedElementId;
               const effectiveBgType = section.bgType || (section.bgGradient ? 'gradient' : section.bgImageUrl ? 'image' : 'solid');
@@ -10637,11 +11230,15 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
                                           }}
                                           popups={funnelPopups}
                                           onOpenEditor={() => {
-                                            const p =
-                                              funnelPopups.find(
-                                                (pop) => pop.id === (element.content.popupId || 'popup_1')
-                                              ) || funnelPopups[0];
-                                            setEditingPopupModal(p);
+                                            const popItems = libraryItems.filter((i) => i.kind === 'popup');
+                                            const targetPop =
+                                              popItems.find((i) => i.id === element.content.popupId) ||
+                                              popItems[0];
+                                            if (targetPop) {
+                                              handleStartEditLibraryItem(targetPop, 'canvas');
+                                            } else {
+                                              setCreatePopupFromButtonElId(element.id);
+                                            }
                                           }}
                                         />
                                       </div>
@@ -10878,6 +11475,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
             </React.Fragment>
           );
         }))}
+          </div>
         </div>
         </main>
 
@@ -11005,28 +11603,7 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         </div>
       )}
 
-      {/* POPUP MODAL BUILDER & EDITOR */}
-      {editingPopupModal && (
-        <PopupEditorModal
-          popup={editingPopupModal}
-          isOpen={true}
-          onClose={() => setEditingPopupModal(null)}
-          onSave={(updatedPopup) => {
-            setFunnelPopups((prev) => {
-              const idx = prev.findIndex((p) => p.id === updatedPopup.id);
-              if (idx >= 0) {
-                const next = [...prev];
-                next[idx] = updatedPopup;
-                return next;
-              }
-              return [...prev, updatedPopup];
-            });
-            setEditingPopupModal(null);
-            setHasUnsavedChanges(true);
-            showToast(`Pop-up "${updatedPopup.name}" guardado exitosamente`);
-          }}
-        />
-      )}
+      {/* POP-UP MANAGED LIVE VIA BIBLIOTECA */}
 
       {/* FULLSCREEN TEXT EDITOR */}
       {fullscreenWysiwygElement && (
@@ -11348,12 +11925,13 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         onOpenLibrary={(tab) =>
           setLibraryModalState({
             isOpen: true,
-            initialTab: tab === 'template' ? 'templates' : 'blocks',
+            initialTab:
+              tab === 'template' ? 'templates' : tab === 'popup' ? 'popups' : 'blocks',
           })
         }
       />
 
-      {/* MODAL 2: ALMACÉN PRINCIPAL BIBLIOTECA (Plantillas, Bloques y Favoritos) */}
+      {/* MODAL 2: ALMACÉN PRINCIPAL BIBLIOTECA (Plantillas, Bloques, Pop-ups y Favoritos) */}
       <LibraryManagerModal
         isOpen={libraryModalState.isOpen}
         initialTab={libraryModalState.initialTab}
@@ -11363,8 +11941,42 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialPage, funnelI
         }
         onInsertBlock={handleInsertLibraryBlock}
         onInsertTemplate={handleInsertLibraryTemplate}
-        onEditItemInEditor={handleStartEditLibraryItem}
+        onInsertPopupButton={handleInsertLibraryPopupButton}
+        onCreatePopupAndEdit={(created) => handleStartEditLibraryItem(created, 'library')}
+        onEditItemInEditor={(item) => handleStartEditLibraryItem(item, 'library')}
       />
+
+      {/* MODAL 3: CREACIÓN RÁPIDA DE POP-UP DESDE BOTÓN POP-UP */}
+      <CreatePopupQuickModal
+        isOpen={Boolean(createPopupFromButtonElId)}
+        onClose={() => setCreatePopupFromButtonElId(null)}
+        onCreated={(created) => {
+          const btnId = createPopupFromButtonElId;
+          setCreatePopupFromButtonElId(null);
+          if (btnId) {
+            updateElementContent(btnId, { popupId: created.id });
+          }
+          handleStartEditLibraryItem(created, 'canvas');
+        }}
+      />
+
+      {/* RUNTIME POP-UP AUTOMÁTICO EN MODO VISTA PREVIA */}
+      {(() => {
+        const autoPopupItem =
+          pageSettings.autoPopupId
+            ? libraryItems.find(
+                (item) => item.kind === 'popup' && item.id === pageSettings.autoPopupId
+              ) || null
+            : null;
+        if (!autoPopupItem) return null;
+        return (
+          <PopupRuntimeModal
+            isOpen={isPreviewMode && !libraryEditSession && previewAutoPopupOpen}
+            popupItem={autoPopupItem}
+            onClose={() => setPreviewAutoPopupOpen(false)}
+          />
+        );
+      })()}
     </div>
   );
 };

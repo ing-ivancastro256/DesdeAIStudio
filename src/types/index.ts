@@ -589,6 +589,9 @@ export interface FunnelPageGlobalSettings {
   pagePaddingLeft?: number;
   seo_title?: string;
   seo_description?: string;
+  autoPopupTrigger?: 'none' | 'exit_intent' | 'delay';
+  autoPopupId?: string;
+  autoPopupDelaySeconds?: number;
 }
 
 export interface FunnelPage {
@@ -610,6 +613,27 @@ export type LibraryItemKind =
   | 'webpage'
   | 'image';
 
+export type PopupCloseButtonPosition = 'inside' | 'edge' | 'outside';
+export type PopupCloseButtonShape = 'circle' | 'rounded' | 'square';
+
+export interface PopupWindowSettings {
+  maxWidth?: number;
+  overlayOpacity?: number;
+  closeOnBackdropClick?: boolean;
+  closeBtnPosition?: PopupCloseButtonPosition;
+  closeBtnOffsetX?: number;
+  closeBtnOffsetY?: number;
+  closeBtnSize?: number;
+  closeBtnShape?: PopupCloseButtonShape;
+  closeBtnBgColor?: string;
+  closeBtnIconColor?: string;
+  showTopProgressBar?: boolean;
+  progressBarPercent?: number;
+  progressBarText?: string;
+  progressBarColor?: string;
+  progressBarTextColor?: string;
+}
+
 export interface LibraryItem {
   id: string;
   kind: LibraryItemKind;
@@ -619,6 +643,7 @@ export interface LibraryItem {
   isSystemSeed?: boolean;
   sections: PageBlockSection[];
   pageSettings?: Partial<FunnelPageGlobalSettings>;
+  popupSettings?: PopupWindowSettings;
   createdAt: string;
   updatedAt: string;
 }

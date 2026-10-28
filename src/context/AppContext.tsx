@@ -23,11 +23,14 @@ import {
   LibraryItemKind,
   PageBlockSection,
   FunnelPageGlobalSettings,
+  PopupWindowSettings,
 } from '../types';
 import {
   DEFAULT_LIBRARY_CATEGORY,
+  DEFAULT_POPUP_SETTINGS,
   INITIAL_LIBRARY_CATEGORIES,
   buildInitialLibrarySeed,
+  buildInitialPopupSeeds,
   cloneSectionsWithFreshIds,
 } from '../utils/libraryUtils';
 import { getAccessToken, createCalendarEvent } from '../services/googleCalendarService';
@@ -146,13 +149,20 @@ interface AppContextType {
     category: string;
     sections: PageBlockSection[];
     pageSettings?: Partial<FunnelPageGlobalSettings>;
+    popupSettings?: PopupWindowSettings;
   }) => LibraryItem;
   updateLibraryItem: (
     id: string,
     patch: Partial<
       Pick<
         LibraryItem,
-        'name' | 'category' | 'isFavorite' | 'sections' | 'pageSettings' | 'kind'
+        | 'name'
+        | 'category'
+        | 'isFavorite'
+        | 'sections'
+        | 'pageSettings'
+        | 'popupSettings'
+        | 'kind'
       >
     >
   ) => void;
@@ -414,7 +424,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed;
+          const hasPopups = parsed.some(
+            (item: LibraryItem) => item && item.kind === 'popup'
+          );
+          return hasPopups ? parsed : [...parsed, ...buildInitialPopupSeeds()];
         }
       } catch {
         // fallback to seed
@@ -1201,12 +1214,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     category,
     sections,
     pageSettings,
+    popupSettings,
   }: {
     kind: LibraryItemKind;
     name: string;
     category: string;
     sections: PageBlockSection[];
     pageSettings?: Partial<FunnelPageGlobalSettings>;
+    popupSettings?: PopupWindowSettings;
   }): LibraryItem => {
     const nowIso = new Date().toISOString();
     const resolvedCategory = category?.trim()
@@ -1214,7 +1229,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       : DEFAULT_LIBRARY_CATEGORY;
     const resolvedName =
       name.trim() ||
-      (kind === 'template' ? 'Nueva Plantilla' : 'Nuevo Bloque');
+      (kind === 'template'
+        ? 'Nueva Plantilla'
+        : kind === 'popup'
+        ? 'Nuevo Pop-up'
+        : 'Nuevo Bloque');
 
     const newItem: LibraryItem = {
       id: `lib_${kind}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -1226,7 +1245,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sections: cloneSectionsWithFreshIds(sections),
       pageSettings: pageSettings
         ? JSON.parse(JSON.stringify(pageSettings))
+        : kind === 'popup'
+        ? {
+            pageBgColor: '#FFFFFF',
+            pageBorderRadius: 16,
+            primaryColor: '#2848F0',
+            textColor: '#121111',
+            headingFontFamily: 'Poppins',
+            bodyFontFamily: 'Inter',
+          }
         : undefined,
+      popupSettings:
+        kind === 'popup'
+          ? JSON.parse(
+              JSON.stringify({
+                ...DEFAULT_POPUP_SETTINGS,
+                ...(popupSettings || {}),
+              })
+            )
+          : undefined,
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -1235,6 +1272,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     showToast(
       kind === 'template'
         ? `Plantilla "${resolvedName}" guardada en tu Biblioteca`
+        : kind === 'popup'
+        ? `Pop-up "${resolvedName}" guardado en tu Biblioteca`
         : `Bloque "${resolvedName}" guardado en tu Biblioteca`
     );
     return newItem;
@@ -1245,7 +1284,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     patch: Partial<
       Pick<
         LibraryItem,
-        'name' | 'category' | 'isFavorite' | 'sections' | 'pageSettings' | 'kind'
+        | 'name'
+        | 'category'
+        | 'isFavorite'
+        | 'sections'
+        | 'pageSettings'
+        | 'popupSettings'
+        | 'kind'
       >
     >
   ) => {
@@ -1275,6 +1320,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 ? JSON.parse(JSON.stringify(patch.pageSettings))
                 : undefined
               : item.pageSettings,
+          popupSettings:
+            patch.popupSettings !== undefined
+              ? patch.popupSettings
+                ? JSON.parse(JSON.stringify(patch.popupSettings))
+                : undefined
+              : item.popupSettings,
           updatedAt: nowIso,
         };
       })
@@ -1296,6 +1347,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       sections: cloneSectionsWithFreshIds(source.sections),
       pageSettings: source.pageSettings
         ? JSON.parse(JSON.stringify(source.pageSettings))
+        : undefined,
+      popupSettings: source.popupSettings
+        ? JSON.parse(JSON.stringify(source.popupSettings))
         : undefined,
       createdAt: nowIso,
       updatedAt: nowIso,

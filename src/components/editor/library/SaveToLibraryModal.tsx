@@ -5,7 +5,10 @@ import {
   FunnelPageGlobalSettings,
   PageBlockSection,
 } from '../../../types';
-import { DEFAULT_LIBRARY_CATEGORY } from '../../../utils/libraryUtils';
+import {
+  DEFAULT_LIBRARY_CATEGORY,
+  DEFAULT_POPUP_SETTINGS,
+} from '../../../utils/libraryUtils';
 import { LibraryScaledPreview } from './LibraryScaledPreview';
 
 interface SaveToLibraryModalProps {
@@ -15,8 +18,8 @@ interface SaveToLibraryModalProps {
   pageSettings?: Partial<FunnelPageGlobalSettings>;
   suggestedName?: string;
   sourceType?: 'section' | 'page';
-  defaultKind?: 'template' | 'block';
-  onOpenLibrary?: (initialTab: 'template' | 'block') => void;
+  defaultKind?: 'template' | 'block' | 'popup';
+  onOpenLibrary?: (initialTab: 'template' | 'block' | 'popup') => void;
 }
 
 export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
@@ -36,7 +39,7 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
     addLibraryCategory,
   } = useApp();
 
-  const [kind, setKind] = useState<'template' | 'block'>(defaultKind);
+  const [kind, setKind] = useState<'template' | 'block' | 'popup'>(defaultKind);
   const [name, setName] = useState<string>(suggestedName);
   const [selectedCategory, setSelectedCategory] = useState<string>(
     DEFAULT_LIBRARY_CATEGORY
@@ -54,7 +57,11 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
       setKind(defaultKind);
       setName(
         suggestedName.trim() ||
-          (defaultKind === 'block' ? 'Mi Nuevo Bloque' : 'Mi Nueva Plantilla')
+          (defaultKind === 'block'
+            ? 'Mi Nuevo Bloque'
+            : defaultKind === 'popup'
+            ? 'Mi Nuevo Pop-up'
+            : 'Mi Nueva Plantilla')
       );
       setSelectedCategory(DEFAULT_LIBRARY_CATEGORY);
       setIsCategoryMenuOpen(false);
@@ -122,6 +129,8 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
       setNameError(
         kind === 'template'
           ? 'Ingresa un nombre para la plantilla.'
+          : kind === 'popup'
+          ? 'Ingresa un nombre para el pop-up.'
           : 'Ingresa un nombre para el bloque.'
       );
       nameInputRef.current?.focus();
@@ -133,7 +142,9 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
       name: cleanName,
       category: selectedCategory || DEFAULT_LIBRARY_CATEGORY,
       sections,
-      pageSettings: kind === 'template' ? pageSettings : undefined,
+      pageSettings:
+        kind === 'template' || kind === 'popup' ? pageSettings : undefined,
+      popupSettings: kind === 'popup' ? DEFAULT_POPUP_SETTINGS : undefined,
     });
     onClose();
   };
@@ -169,7 +180,6 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
           {/* Center Save Tray Icon + Heading + Subtitle */}
           <div className="flex flex-col items-center text-center mb-9">
             <div className="w-24 h-24 bg-[#F7F7F8] border border-zinc-100 flex items-center justify-center mb-4">
-              {/* Save-into-tray crisp SVG icon matching reference */}
               <svg
                 viewBox="0 0 64 64"
                 className="w-14 h-14 text-zinc-950"
@@ -185,15 +195,29 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
             <h2 className="text-xl sm:text-2xl text-zinc-600 font-normal font-['Poppins'] tracking-tight">
               Guarda esta {sourceWord} en tu biblioteca{' '}
               <strong className="font-bold text-zinc-950">
-                {kind === 'template' ? 'de Plantillas' : 'de Bloques'}
+                {kind === 'template'
+                  ? 'de Plantillas'
+                  : kind === 'popup'
+                  ? 'de Pop-ups'
+                  : 'de Bloques'}
               </strong>
             </h2>
-            <p className="mt-2.5 text-xs sm:text-sm text-zinc-600 max-w-xl leading-relaxed">
-              Las plantillas y bloques guardados se pueden cargar fácilmente en
-              tus páginas.
-              <br className="hidden sm:inline" /> Actualizar un elemento en la
-              biblioteca no afectará al contenido ya publicado.
-            </p>
+            {kind === 'popup' ? (
+              <p className="mt-2.5 text-xs sm:text-sm text-zinc-600 max-w-xl leading-relaxed">
+                Los Pop-ups son únicos en tu Biblioteca y se vinculan en vivo a
+                cualquier Botón Pop-up.
+                <br className="hidden sm:inline" /> Al editar este Pop-up más
+                adelante, los cambios se verán reflejados automáticamente en
+                todas las páginas que lo llamen.
+              </p>
+            ) : (
+              <p className="mt-2.5 text-xs sm:text-sm text-zinc-600 max-w-xl leading-relaxed">
+                Las plantillas y bloques guardados se pueden cargar fácilmente
+                en tus páginas.
+                <br className="hidden sm:inline" /> Actualizar un elemento en la
+                biblioteca no afectará al contenido ya publicado.
+              </p>
+            )}
           </div>
 
           {/* Two-Column Content: Left Rectangular Preview | Right Save Form */}
@@ -204,6 +228,10 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                 <LibraryScaledPreview
                   sections={sections}
                   pageSettings={pageSettings}
+                  isPopup={kind === 'popup'}
+                  popupSettings={
+                    kind === 'popup' ? DEFAULT_POPUP_SETTINGS : undefined
+                  }
                   maxHeight={310}
                 />
               </div>
@@ -218,16 +246,16 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
               onSubmit={handleSave}
               className="md:col-span-6 flex flex-col justify-between space-y-6 pt-1"
             >
-              {/* Guardar Como: Plantilla | Bloque (Bloque default) */}
+              {/* Guardar Como: Plantilla | Bloque (default) | Pop-up */}
               <div>
                 <label className="block text-xs font-semibold text-zinc-700 mb-2">
                   Guardar Como
                 </label>
-                <div className="grid grid-cols-2 border border-zinc-300 rounded-[3px] overflow-hidden">
+                <div className="grid grid-cols-3 border border-zinc-300 rounded-[3px] overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setKind('template')}
-                    className={`py-2.5 px-4 text-sm font-bold transition-colors cursor-pointer font-['Poppins'] ${
+                    className={`py-2.5 px-3 text-sm font-bold transition-colors cursor-pointer font-['Poppins'] ${
                       kind === 'template'
                         ? 'bg-[#59606D] text-white'
                         : 'bg-white text-zinc-900 hover:bg-zinc-50'
@@ -238,13 +266,24 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setKind('block')}
-                    className={`py-2.5 px-4 text-sm font-bold border-l border-zinc-300 transition-colors cursor-pointer font-['Poppins'] ${
+                    className={`py-2.5 px-3 text-sm font-bold border-l border-zinc-300 transition-colors cursor-pointer font-['Poppins'] ${
                       kind === 'block'
                         ? 'bg-[#59606D] text-white'
                         : 'bg-white text-zinc-900 hover:bg-zinc-50'
                     }`}
                   >
                     Bloque
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKind('popup')}
+                    className={`py-2.5 px-3 text-sm font-bold border-l border-zinc-300 transition-colors cursor-pointer font-['Poppins'] ${
+                      kind === 'popup'
+                        ? 'bg-[#59606D] text-white'
+                        : 'bg-white text-zinc-900 hover:bg-zinc-50'
+                    }`}
+                  >
+                    Pop-up
                   </button>
                 </div>
               </div>
@@ -254,6 +293,8 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                 <label className="block text-xs font-semibold text-zinc-700 mb-1.5">
                   {kind === 'template'
                     ? 'Nombre de Plantilla'
+                    : kind === 'popup'
+                    ? 'Nombre de Pop-up'
                     : 'Nombre de Bloque'}
                 </label>
                 <input
@@ -267,6 +308,8 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                   placeholder={
                     kind === 'template'
                       ? 'Ej. Carta de Ventas Principal'
+                      : kind === 'popup'
+                      ? 'Ej. Pop-up Captura 2 Pasos'
                       : 'Ej. Formulario con Imagen'
                   }
                   className="w-full py-2 px-0.5 text-sm font-semibold text-zinc-900 bg-transparent border-0 border-b-2 border-[#4CAF50] focus:outline-none focus:border-[#388E3C] transition-colors"
@@ -293,6 +336,8 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                         Revisar &quot;Mostrar{' '}
                         {kind === 'template'
                           ? 'todas las Plantillas guardadas'
+                          : kind === 'popup'
+                          ? 'todos los Pop-ups guardados'
                           : 'todos los Bloques guardados'}
                         &quot;
                       </button>
@@ -339,7 +384,9 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                             }`}
                           >
                             <span className="truncate">{cat}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
+                            {isSelected && (
+                              <Check className="w-3.5 h-3.5 shrink-0" />
+                            )}
                           </button>
                         );
                       })}
@@ -395,6 +442,8 @@ export const SaveToLibraryModal: React.FC<SaveToLibraryModalProps> = ({
                 >
                   {kind === 'template'
                     ? 'Guardar nueva plantilla'
+                    : kind === 'popup'
+                    ? 'Guardar nuevo pop-up'
                     : 'Guardar nuevo bloque'}
                 </button>
               </div>

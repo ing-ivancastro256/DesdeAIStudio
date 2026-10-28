@@ -1,8 +1,10 @@
+import type { CSSProperties } from 'react';
 import {
   LibraryItem,
   PageBlockSection,
   PageBlockRow,
   PageBlockElement,
+  PopupWindowSettings,
 } from '../types';
 import { PAGE_TEMPLATES } from '../data/pageTemplates';
 import { cloneRowWithFreshIds } from './editorTreeUtils';
@@ -1814,6 +1816,420 @@ export const createPrebuiltBlockSection = (
   };
 };
 
+export const DEFAULT_POPUP_SETTINGS: Required<PopupWindowSettings> = {
+  maxWidth: 560,
+  overlayOpacity: 68,
+  closeOnBackdropClick: true,
+  closeBtnPosition: 'inside',
+  closeBtnOffsetX: 0,
+  closeBtnOffsetY: 0,
+  closeBtnSize: 32,
+  closeBtnShape: 'circle',
+  closeBtnBgColor: '#18181B',
+  closeBtnIconColor: '#FFFFFF',
+  showTopProgressBar: false,
+  progressBarPercent: 50,
+  progressBarText: 'Paso 1 de 2: Casi listo — Completa tus datos abajo',
+  progressBarColor: '#2848F0',
+  progressBarTextColor: '#FFFFFF',
+};
+
+export const resolvePopupSettings = (
+  settings?: PopupWindowSettings
+): Required<PopupWindowSettings> => ({
+  maxWidth: settings?.maxWidth ?? DEFAULT_POPUP_SETTINGS.maxWidth,
+  overlayOpacity: settings?.overlayOpacity ?? DEFAULT_POPUP_SETTINGS.overlayOpacity,
+  closeOnBackdropClick:
+    settings?.closeOnBackdropClick ?? DEFAULT_POPUP_SETTINGS.closeOnBackdropClick,
+  closeBtnPosition:
+    settings?.closeBtnPosition ?? DEFAULT_POPUP_SETTINGS.closeBtnPosition,
+  closeBtnOffsetX: settings?.closeBtnOffsetX ?? DEFAULT_POPUP_SETTINGS.closeBtnOffsetX,
+  closeBtnOffsetY: settings?.closeBtnOffsetY ?? DEFAULT_POPUP_SETTINGS.closeBtnOffsetY,
+  closeBtnSize: settings?.closeBtnSize ?? DEFAULT_POPUP_SETTINGS.closeBtnSize,
+  closeBtnShape: settings?.closeBtnShape ?? DEFAULT_POPUP_SETTINGS.closeBtnShape,
+  closeBtnBgColor: settings?.closeBtnBgColor ?? DEFAULT_POPUP_SETTINGS.closeBtnBgColor,
+  closeBtnIconColor:
+    settings?.closeBtnIconColor ?? DEFAULT_POPUP_SETTINGS.closeBtnIconColor,
+  showTopProgressBar:
+    settings?.showTopProgressBar ?? DEFAULT_POPUP_SETTINGS.showTopProgressBar,
+  progressBarPercent:
+    settings?.progressBarPercent ?? DEFAULT_POPUP_SETTINGS.progressBarPercent,
+  progressBarText: settings?.progressBarText ?? DEFAULT_POPUP_SETTINGS.progressBarText,
+  progressBarColor:
+    settings?.progressBarColor ?? DEFAULT_POPUP_SETTINGS.progressBarColor,
+  progressBarTextColor:
+    settings?.progressBarTextColor ?? DEFAULT_POPUP_SETTINGS.progressBarTextColor,
+});
+
+export const computePopupCloseButtonStyle = (
+  settings?: PopupWindowSettings
+): CSSProperties => {
+  const s = resolvePopupSettings(settings);
+  const size = s.closeBtnSize;
+  const baseTop =
+    s.closeBtnPosition === 'edge'
+      ? -Math.round(size / 2)
+      : s.closeBtnPosition === 'outside'
+      ? -(size + 10)
+      : 12;
+  const baseRight =
+    s.closeBtnPosition === 'edge'
+      ? -Math.round(size / 2)
+      : s.closeBtnPosition === 'outside'
+      ? 0
+      : 12;
+  const borderRadius =
+    s.closeBtnShape === 'circle'
+      ? '9999px'
+      : s.closeBtnShape === 'rounded'
+      ? '8px'
+      : '0px';
+
+  return {
+    top: `${baseTop + s.closeBtnOffsetY}px`,
+    right: `${baseRight - s.closeBtnOffsetX}px`,
+    width: `${size}px`,
+    height: `${size}px`,
+    borderRadius,
+    backgroundColor: s.closeBtnBgColor,
+    color: s.closeBtnIconColor,
+  };
+};
+
+export const createBlankPopupSections = (): PageBlockSection[] => {
+  const s = () => freshUid('pop');
+  return [
+    {
+      id: s(),
+      name: 'Sección Principal Pop-up',
+      bgColor: 'transparent',
+      paddingTop: 28,
+      paddingBottom: 28,
+      paddingLeft: 28,
+      paddingRight: 28,
+      rows: [
+        {
+          id: s(),
+          name: 'Contenedor',
+          columns: [
+            {
+              id: s(),
+              widthPercentage: 100,
+              elements: [
+                {
+                  id: s(),
+                  type: 'heading',
+                  content: {
+                    text: '¡Último Paso! Ingresa tus Datos para Continuar',
+                    level: 'h2',
+                  },
+                  styles: {
+                    fontSize: 24,
+                    fontFamily: 'Poppins',
+                    textColor: '#121111',
+                    isBold: true,
+                    textAlign: 'center',
+                    marginBottom: 10,
+                  },
+                },
+                {
+                  id: s(),
+                  type: 'paragraph',
+                  content: {
+                    text: 'Completa el formulario a continuación para desbloquear tu acceso inmediato.',
+                  },
+                  styles: {
+                    fontSize: 14,
+                    fontFamily: 'Inter',
+                    textColor: '#52525B',
+                    textAlign: 'center',
+                    marginBottom: 18,
+                  },
+                },
+                {
+                  id: s(),
+                  type: 'simple_form',
+                  content: {
+                    showNameField: true,
+                    showPhoneField: false,
+                    submitButtonText: 'Quiero Mi Acceso Ahora →',
+                    formSuccessMessage:
+                      '¡Excelente! Hemos recibido tus datos correctamente.',
+                  },
+                  styles: {
+                    bgColor: '#2848F0',
+                    textColor: '#FFFFFF',
+                    borderRadius: 8,
+                    marginBottom: 6,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+};
+
+export const buildInitialPopupSeeds = (): LibraryItem[] => {
+  const nowIso = new Date().toISOString();
+  const s = () => freshUid('seedpop');
+
+  const lead2StepPopup: LibraryItem = {
+    id: 'lib_pop_lead_2step',
+    kind: 'popup',
+    name: 'Captura Rápida 2 Pasos (Lead Magnet)',
+    category: 'Captura / Leads',
+    isFavorite: false,
+    isSystemSeed: true,
+    pageSettings: {
+      pageBgColor: '#FFFFFF',
+      pageBorderRadius: 16,
+      primaryColor: '#2848F0',
+      textColor: '#121111',
+      headingFontFamily: 'Poppins',
+      bodyFontFamily: 'Inter',
+    },
+    popupSettings: {
+      ...DEFAULT_POPUP_SETTINGS,
+      maxWidth: 540,
+      closeBtnPosition: 'edge',
+      closeBtnSize: 32,
+      closeBtnShape: 'circle',
+      closeBtnBgColor: '#18181B',
+      closeBtnIconColor: '#FFFFFF',
+      showTopProgressBar: true,
+      progressBarPercent: 50,
+      progressBarText: 'Paso 1 de 2: 50% Completado — ¿A dónde enviamos tu acceso?',
+      progressBarColor: '#2848F0',
+      progressBarTextColor: '#FFFFFF',
+    },
+    sections: [
+      {
+        id: s(),
+        name: 'Sección Captura 2 Pasos',
+        bgColor: 'transparent',
+        paddingTop: 28,
+        paddingBottom: 28,
+        paddingLeft: 28,
+        paddingRight: 28,
+        rows: [
+          {
+            id: s(),
+            name: 'Contenedor',
+            columns: [
+              {
+                id: s(),
+                widthPercentage: 100,
+                elements: [
+                  {
+                    id: s(),
+                    type: 'heading',
+                    content: {
+                      text: 'Ingresa Tu Mejor Correo para Acceder a la Clase Gratuita',
+                      level: 'h2',
+                    },
+                    styles: {
+                      fontSize: 23,
+                      fontFamily: 'Poppins',
+                      textColor: '#111827',
+                      isBold: true,
+                      textAlign: 'center',
+                      marginBottom: 10,
+                    },
+                  },
+                  {
+                    id: s(),
+                    type: 'paragraph',
+                    content: {
+                      text: 'Recibirás el enlace privado de acceso + la guía práctica descargable en menos de 60 segundos.',
+                    },
+                    styles: {
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                      textColor: '#52525B',
+                      textAlign: 'center',
+                      marginBottom: 18,
+                    },
+                  },
+                  {
+                    id: s(),
+                    type: 'simple_form',
+                    content: {
+                      showNameField: true,
+                      showPhoneField: true,
+                      submitButtonText: 'Sí, Quiero Ver el Entrenamiento Ahora →',
+                      formSuccessMessage:
+                        '¡Perfecto! Redirigiendo a tu acceso exclusivo...',
+                    },
+                    styles: {
+                      bgColor: '#2848F0',
+                      textColor: '#FFFFFF',
+                      borderRadius: 10,
+                      marginBottom: 10,
+                    },
+                  },
+                  {
+                    id: s(),
+                    type: 'paragraph',
+                    content: {
+                      text: '🔒 Tus datos están 100% protegidos. Cero spam garantizado.',
+                    },
+                    styles: {
+                      fontSize: 12,
+                      fontFamily: 'Inter',
+                      textColor: '#71717A',
+                      textAlign: 'center',
+                      marginBottom: 0,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  const exitOfferPopup: LibraryItem = {
+    id: 'lib_pop_exit_offer',
+    kind: 'popup',
+    name: 'Oferta Relámpago / Intención de Salida',
+    category: 'Cierre y Urgencia',
+    isFavorite: false,
+    isSystemSeed: true,
+    pageSettings: {
+      pageBgColor: '#0F172A',
+      pageBorderRadius: 18,
+      primaryColor: '#F59E0B',
+      textColor: '#F8FAFC',
+      headingFontFamily: 'Poppins',
+      bodyFontFamily: 'Inter',
+    },
+    popupSettings: {
+      ...DEFAULT_POPUP_SETTINGS,
+      maxWidth: 580,
+      closeBtnPosition: 'inside',
+      closeBtnSize: 32,
+      closeBtnShape: 'circle',
+      closeBtnBgColor: '#EF4444',
+      closeBtnIconColor: '#FFFFFF',
+      showTopProgressBar: false,
+    },
+    sections: [
+      {
+        id: s(),
+        name: 'Sección Oferta de Salida',
+        bgColor: 'transparent',
+        paddingTop: 32,
+        paddingBottom: 30,
+        paddingLeft: 30,
+        paddingRight: 30,
+        rows: [
+          {
+            id: s(),
+            name: 'Contenedor',
+            columns: [
+              {
+                id: s(),
+                widthPercentage: 100,
+                elements: [
+                  {
+                    id: s(),
+                    type: 'paragraph',
+                    content: {
+                      text: '⚡ ESPERA UN SEGUNDO — OFERTA ÚNICA ANTES DE SALIR',
+                    },
+                    styles: {
+                      fontSize: 12,
+                      fontFamily: 'Poppins',
+                      textColor: '#FBBF24',
+                      isBold: true,
+                      textAlign: 'center',
+                      marginBottom: 8,
+                    },
+                  },
+                  {
+                    id: s(),
+                    type: 'heading',
+                    content: {
+                      text: '¿Te Vas con las Manos Vacías? Llévate el Bono de Acción Rápida Gratis',
+                      level: 'h2',
+                    },
+                    styles: {
+                      fontSize: 24,
+                      fontFamily: 'Poppins',
+                      textColor: '#FFFFFF',
+                      isBold: true,
+                      textAlign: 'center',
+                      marginBottom: 12,
+                    },
+                  },
+                  {
+                    id: s(),
+                    type: 'paragraph',
+                    content: {
+                      text: 'Reclama tu cupón especial y desbloquea la plantilla probada de Scale Sales Pro antes de que el contador llegue a cero.',
+                    },
+                    styles: {
+                      fontSize: 14,
+                      fontFamily: 'Inter',
+                      textColor: '#CBD5E1',
+                      textAlign: 'center',
+                      marginBottom: 16,
+                    },
+                  },
+                  {
+                    id: s(),
+                    type: 'countdown',
+                    content: {
+                      countdownEndDate: new Date(
+                        Date.now() + 2 * 60 * 60 * 1000
+                      ).toISOString(),
+                      countdownTheme: 'dark',
+                    },
+                    styles: {
+                      textAlign: 'center',
+                      marginBottom: 18,
+                    },
+                  },
+                  {
+                    id: s(),
+                    type: 'inline_form',
+                    content: {
+                      inlineEmailPlaceholder: 'Ingresa tu mejor correo electrónico...',
+                      submitButtonText: 'Reclamar Bono →',
+                      inlineFormButtonWidthPercent: 35,
+                      inlineFormHeight: 50,
+                      inlineFormGap: 0,
+                      formSuccessMessage: '¡Cupón reservado! Redirigiendo...',
+                    },
+                    styles: {
+                      bgColor: '#F59E0B',
+                      textColor: '#111827',
+                      isBold: true,
+                      borderRadius: 10,
+                      marginBottom: 6,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  return [lead2StepPopup, exitOfferPopup];
+};
+
 export const buildInitialLibrarySeed = (): LibraryItem[] => {
   const nowIso = new Date().toISOString();
 
@@ -1844,5 +2260,5 @@ export const buildInitialLibrarySeed = (): LibraryItem[] => {
     updatedAt: nowIso,
   }));
 
-  return [...seededTemplates, ...seededBlocks];
+  return [...seededTemplates, ...seededBlocks, ...buildInitialPopupSeeds()];
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PageBlockSection, PageBlockRow, PageBlockElement } from '../../types';
 import {
@@ -32,6 +32,7 @@ import { ConfiguredImage } from '../common/ConfiguredImage';
 import { SimpleFormElement } from '../editor/elements/SimpleFormElement';
 import { InlineFormElement } from '../editor/elements/InlineFormElement';
 import { PopupButtonElement, formatCtaDisplayText } from '../editor/elements/PopupButtonElement';
+import { PopupRuntimeModal } from '../editor/library/PopupRuntimeModal';
 import { EmbeddedVideoPlayer } from '../common/EmbeddedVideoPlayer';
 import { DelayedAppearance } from '../common/DelayedAppearance';
 import { renderBulletIcon } from '../../utils/bulletIcons';
@@ -54,6 +55,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
 }) => {
   const {
     activeFunnel,
+    libraryItems,
     forms,
     submitPublicForm,
     availability,
@@ -90,6 +92,78 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
   const [selectedDayOffset, setSelectedDayOffset] = useState<number>(1); // 1 = Tomorrow
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('11:00');
   const [bookingNotes, setBookingNotes] = useState<string>('');
+  const [autoPopupOpen, setAutoPopupOpen] = useState<boolean>(false);
+  const [triggeredAutoSteps, setTriggeredAutoSteps] = useState<
+    Record<number, boolean>
+  >({});
+
+  const stepPageTypes = [
+    'landing',
+    'vsl',
+    'qualification',
+    'calendar',
+    'thank_you',
+  ];
+  const currentTargetType = stepPageTypes[currentStepIndex];
+  const resolvedStepPage =
+    activeFunnel?.pages?.find((p) => p.page_type === currentTargetType) ||
+    activeFunnel?.pages?.find((p) => p.position === currentStepIndex + 1) ||
+    activeFunnel?.pages?.[currentStepIndex] ||
+    activeFunnel?.pages?.[0];
+
+  useEffect(() => {
+    if (!isOpen) {
+      setAutoPopupOpen(false);
+      setTriggeredAutoSteps({});
+      return;
+    }
+
+    const triggerMode = resolvedStepPage?.settings?.autoPopupTrigger || 'none';
+    const targetPopupId = resolvedStepPage?.settings?.autoPopupId;
+    if (
+      triggerMode === 'none' ||
+      !targetPopupId ||
+      triggeredAutoSteps[currentStepIndex]
+    ) {
+      return;
+    }
+
+    if (triggerMode === 'delay') {
+      const waitMs =
+        Math.max(1, resolvedStepPage?.settings?.autoPopupDelaySeconds ?? 8) *
+        1000;
+      const timer = setTimeout(() => {
+        setTriggeredAutoSteps((prev) => ({
+          ...prev,
+          [currentStepIndex]: true,
+        }));
+        setAutoPopupOpen(true);
+      }, waitMs);
+      return () => clearTimeout(timer);
+    }
+
+    if (triggerMode === 'exit_intent') {
+      const handleMouseLeave = (ev: MouseEvent) => {
+        if (ev.clientY <= 12) {
+          setTriggeredAutoSteps((prev) => ({
+            ...prev,
+            [currentStepIndex]: true,
+          }));
+          setAutoPopupOpen(true);
+        }
+      };
+      document.addEventListener('mouseleave', handleMouseLeave);
+      return () => document.removeEventListener('mouseleave', handleMouseLeave);
+    }
+  }, [
+    isOpen,
+    currentStepIndex,
+    resolvedStepPage?.id,
+    resolvedStepPage?.settings?.autoPopupTrigger,
+    resolvedStepPage?.settings?.autoPopupId,
+    resolvedStepPage?.settings?.autoPopupDelaySeconds,
+    triggeredAutoSteps,
+  ]);
 
   if (!isOpen) return null;
 
@@ -167,13 +241,7 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
   };
 
   // Safe page retrieval matching current step by type or position
-  const stepPageTypes = ['landing', 'vsl', 'qualification', 'calendar', 'thank_you'];
-  const targetType = stepPageTypes[currentStepIndex];
-  const activePage =
-    activeFunnel?.pages?.find((p) => p.page_type === targetType) ||
-    activeFunnel?.pages?.find((p) => p.position === currentStepIndex + 1) ||
-    activeFunnel?.pages?.[currentStepIndex] ||
-    activeFunnel?.pages?.[0];
+  const activePage = resolvedStepPage;
 
   const hasCustomSections = Boolean(
     activePage?.sections && activePage.sections.length > 0
@@ -626,6 +694,8 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
               defaultPrimaryColor={activePage?.settings?.primaryColor || '#2848F0'}
               defaultFontFamily={activePage?.settings?.bodyFontFamily || 'Poppins'}
               popups={activeFunnel?.pages[currentStepIndex]?.popups}
+              onNextFunnelStep={advanceToNextStep}
+              onGoToFunnelPage={goToFunnelPageById}
             />
           </div>
         );
@@ -1530,6 +1600,23 @@ export const PublicFunnelModal: React.FC<PublicFunnelModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Automatic Page Pop-up Runtime (Exit-Intent or Timed Delay) */}
+      <PopupRuntimeModal
+        isOpen={autoPopupOpen}
+        onClose={() => setAutoPopupOpen(false)}
+        popupItem={
+          libraryItems.find(
+            (i) =>
+              i.kind === 'popup' &&
+              i.id === resolvedStepPage?.settings?.autoPopupId
+          ) ||
+          libraryItems.find((i) => i.kind === 'popup') ||
+          null
+        }
+        onNextFunnelStep={advanceToNextStep}
+        onGoToFunnelPage={goToFunnelPageById}
+      />
     </div>
   );
 };

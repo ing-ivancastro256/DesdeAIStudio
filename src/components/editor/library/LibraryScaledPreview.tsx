@@ -1,13 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as LucideIcons from 'lucide-react';
-import { Play, Calendar as CalendarIcon } from 'lucide-react';
+import { Play, Calendar as CalendarIcon, X } from 'lucide-react';
 import {
   FunnelPageGlobalSettings,
   PageBlockColumn,
   PageBlockElement,
   PageBlockRow,
   PageBlockSection,
+  PopupWindowSettings,
 } from '../../../types';
+import {
+  computePopupCloseButtonStyle,
+  resolvePopupSettings,
+} from '../../../utils/libraryUtils';
 import {
   getColumnShadowClass,
   getColumnSurfaceStyle,
@@ -31,6 +36,8 @@ import {
 interface LibraryScaledPreviewProps {
   sections: PageBlockSection[];
   pageSettings?: Partial<FunnelPageGlobalSettings>;
+  popupSettings?: PopupWindowSettings;
+  isPopup?: boolean;
   maxHeight?: number;
   fixedHeight?: number;
   virtualWidth?: number;
@@ -49,6 +56,8 @@ const getYoutubeThumbnail = (videoUrl?: string): string | null => {
 export const LibraryScaledPreview: React.FC<LibraryScaledPreviewProps> = ({
   sections,
   pageSettings,
+  popupSettings,
+  isPopup = false,
   maxHeight = 320,
   fixedHeight,
   virtualWidth = 1080,
@@ -91,9 +100,14 @@ export const LibraryScaledPreview: React.FC<LibraryScaledPreviewProps> = ({
     const ro = new ResizeObserver(updateHeight);
     ro.observe(innerEl);
     return () => ro.disconnect();
-  }, [sections, pageSettings]);
+  }, [sections, pageSettings, popupSettings, isPopup]);
 
-  const scale = Math.max(0.14, Math.min(1, frameWidth / virtualWidth));
+  const resolvedPopup = resolvePopupSettings(popupSettings);
+  const effectiveVirtualWidth = isPopup
+    ? Math.max(660, resolvedPopup.maxWidth + 140)
+    : virtualWidth;
+
+  const scale = Math.max(0.14, Math.min(1, frameWidth / effectiveVirtualWidth));
   const scaledHeight = Math.max(72, Math.ceil(innerHeight * scale));
 
   const headingFont = pageSettings?.headingFontFamily || 'Poppins';
@@ -609,77 +623,182 @@ export const LibraryScaledPreview: React.FC<LibraryScaledPreviewProps> = ({
         <div
           ref={innerRef}
           style={{
-            width: `${virtualWidth}px`,
+            width: `${effectiveVirtualWidth}px`,
             transform: `scale(${scale})`,
             transformOrigin: 'top left',
-            backgroundColor: canvasBg,
+            backgroundColor: isPopup ? '#18181B' : canvasBg,
+            padding: isPopup ? '44px 36px' : undefined,
             pointerEvents: 'none',
             userSelect: 'none',
           }}
           className="box-border"
         >
-          {(sections || []).map((sec) => {
-            const secBoxed = isSectionBoxed(sec);
-            const secBgType =
-              sec.bgType ||
-              (sec.bgGradient ? 'gradient' : sec.bgImageUrl ? 'image' : 'solid');
-            const borderStyle = sec.borderStyle || 'solid';
-            const borderColor = sec.borderColor || '#E4E4E7';
-            const padTop = sec.paddingTop ?? sec.paddingY ?? 36;
-            const padBottom = sec.paddingBottom ?? sec.paddingY ?? 36;
-            const padLeft = sec.paddingLeft ?? 24;
-            const padRight = sec.paddingRight ?? 24;
-
-            const resolvedBg =
-              secBgType === 'solid'
-                ? sec.bgColor && sec.bgColor !== 'transparent'
-                  ? sec.bgColor
-                  : 'transparent'
-                : undefined;
-
-            return (
+          {isPopup ? (
+            <div
+              style={{ maxWidth: `${resolvedPopup.maxWidth}px` }}
+              className="relative mx-auto overflow-visible"
+            >
+              {/* Corner X Close Button Preview */}
               <div
-                key={sec.id}
-                style={{
-                  width: '100%',
-                  maxWidth: secBoxed
-                    ? `${getSectionEffectiveMaxWidth(sec, virtualWidth)}px`
-                    : undefined,
-                  marginLeft: secBoxed ? 'auto' : undefined,
-                  marginRight: secBoxed ? 'auto' : undefined,
-                  paddingTop: `${padTop}px`,
-                  paddingBottom: `${padBottom}px`,
-                  paddingLeft: `${padLeft}px`,
-                  paddingRight: `${padRight}px`,
-                  borderRadius: sec.borderRadius ? `${sec.borderRadius}px` : undefined,
-                  borderTop: sec.borderTopWidth
-                    ? `${sec.borderTopWidth}px ${borderStyle} ${borderColor}`
-                    : undefined,
-                  borderRight: sec.borderRightWidth
-                    ? `${sec.borderRightWidth}px ${borderStyle} ${borderColor}`
-                    : undefined,
-                  borderBottom: sec.borderBottomWidth
-                    ? `${sec.borderBottomWidth}px ${borderStyle} ${borderColor}`
-                    : undefined,
-                  borderLeft: sec.borderLeftWidth
-                    ? `${sec.borderLeftWidth}px ${borderStyle} ${borderColor}`
-                    : undefined,
-                  backgroundColor: resolvedBg,
-                  backgroundImage:
-                    secBgType === 'gradient'
-                      ? sec.bgGradient
-                      : secBgType === 'image' && sec.bgImageUrl
-                      ? `url(${sec.bgImageUrl})`
-                      : undefined,
-                  backgroundSize: secBgType === 'image' ? 'cover' : undefined,
-                  backgroundPosition: secBgType === 'image' ? 'center' : undefined,
-                }}
-                className="relative box-border"
+                style={computePopupCloseButtonStyle(resolvedPopup)}
+                className="absolute z-20 flex items-center justify-center shadow-md"
               >
-                {(sec.rows || []).map((row) => renderRow(row, false))}
+                <X
+                  style={{
+                    width: `${Math.max(
+                      12,
+                      Math.round(resolvedPopup.closeBtnSize * 0.5)
+                    )}px`,
+                    height: `${Math.max(
+                      12,
+                      Math.round(resolvedPopup.closeBtnSize * 0.5)
+                    )}px`,
+                  }}
+                  strokeWidth={2.5}
+                />
               </div>
-            );
-          })}
+
+              <div
+                style={{
+                  backgroundColor: canvasBg,
+                  borderRadius: `${pageSettings?.pageBorderRadius ?? 16}px`,
+                }}
+                className="w-full overflow-hidden shadow-2xl border border-white/15"
+              >
+                {resolvedPopup.showTopProgressBar && (
+                  <div className="w-full bg-zinc-200/80 border-b border-black/5">
+                    <div className="relative w-full h-8 overflow-hidden flex items-center justify-center px-3">
+                      <div
+                        style={{
+                          width: `${Math.max(
+                            5,
+                            Math.min(100, resolvedPopup.progressBarPercent)
+                          )}%`,
+                          backgroundColor: resolvedPopup.progressBarColor,
+                        }}
+                        className="absolute inset-y-0 left-0"
+                      />
+                      <span
+                        style={{ color: resolvedPopup.progressBarTextColor }}
+                        className="relative z-10 text-[11px] font-bold truncate font-['Poppins']"
+                      >
+                        {resolvedPopup.progressBarText}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {(sections || []).map((sec) => {
+                  const secBgType =
+                    sec.bgType ||
+                    (sec.bgGradient
+                      ? 'gradient'
+                      : sec.bgImageUrl
+                      ? 'image'
+                      : 'solid');
+                  const padTop = sec.paddingTop ?? sec.paddingY ?? 28;
+                  const padBottom = sec.paddingBottom ?? sec.paddingY ?? 28;
+                  const padLeft = sec.paddingLeft ?? 24;
+                  const padRight = sec.paddingRight ?? 24;
+                  const resolvedBg =
+                    secBgType === 'solid'
+                      ? sec.bgColor && sec.bgColor !== 'transparent'
+                        ? sec.bgColor
+                        : 'transparent'
+                      : undefined;
+
+                  return (
+                    <div
+                      key={sec.id}
+                      style={{
+                        paddingTop: `${padTop}px`,
+                        paddingBottom: `${padBottom}px`,
+                        paddingLeft: `${padLeft}px`,
+                        paddingRight: `${padRight}px`,
+                        backgroundColor: resolvedBg,
+                      }}
+                      className="relative box-border"
+                    >
+                      {(sec.rows || []).map((row) => renderRow(row, false))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            (sections || []).map((sec) => {
+              const secBoxed = isSectionBoxed(sec);
+              const secBgType =
+                sec.bgType ||
+                (sec.bgGradient
+                  ? 'gradient'
+                  : sec.bgImageUrl
+                  ? 'image'
+                  : 'solid');
+              const borderStyle = sec.borderStyle || 'solid';
+              const borderColor = sec.borderColor || '#E4E4E7';
+              const padTop = sec.paddingTop ?? sec.paddingY ?? 36;
+              const padBottom = sec.paddingBottom ?? sec.paddingY ?? 36;
+              const padLeft = sec.paddingLeft ?? 24;
+              const padRight = sec.paddingRight ?? 24;
+
+              const resolvedBg =
+                secBgType === 'solid'
+                  ? sec.bgColor && sec.bgColor !== 'transparent'
+                    ? sec.bgColor
+                    : 'transparent'
+                  : undefined;
+
+              return (
+                <div
+                  key={sec.id}
+                  style={{
+                    width: '100%',
+                    maxWidth: secBoxed
+                      ? `${getSectionEffectiveMaxWidth(
+                          sec,
+                          effectiveVirtualWidth
+                        )}px`
+                      : undefined,
+                    marginLeft: secBoxed ? 'auto' : undefined,
+                    marginRight: secBoxed ? 'auto' : undefined,
+                    paddingTop: `${padTop}px`,
+                    paddingBottom: `${padBottom}px`,
+                    paddingLeft: `${padLeft}px`,
+                    paddingRight: `${padRight}px`,
+                    borderRadius: sec.borderRadius
+                      ? `${sec.borderRadius}px`
+                      : undefined,
+                    borderTop: sec.borderTopWidth
+                      ? `${sec.borderTopWidth}px ${borderStyle} ${borderColor}`
+                      : undefined,
+                    borderRight: sec.borderRightWidth
+                      ? `${sec.borderRightWidth}px ${borderStyle} ${borderColor}`
+                      : undefined,
+                    borderBottom: sec.borderBottomWidth
+                      ? `${sec.borderBottomWidth}px ${borderStyle} ${borderColor}`
+                      : undefined,
+                    borderLeft: sec.borderLeftWidth
+                      ? `${sec.borderLeftWidth}px ${borderStyle} ${borderColor}`
+                      : undefined,
+                    backgroundColor: resolvedBg,
+                    backgroundImage:
+                      secBgType === 'gradient'
+                        ? sec.bgGradient
+                        : secBgType === 'image' && sec.bgImageUrl
+                        ? `url(${sec.bgImageUrl})`
+                        : undefined,
+                    backgroundSize: secBgType === 'image' ? 'cover' : undefined,
+                    backgroundPosition:
+                      secBgType === 'image' ? 'center' : undefined,
+                  }}
+                  className="relative box-border"
+                >
+                  {(sec.rows || []).map((row) => renderRow(row, false))}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

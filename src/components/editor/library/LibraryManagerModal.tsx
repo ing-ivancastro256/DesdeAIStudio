@@ -14,11 +14,16 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
-import { LibraryItem } from '../../../types';
+import { LibraryItem, PageBlockElement, PageBlockRow } from '../../../types';
 import { DEFAULT_LIBRARY_CATEGORY } from '../../../utils/libraryUtils';
 import { LibraryScaledPreview } from './LibraryScaledPreview';
+import { CreatePopupQuickModal } from './CreatePopupQuickModal';
 
-export type LibrarySidebarTab = 'templates' | 'blocks' | 'favorites';
+export type LibrarySidebarTab =
+  | 'templates'
+  | 'blocks'
+  | 'popups'
+  | 'favorites';
 
 interface LibraryManagerModalProps {
   isOpen: boolean;
@@ -27,6 +32,8 @@ interface LibraryManagerModalProps {
   onClose: () => void;
   onInsertBlock: (item: LibraryItem) => void;
   onInsertTemplate: (item: LibraryItem) => void;
+  onInsertPopupButton?: (item: LibraryItem) => void;
+  onCreatePopupAndEdit?: (createdPopup: LibraryItem) => void;
   onEditItemInEditor: (item: LibraryItem) => void;
 }
 
@@ -37,9 +44,12 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
   onClose,
   onInsertBlock,
   onInsertTemplate,
+  onInsertPopupButton,
+  onCreatePopupAndEdit,
   onEditItemInEditor,
 }) => {
   const {
+    funnels,
     libraryItems,
     libraryCategories,
     updateLibraryItem,
@@ -56,6 +66,7 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Sub-modals inside Library
+  const [isCreatePopupOpen, setIsCreatePopupOpen] = useState<boolean>(false);
   const [itemToDelete, setItemToDelete] = useState<LibraryItem | null>(null);
   const [templateConfirmItem, setTemplateConfirmItem] =
     useState<LibraryItem | null>(null);
@@ -75,6 +86,7 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
       setSearchQuery('');
       setCategoryFilter('ALL');
       setOpenMenuId(null);
+      setIsCreatePopupOpen(false);
       setItemToDelete(null);
       setTemplateConfirmItem(null);
       setItemToRename(null);
@@ -98,11 +110,13 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
   const counts = useMemo(() => {
     const templates = libraryItems.filter((i) => i.kind === 'template').length;
     const blocks = libraryItems.filter((i) => i.kind === 'block').length;
+    const popups = libraryItems.filter((i) => i.kind === 'popup').length;
     const favorites = libraryItems.filter(
       (i) =>
-        i.isFavorite && (i.kind === 'template' || i.kind === 'block')
+        i.isFavorite &&
+        (i.kind === 'template' || i.kind === 'block' || i.kind === 'popup')
     ).length;
-    return { templates, blocks, favorites };
+    return { templates, blocks, popups, favorites };
   }, [libraryItems]);
 
   const allAvailableCategories = useMemo(() => {
@@ -127,13 +141,21 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
     return libraryItems.filter((item) => {
       if (activeTab === 'templates' && item.kind !== 'template') return false;
       if (activeTab === 'blocks' && item.kind !== 'block') return false;
+      if (activeTab === 'popups' && item.kind !== 'popup') return false;
       if (activeTab === 'favorites') {
         if (!item.isFavorite) return false;
-        if (item.kind !== 'template' && item.kind !== 'block') return false;
+        if (
+          item.kind !== 'template' &&
+          item.kind !== 'block' &&
+          item.kind !== 'popup'
+        )
+          return false;
       }
 
       if (categoryFilter !== 'ALL') {
-        const cat = (item.category || DEFAULT_LIBRARY_CATEGORY).trim().toLowerCase();
+        const cat = (item.category || DEFAULT_LIBRARY_CATEGORY)
+          .trim()
+          .toLowerCase();
         if (cat !== categoryFilter.trim().toLowerCase()) return false;
       }
 
@@ -146,6 +168,43 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
       return true;
     });
   }, [libraryItems, activeTab, categoryFilter, searchQuery]);
+
+  // Count how many funnel buttons / automatic triggers currently reference itemToDelete if it's a popup
+  const deletePopupUsageCount = useMemo(() => {
+    if (!itemToDelete || itemToDelete.kind !== 'popup') return 0;
+    const targetId = itemToDelete.id;
+    let total = 0;
+
+    const countInRow = (row: PageBlockRow) => {
+      (row.columns || []).forEach((col) => {
+        (col.elements || []).forEach((el: PageBlockElement) => {
+          if (el.type === 'popup_button' && el.content.popupId === targetId) {
+            total += 1;
+          }
+          if (el.type === 'inner_columns' && el.nestedRow) {
+            countInRow(el.nestedRow);
+          }
+        });
+      });
+    };
+
+    (funnels || []).forEach((fn) => {
+      (fn.pages || []).forEach((pg) => {
+        if (
+          pg.settings?.autoPopupTrigger &&
+          pg.settings.autoPopupTrigger !== 'none' &&
+          pg.settings.autoPopupId === targetId
+        ) {
+          total += 1;
+        }
+        (pg.sections || []).forEach((sec) => {
+          (sec.rows || []).forEach((row) => countInRow(row));
+        });
+      });
+    });
+
+    return total;
+  }, [itemToDelete, funnels]);
 
   // Keep selection synced with visible items
   useEffect(() => {
@@ -165,6 +224,14 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
     filteredItems.find((i) => i.id === selectedItemId) || null;
 
   const handleTriggerInsert = (item: LibraryItem) => {
+    if (item.kind === 'popup') {
+      if (onInsertPopupButton) {
+        onInsertPopupButton(item);
+      }
+      onClose();
+      return;
+    }
+
     if (item.kind === 'block') {
       onInsertBlock(item);
       onClose();
@@ -210,6 +277,8 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
       ? 'Plantillas'
       : activeTab === 'blocks'
       ? 'Bloques'
+      : activeTab === 'popups'
+      ? 'Pop-ups'
       : 'Favoritos';
 
   return (
@@ -305,6 +374,21 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
 
               <button
                 type="button"
+                onClick={() => setActiveTab('popups')}
+                className={`w-full px-5 py-2.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                  activeTab === 'popups'
+                    ? 'bg-[#EAECEF] text-zinc-950 font-bold'
+                    : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 font-medium'
+                }`}
+              >
+                <span>Pop-ups</span>
+                <span className="tabular-nums text-xs font-semibold text-zinc-700">
+                  {counts.popups}
+                </span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab('favorites')}
                 className={`w-full px-5 py-2.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
                   activeTab === 'favorites'
@@ -331,18 +415,35 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
 
           {/* Right Main Area */}
           <div className="flex-1 flex flex-col min-h-0 bg-white">
-            {/* Sub-header with Active Title & Category Filter */}
+            {/* Sub-header with Active Title (+ Crear Pop-up button when on Pop-ups) & Category Filter */}
             <div className="px-6 sm:px-8 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-zinc-950 font-['Poppins']">
-                  {tabHeading}
-                </h2>
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-lg sm:text-xl font-bold text-zinc-950 font-['Poppins']">
+                    {tabHeading}
+                  </h2>
+
+                  {activeTab === 'popups' && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatePopupOpen(true)}
+                      className="px-3.5 py-1.5 text-xs font-bold text-white bg-[#2848F0] hover:bg-[#1E36B9] rounded-[4px] shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer font-['Poppins']"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Crear Pop-up</span>
+                    </button>
+                  )}
+                </div>
+
                 <p className="text-xs text-zinc-500 mt-0.5">
                   {filteredItems.length}{' '}
                   {filteredItems.length === 1
                     ? 'elemento disponible'
                     : 'elementos disponibles'}{' '}
-                  • Haz clic en una tarjeta y pulsa Agregar para insertarla
+                  •{' '}
+                  {activeTab === 'popups'
+                    ? 'Haz clic en una tarjeta y pulsa Agregar para insertar un Botón Pop-up vinculado en tu página'
+                    : 'Haz clic en una tarjeta y pulsa Agregar para insertarla'}
                 </p>
               </div>
 
@@ -371,13 +472,27 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
                   <p className="text-sm font-semibold text-zinc-700 font-['Poppins']">
                     {activeTab === 'favorites'
                       ? 'Aún no tienes elementos marcados en Favoritos'
+                      : activeTab === 'popups'
+                      ? 'No se encontraron Pop-ups con ese filtro'
                       : 'No se encontraron elementos con ese filtro'}
                   </p>
                   <p className="text-xs text-zinc-500 mt-1 max-w-md">
                     {activeTab === 'favorites'
-                      ? 'Haz clic en el icono de corazón (♥) de cualquier Plantilla o Bloque para tenerlo siempre a mano aquí.'
+                      ? 'Haz clic en el icono de corazón (♥) de cualquier Plantilla, Bloque o Pop-up para tenerlo siempre a mano aquí.'
+                      : activeTab === 'popups'
+                      ? 'Haz clic en "+ Crear Pop-up" arriba para diseñar un nuevo Pop-up en el constructor.'
                       : 'Prueba cambiando la categoría seleccionada, limpiando el buscador o guardando una nueva sección desde el lienzo.'}
                   </p>
+                  {activeTab === 'popups' && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatePopupOpen(true)}
+                      className="mt-4 px-4 py-2 text-xs font-bold text-white bg-[#2848F0] hover:bg-[#1E36B9] rounded-[4px] shadow-xs flex items-center gap-1.5 cursor-pointer font-['Poppins']"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Crear Pop-up</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -410,6 +525,8 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-zinc-100 text-zinc-600 rounded-[3px] shrink-0">
                                   {item.kind === 'template'
                                     ? 'Plantilla'
+                                    : item.kind === 'popup'
+                                    ? 'Pop-up'
                                     : 'Bloque'}
                                 </span>
                               )}
@@ -457,7 +574,7 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
                                   )
                                 }
                                 className="px-1.5 py-1 bg-[#ECEEF1] hover:bg-zinc-300/80 text-zinc-700 rounded-[3px] transition-colors cursor-pointer flex items-center justify-center"
-                                title="Opciones de plantilla o bloque"
+                                title="Opciones"
                               >
                                 <MoreVertical className="w-3.5 h-3.5" />
                               </button>
@@ -533,6 +650,8 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
                             <LibraryScaledPreview
                               sections={item.sections}
                               pageSettings={item.pageSettings}
+                              isPopup={item.kind === 'popup'}
+                              popupSettings={item.popupSettings}
                               fixedHeight={185}
                             />
                           </div>
@@ -557,6 +676,8 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
                       (
                       {selectedItem.kind === 'template'
                         ? 'Plantilla completa'
+                        : selectedItem.kind === 'popup'
+                        ? 'Pop-up vinculado en vivo'
                         : 'Bloque de sección'}{' '}
                       • {selectedItem.category || DEFAULT_LIBRARY_CATEGORY})
                     </span>
@@ -594,6 +715,21 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* SUB-MODAL 0: Create New Pop-up Quick Dialog */}
+        <CreatePopupQuickModal
+          isOpen={isCreatePopupOpen}
+          onClose={() => setIsCreatePopupOpen(false)}
+          onCreated={(created) => {
+            setIsCreatePopupOpen(false);
+            if (onCreatePopupAndEdit) {
+              onClose();
+              onCreatePopupAndEdit(created);
+            } else {
+              setSelectedItemId(created.id);
+            }
+          }}
+        />
 
         {/* SUB-MODAL 1: Confirm Replace Non-Empty Canvas with Template */}
         {templateConfirmItem && (
@@ -669,14 +805,44 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({
                   <h4 className="text-sm font-bold text-zinc-900 font-['Poppins']">
                     ¿Eliminar de tu Biblioteca?
                   </h4>
-                  <p className="text-xs text-zinc-600 mt-1 leading-relaxed">
-                    Se eliminará{' '}
-                    <strong className="text-zinc-900">
-                      &quot;{itemToDelete.name}&quot;
-                    </strong>{' '}
-                    de la Biblioteca. Las páginas de tus embudos donde ya la
-                    hayas insertado anteriormente no se verán afectadas.
-                  </p>
+                  {itemToDelete.kind === 'popup' ? (
+                    <div className="text-xs text-zinc-600 mt-1 leading-relaxed space-y-2">
+                      <p>
+                        Se eliminará el Pop-up{' '}
+                        <strong className="text-zinc-900">
+                          &quot;{itemToDelete.name}&quot;
+                        </strong>{' '}
+                        de tu Biblioteca.
+                      </p>
+                      {deletePopupUsageCount > 0 ? (
+                        <div className="p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-900 font-medium">
+                          ⚠️ Atención: Actualmente hay{' '}
+                          <strong>
+                            {deletePopupUsageCount}{' '}
+                            {deletePopupUsageCount === 1
+                              ? 'botón o página vinculada'
+                              : 'botones o páginas vinculadas'}
+                          </strong>{' '}
+                          a este Pop-up en tus embudos. Si lo eliminas, recuerda
+                          vincular otro Pop-up en esos botones.
+                        </div>
+                      ) : (
+                        <p className="text-zinc-500">
+                          Actualmente ningún botón en tus embudos está llamando a
+                          este Pop-up.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-600 mt-1 leading-relaxed">
+                      Se eliminará{' '}
+                      <strong className="text-zinc-900">
+                        &quot;{itemToDelete.name}&quot;
+                      </strong>{' '}
+                      de la Biblioteca. Las páginas de tus embudos donde ya la
+                      hayas insertado anteriormente no se verán afectadas.
+                    </p>
+                  )}
                 </div>
               </div>
 
